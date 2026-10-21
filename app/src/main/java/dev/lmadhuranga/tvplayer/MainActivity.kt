@@ -17,8 +17,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
@@ -36,6 +39,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.launch
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.CaptionStyleCompat
@@ -46,19 +51,20 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 
-private val Ink = Color(0xFF07111F)
-private val Teal = Color(0xFF5BD5C6)
-private val Muted = Color(0xFFB9C8D9)
+internal val Ink = Color(0xFF07111F)
+internal val Teal = Color(0xFF5BD5C6)
+internal val Muted = Color(0xFFB9C8D9)
 
 class MainActivity : ComponentActivity() {
     private lateinit var playback: PlaybackController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        playback = PlaybackController(applicationContext)
+        val history = HistoryRepository(applicationContext)
+        playback = PlaybackController(applicationContext, history)
         setContent {
             MaterialTheme {
-                TVPlayerApp(playback)
+                TVPlayerApp(playback, history)
             }
         }
     }
@@ -77,12 +83,26 @@ class MainActivity : ComponentActivity() {
 private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 
 @Composable
-private fun TVPlayerApp(playback: PlaybackController) {
+private fun TVPlayerApp(playback: PlaybackController, historyRepository: HistoryRepository) {
     var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
     val settingsCloseRequester = remember { FocusRequester() }
+    val rememberPositions by historyRepository.enabled.collectAsState(initial = false)
+    val recentEntries by historyRepository.entries.collectAsState(initial = emptyList())
+    val appScope = rememberCoroutineScope()
+    var pendingStart by remember { mutableStateOf<PendingPlayback?>(null) }
+
+    fun startVideo(url: String, title: String, subtitleUrl: String?) {
+        val candidate = recentEntries.firstOrNull { it.positionMs > 5_000L }
+        if (rememberPositions && candidate != null) {
+            pendingStart = PendingPlayback(url, title, subtitleUrl, candidate)
+        } else {
+            playback.playUrl(url, title, subtitleUrl)
+            route = AppRoute.PLAYER
+        }
+    }
 
     BackHandler(enabled = settingsOpen || route != AppRoute.HOME) {
         if (settingsOpen) settingsOpen = false else route = AppRoute.HOME
@@ -99,8 +119,7 @@ private fun TVPlayerApp(playback: PlaybackController) {
 
         AppRoute.ADD_URL -> VideoUrlEntryScreen(
             onStart = { url, subtitleUrl, label ->
-                playback.playUrl(url, "Video from $label", subtitleUrl)
-                route = AppRoute.PLAYER
+                startVideo(url, "Video from $label", subtitleUrl)
             },
             onBack = { route = AppRoute.HOME },
         )
@@ -108,23 +127,51 @@ private fun TVPlayerApp(playback: PlaybackController) {
         AppRoute.HANDOFF -> HandoffScreen(
             onVideoSubmitted = { submission ->
                 val host = (validateVideoUrl(submission.videoUrl) as? VideoUrlValidation.Valid)?.sourceLabel ?: "TV Player"
-                playback.playUrl(submission.videoUrl, "Video from $host", submission.subtitleUrl)
-                route = AppRoute.PLAYER
+                startVideo(submission.videoUrl, "Video from $host", submission.subtitleUrl)
             },
             onBack = { route = AppRoute.HOME },
         )
 
-        AppRoute.PLAYER -> PlayerScreen(playback = playback, onHome = { route = AppRoute.HOME })
+        AppRoute.PLAYER -> PlayerScreen(playback = playback, onHome = {
+            playback.pauseForBackground()
+            route = AppRoute.HOME
+        })
     }
 
     if (settingsOpen) {
         LaunchedEffect(Unit) { settingsCloseRequester.requestFocus() }
-        SettingsPlaceholder(focusRequester = settingsCloseRequester, onDismiss = { settingsOpen = false })
+        SettingsScreen(
+            focusRequester = settingsCloseRequester,
+            rememberPositions = rememberPositions,
+            entries = recentEntries,
+            onToggleRemember = { appScope.launch { historyRepository.setEnabled(!rememberPositions) } },
+            onClearHistory = { appScope.launch { historyRepository.clear() } },
+            onDismiss = { settingsOpen = false },
+        )
     } else if (settingsWasOpen) {
         LaunchedEffect(settingsOpen) { settingsOpenerRequester.requestFocus() }
     }
     LaunchedEffect(settingsOpen) { settingsWasOpen = settingsOpen }
+
+    pendingStart?.let { pending ->
+        ResumePrompt(
+            entry = pending.entry,
+            onResume = {
+                playback.playUrl(pending.url, pending.title, pending.subtitleUrl, pending.entry.positionMs)
+                pendingStart = null
+                route = AppRoute.PLAYER
+            },
+            onStartOver = {
+                playback.playUrl(pending.url, pending.title, pending.subtitleUrl)
+                pendingStart = null
+                route = AppRoute.PLAYER
+            },
+            onCancel = { pendingStart = null },
+        )
+    }
 }
+
+private data class PendingPlayback(val url: String, val title: String, val subtitleUrl: String?, val entry: HistoryEntry)
 
 @Composable
 private fun HomeScreen(
@@ -194,22 +241,62 @@ private fun HomeScreen(
 }
 
 @Composable
-private fun SettingsPlaceholder(focusRequester: FocusRequester, onDismiss: () -> Unit) {
-    BackHandler(onBack = onDismiss)
-    Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xD907111F)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier.padding(72.dp),
-            verticalArrangement = Arrangement.Center,
+private fun SettingsScreen(
+    focusRequester: FocusRequester,
+    rememberPositions: Boolean,
+    entries: List<HistoryEntry>,
+    onToggleRemember: () -> Unit,
+    onClearHistory: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        LaunchedEffect(Unit) { focusRequester.requestFocus() }
+        Surface(
+            modifier = Modifier.width(760.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
         ) {
-            Text("SETTINGS", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
-            Spacer(Modifier.height(16.dp))
-            Text("Settings will appear here.", color = Color.White, fontSize = 32.sp)
-            Spacer(Modifier.height(28.dp))
-            Button(onClick = onDismiss, modifier = Modifier.focusRequester(focusRequester)) {
-                Text("Close")
+            Column(
+                modifier = Modifier.padding(36.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("PRIVACY & HISTORY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
+                Text("Position history stays on this device. Full video and subtitle URLs are never saved.", color = Muted, fontSize = 18.sp)
+                Button(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
+                    Text("Remember positions: ${if (rememberPositions) "On" else "Off"}")
+                }
+                if (entries.isNotEmpty()) {
+                    Text("RECENT POSITIONS", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
+                    entries.forEach { entry ->
+                        Text("${entry.title} · ${entry.sourceHost} · ${formatTime(entry.positionMs)}", color = Color.White, fontSize = 17.sp)
+                    }
+                    Button(onClick = onClearHistory) { Text("Clear history") }
+                } else {
+                    Text("No saved positions.", color = Muted, fontSize = 17.sp)
+                }
+                Button(onClick = onDismiss) { Text("Close") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResumePrompt(entry: HistoryEntry, onResume: () -> Unit, onStartOver: () -> Unit, onCancel: () -> Unit) {
+    val resumeRequester = remember { FocusRequester() }
+    Dialog(onDismissRequest = onCancel) {
+        LaunchedEffect(Unit) { resumeRequester.requestFocus() }
+        Surface(
+            modifier = Modifier.width(700.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
+        ) {
+            Column(Modifier.padding(36.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("RESUME VIDEO?", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
+                Text("A saved position is available from ${entry.sourceHost.ifBlank { "a previous video" }} at ${formatTime(entry.positionMs)}.", color = Color.White, fontSize = 21.sp)
+                Text("The new link may point to different content. Choose where to begin.", color = Muted, fontSize = 17.sp)
+                Button(onClick = onResume, modifier = Modifier.focusRequester(resumeRequester)) { Text("Resume at ${formatTime(entry.positionMs)}") }
+                Button(onClick = onStartOver) { Text("Start from the beginning") }
+                Button(onClick = onCancel) { Text("Cancel") }
             }
         }
     }
@@ -260,6 +347,7 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                             setFractionalTextSize(listOf(0.045f, 0.06f, 0.075f, 0.09f)[state.subtitleSizeIndex])
                         }
                     },
+                    onRelease = { view -> view.player = null },
                 )
                 if (state.title == null) {
                     Text("Nothing is playing yet", color = Color.White, fontSize = 28.sp)
@@ -291,9 +379,14 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
         }
         if (menuOpen) {
             LaunchedEffect(Unit) { menuFirst.requestFocus() }
-            Box(Modifier.fillMaxSize().background(Color(0xC807111F)), contentAlignment = Alignment.CenterEnd) {
+            Dialog(onDismissRequest = { menuOpen = false }) {
+                Surface(
+                    modifier = Modifier.width(600.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
+                ) {
                 Column(
-                    modifier = Modifier.width(440.dp).fillMaxSize().background(Color(0xFF102239), RoundedCornerShape(20.dp)).padding(30.dp),
+                    modifier = Modifier.padding(30.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text("PLAYER OPTIONS", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
@@ -318,6 +411,7 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                     }
                     state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
                     Button(onClick = { menuOpen = false }) { Text("Close options") }
+                }
                 }
             }
         } else if (menuWasOpen) {

@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-The Android TV project skeleton is implemented on `2-android-tv-skeleton`. Core milestones are being implemented sequentially from the plan, each on its numbered branch. See [the implementation plan](docs/PLAN.md) for scope and [the progress log](docs/PROGRESS.md) for the current checkpoint and verification status.
+The source now covers direct link entry and playback, same-Wi-Fi link handoff, external subtitles, display controls, and opt-in local resume history. The remaining core milestones are being implemented sequentially on their numbered branches. This work has not yet been built or device-tested; see [the implementation plan](docs/PLAN.md) for scope and [the progress log](docs/PROGRESS.md) for evidence and verification status.
 
 ## Development workflow
 

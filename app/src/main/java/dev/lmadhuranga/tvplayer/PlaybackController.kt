@@ -22,6 +22,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import androidx.media3.ui.AspectRatioFrameLayout
+import kotlin.math.abs
 
 data class PlaybackUiState(
     val title: String? = null,
@@ -49,7 +50,7 @@ enum class VideoDisplayMode(val label: String, val resizeMode: Int) {
 }
 
 @OptIn(UnstableApi::class)
-class PlaybackController(context: Context) : Player.Listener {
+class PlaybackController(context: Context, private val historyRepository: HistoryRepository) : Player.Listener {
     private val appContext = context.applicationContext
     val player: ExoPlayer = ExoPlayer.Builder(appContext).build()
     private val subtitleRepository = SubtitleRepository(appContext.cacheDir)
@@ -61,6 +62,7 @@ class PlaybackController(context: Context) : Player.Listener {
     private val ticker = object : Runnable {
         override fun run() {
             publishState()
+            maybeSaveHistory()
             if (!released) handler.postDelayed(this, 500L)
         }
     }
@@ -69,14 +71,17 @@ class PlaybackController(context: Context) : Player.Listener {
     private var downloadedSubtitle: CachedSubtitle? = null
     private var subtitleJob: Job? = null
     private var sourceGeneration = 0L
+    private var historyEntry: HistoryEntry? = null
+    private var lastHistorySaveMs = 0L
 
     init {
         player.addListener(this)
         handler.post(ticker)
     }
 
-    fun playUrl(url: String, title: String? = null, subtitleUrl: String? = null) {
+    fun playUrl(url: String, title: String? = null, subtitleUrl: String? = null, startPositionMs: Long = 0L) {
         if (released) return
+        saveHistoryNow()
         val generation = ++sourceGeneration
         subtitleJob?.cancel()
         subtitleJob = null
@@ -88,11 +93,15 @@ class PlaybackController(context: Context) : Player.Listener {
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
         currentVideoUrl = url
+        val cleanTitle = title?.takeIf(String::isNotBlank) ?: "Video"
+        val host = Uri.parse(url).host.orEmpty()
+        historyEntry = null
+        historyEntry = historyRepository.newEntry(cleanTitle, host)
         mutableState.value = PlaybackUiState(
-            title = title?.takeIf(String::isNotBlank) ?: "Video",
+            title = cleanTitle,
             subtitlesEnabled = true,
         )
-        player.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+        player.setMediaItem(MediaItem.fromUri(Uri.parse(url)), startPositionMs.coerceAtLeast(0L))
         player.prepare()
         player.playWhenReady = true
         if (subtitleUrl != null) {
@@ -127,6 +136,7 @@ class PlaybackController(context: Context) : Player.Listener {
         if (released) return
         player.pause()
         publishState()
+        saveHistoryNow()
     }
 
     fun seekBy(deltaMs: Long) {
@@ -203,6 +213,9 @@ class PlaybackController(context: Context) : Player.Listener {
 
     fun release() {
         if (released) return
+        val finalEntry = historyEntry
+        val finalPosition = player.currentPosition.coerceAtLeast(0L)
+        val finalDuration = player.duration.takeIf { it > 0L } ?: 0L
         released = true
         sourceGeneration++
         subtitleJob?.cancel()
@@ -211,7 +224,14 @@ class PlaybackController(context: Context) : Player.Listener {
         player.release()
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
-        scope.cancel()
+        if (finalEntry != null && finalPosition > 0L) {
+            scope.launch {
+                historyRepository.save(finalEntry.copy(positionMs = finalPosition, durationMs = finalDuration, updatedAtMs = System.currentTimeMillis()))
+                scope.cancel()
+            }
+        } else {
+            scope.cancel()
+        }
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) = publishState()
@@ -235,6 +255,26 @@ class PlaybackController(context: Context) : Player.Listener {
             durationMs = player.duration.takeIf { it > 0L } ?: 0L,
             speed = player.playbackParameters.speed,
         )
+    }
+
+    private fun maybeSaveHistory() {
+        if (released || !player.isPlaying || abs(player.currentPosition - lastHistorySaveMs) < 15_000L) return
+        saveHistoryNow()
+    }
+
+    private fun saveHistoryNow() {
+        val entry = historyEntry ?: return
+        val position = player.currentPosition.coerceAtLeast(0L)
+        if (position <= 0L) return
+        val duration = player.duration.takeIf { it > 0L } ?: 0L
+        lastHistorySaveMs = position
+        scope.launch {
+            historyRepository.save(entry.copy(
+                positionMs = position,
+                durationMs = duration,
+                updatedAtMs = System.currentTimeMillis(),
+            ))
+        }
     }
 
     private fun replaceMediaWithSubtitle(subtitle: CachedSubtitle, generation: Long) {
