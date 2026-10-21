@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.media3.common.MimeTypes
 import java.io.File
+import java.io.FileInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -116,6 +117,37 @@ class SubtitleRepository(cacheDirectory: File) {
             source.delete()
             adjusted?.delete()
             throw SubtitleLoadException("The selected subtitle file could not be read.")
+        }
+    }
+
+    suspend fun importFile(file: File): CachedSubtitle = withContext(Dispatchers.IO) {
+        val extension = file.extension.lowercase(Locale.ROOT)
+        val mimeType = when (extension) {
+            "vtt" -> MimeTypes.TEXT_VTT
+            "srt" -> MimeTypes.APPLICATION_SUBRIP
+            else -> throw SubtitleLoadException("Choose an SRT or WebVTT subtitle file.")
+        }
+        val source = File.createTempFile("tv-player-${UUID.randomUUID()}-", ".source", directory)
+        var adjusted: File? = null
+        try {
+            FileInputStream(file).use { copyBoundedSubtitle(it, source) }
+            coroutineContext.ensureActive()
+            val result = applyOffset(CachedSubtitle(source, source, mimeType), 0L)
+            adjusted = result.adjustedFile
+            coroutineContext.ensureActive()
+            result
+        } catch (error: CancellationException) {
+            source.delete()
+            adjusted?.delete()
+            throw error
+        } catch (error: SubtitleLoadException) {
+            source.delete()
+            adjusted?.delete()
+            throw error
+        } catch (_: Exception) {
+            source.delete()
+            adjusted?.delete()
+            throw SubtitleLoadException("The uploaded subtitle file could not be read.")
         }
     }
 

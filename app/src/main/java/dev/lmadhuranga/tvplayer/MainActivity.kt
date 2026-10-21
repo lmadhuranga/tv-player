@@ -90,6 +90,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     val settingsCloseRequester = remember { FocusRequester() }
     val rememberPositions by historyRepository.enabled.collectAsState(initial = false)
     val recentEntries by historyRepository.entries.collectAsState(initial = emptyList())
+    val playbackState by playback.state.collectAsState()
     val appScope = rememberCoroutineScope()
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playback.loadSubtitleFile(uri)
@@ -127,10 +128,21 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         )
 
         AppRoute.HANDOFF -> HandoffScreen(
+            cacheDirectory = playback.cacheDirectory,
+            hasActiveMedia = playbackState.hasMedia,
             settingsRequester = settingsOpenerRequester,
             onVideoSubmitted = { submission ->
                 pendingStart = null
-                playback.playUrl(submission.videoUrl, submission.subtitleUrl)
+                if (submission.uploadedVideo != null) {
+                    playback.playUploadedFile(
+                        submission.uploadedVideo,
+                        submission.uploadedVideoName ?: submission.uploadedVideo.name,
+                        submission.subtitleUrl,
+                        submission.uploadedSubtitle,
+                    )
+                } else {
+                    playback.playUrl(submission.videoUrl, submission.subtitleUrl, uploadedSubtitleFile = submission.uploadedSubtitle)
+                }
                 route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },

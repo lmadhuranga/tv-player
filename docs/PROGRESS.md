@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `19-handoff-server-settings-return` (build/lint/install/launch command complete; Settings failure reproduction pending)
-- Current branch: `19-handoff-server-settings-return`
+- Implemented through milestone: `20-phone-video-subtitle-upload` (build/lint/install/launch complete; phone upload and playback QA pending)
+- Current branch: `20-phone-video-subtitle-upload`
 - Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
 - The milestone 19 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, Settings reopen, or other functional runtime QA was performed.
 
@@ -43,6 +43,7 @@
 | 17 | `17-subtitle-file-upload-filename-and-hidden-skip` | `8f5d72b` |
 | 18 | `18-player-back-handoff-screen` | `1019bf4` |
 | 19 | `19-handoff-server-settings-return` | `1d929e2` |
+| 20 | `20-phone-video-subtitle-upload` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -189,7 +190,7 @@ Verification record:
 
 ## Milestone 18: `18-player-back-handoff-screen`
 
-When the player exits through Back, the app returns to the phone-send handoff route instead of Home. The existing handoff screen continues to own its current QR, displayed phone URL, short PIN and foreground-only server. It now initially focuses a focusable “Go to Player” action and also exposes “Settings”; the player can be opened empty and Settings returns focus to its handoff button. Leaving the handoff route still disposes its server and pairing session; returning creates a fresh session through the existing lifecycle. Browser submissions continue to start playback immediately.
+When the player exits through Back, the app returns to the phone-send handoff route instead of Home. The existing handoff screen continues to own its current QR, displayed phone URL, short PIN and foreground-only server. “Go to Player” is shown and initially focused only while current media is available; when no media is loaded the action is hidden and Settings receives initial focus. Leaving the handoff route still disposes its server and pairing session; returning creates a fresh session through the existing lifecycle. Browser submissions continue to start playback immediately.
 
 Verification record:
 
@@ -207,6 +208,18 @@ Verification record:
 - Before install, ADB identified `192.168.8.100:5555` as Sony BRAVIA VU3, API 34. `adb install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`; package metadata confirmed `dev.lmadhuranga.tvplayer`, version `0.1.0`, minSdk 26, targetSdk 36. `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`.
 - Runtime reproduction of the user's Settings error has not been performed; install/launch does not confirm the fix. Verify repeated Settings open/close keeps the URL/QR working and genuine port conflicts remain actionable.
 
+## Milestone 20: `20-phone-video-subtitle-upload`
+
+The paired phone page keeps video URL and optional subtitle URL submission and adds the alternative of uploading a video and/or SRT/WebVTT subtitle file. The browser sends each file as a raw authenticated octet-stream request with `Content-Length`; Android copies it in 64 KiB chunks directly to app-private cache (no full-file heap buffer and no media proxy). The page receives an authenticated effective limit calculated from the 8 GiB video/8 MiB subtitle caps and current usable cache after retaining a 512 MiB reserve. The server rechecks the size before writing and free cache while streaming. Header, request, same-origin, same-subnet, PIN/session token bounds and checks remain active; filenames are sanitized and media extensions/container signatures are checked.
+
+Only one staged file of each kind is kept for a paired session. Cancel or failed uploads remove the incomplete/staged files; a successful `/api/play` atomically transfers files to an app-private playback directory. The playback controller owns the files, keeps their paths out of history, imports uploaded subtitles to its existing parsed/cache path, and removes the uploads on replacement, player Back, app stop/release, playback completion, or media error. App start removes playback-upload leftovers from a previous process. Phone-page URL and upload choices are mutually exclusive per media kind, with upload progress, cancel, and status/error messaging. URL-only traffic still sends a small JSON request and the TV fetches its media directly.
+
+Verification record:
+
+- `git diff --check` passed. With JDK `17.0.17`, Gradle `8.13`, SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks); lint task passed. An initial sandbox attempt was blocked before Gradle configuration by local lock-socket permission; the same build passed with local build permission. No unit, browser, media playback, or cleanup lifecycle tests were run.
+- Before final install, `adb devices -l` showed `192.168.8.100:5555` online; getprop identified manufacturer Sony, model BRAVIA VU3, API 34. `adb install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`. Read-only package inspection confirmed `/data/app/.../dev.lmadhuranga.tvplayer.../base.apk`, versionCode 1 / versionName 0.1.0, minSdk 26, targetSdk 36. `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`.
+- Phone-browser upload, URL/file combinations, visible limit/progress, cancel, file decoding, subtitle rendering, cleanup on each exit, handoff focus, and player UI were not exercised. The install and launch prove package deployment/start only, not runtime feature acceptance.
+
 ## Current execution boundary
 
-Milestones 2–19 are committed on separate local branches, stacked sequentially. The Settings/server fix has not been reproduced on-device; manual functional/runtime QA remains pending. Optional Seedr discovery remains deferred.
+Milestones 2–19 are committed on separate local branches, stacked sequentially. Milestone 20 implementation is built, linted, installed, and launched on the approved BRAVIA; phone-browser upload and all behavioral/runtime QA remain pending. Optional Seedr discovery remains deferred.

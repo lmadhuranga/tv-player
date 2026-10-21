@@ -33,6 +33,7 @@ import kotlin.math.abs
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 data class PlaybackUiState(
     val title: String? = null,
+    val hasMedia: Boolean = false,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val positionMs: Long = 0L,
@@ -77,6 +78,7 @@ enum class VideoDisplayMode(val label: String, val resizeMode: Int) {
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 class PlaybackController(context: Context, private val historyRepository: HistoryRepository) : Player.Listener {
     private val appContext = context.applicationContext
+    val cacheDirectory: java.io.File get() = appContext.cacheDir
     private val loadControl = DefaultLoadControl.Builder()
         .setBufferDurationsMs(15_000, 50_000, 2_500, 5_000)
         .setTargetBufferBytes(64 * 1024 * 1024)
@@ -104,6 +106,9 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     }
     private var released = false
     private var currentVideoUrl: String? = null
+    private var ownedUploadVideo: java.io.File? = null
+    private var ownedUploadSubtitle: java.io.File? = null
+    private var hasTemporaryUploadSource = false
     private var downloadedSubtitle: CachedSubtitle? = null
     private var subtitleJob: Job? = null
     private var sourceGeneration = 0L
@@ -116,11 +121,20 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     private var selectedVideoVariantKey: String? = null
 
     init {
+        java.io.File(appContext.cacheDir, "playback-uploads").apply { mkdirs() }
+            .listFiles()?.forEach { it.delete() } // Remove local-media leftovers from a previous process.
         player.addListener(this)
         handler.post(ticker)
     }
 
-    fun playUrl(url: String, subtitleUrl: String? = null, startPositionMs: Long = 0L) {
+    fun playUrl(
+        url: String,
+        subtitleUrl: String? = null,
+        startPositionMs: Long = 0L,
+        uploadedSubtitleFile: java.io.File? = null,
+        titleOverride: String? = null,
+        uploadedVideoFile: java.io.File? = null,
+    ) {
         if (released) return
         saveHistoryNow()
         val generation = ++sourceGeneration
@@ -132,6 +146,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         playbackIntent = true
         player.stop()
         player.clearMediaItems()
+        clearOwnedUploads()
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
             .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
@@ -141,23 +156,28 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
         currentVideoUrl = url
-        val cleanTitle = videoFilenameFromUrl(url)
-        val host = Uri.parse(url).host.orEmpty()
+        ownedUploadVideo = uploadedVideoFile
+        ownedUploadSubtitle = uploadedSubtitleFile
+        hasTemporaryUploadSource = uploadedVideoFile != null || uploadedSubtitleFile != null
+        val cleanTitle = titleOverride ?: videoFilenameFromUrl(url)
+        val host = if (uploadedVideoFile != null) "Local upload" else Uri.parse(url).host.orEmpty()
         historyEntry = null
         historyEntry = historyRepository.newEntry(cleanTitle, host)
         mutableState.value = PlaybackUiState(
             title = cleanTitle,
+            hasMedia = true,
             subtitlesEnabled = true,
-            subtitleLoading = subtitleUrl != null,
+            subtitleLoading = subtitleUrl != null || uploadedSubtitleFile != null,
         )
         player.setMediaItem(MediaItem.fromUri(Uri.parse(url)), startPositionMs.coerceAtLeast(0L))
         player.prepare()
         player.playWhenReady = true
         playbackIntent = true
-        if (subtitleUrl != null) {
+        if (subtitleUrl != null || uploadedSubtitleFile != null) {
             subtitleJob = scope.launch {
                 try {
-                    val cached = subtitleRepository.download(subtitleUrl)
+                    val cached = if (uploadedSubtitleFile != null) subtitleRepository.importFile(uploadedSubtitleFile)
+                    else subtitleRepository.download(subtitleUrl!!)
                     if (released || generation != sourceGeneration) {
                         subtitleRepository.discard(cached)
                         return@launch
@@ -171,9 +191,22 @@ class PlaybackController(context: Context, private val historyRepository: Histor
                     }
                 } catch (error: CancellationException) {
                     throw error
+                } finally {
+                    uploadedSubtitleFile?.delete()
+                    if (ownedUploadSubtitle == uploadedSubtitleFile) ownedUploadSubtitle = null
                 }
             }
         }
+    }
+
+    fun playUploadedFile(videoFile: java.io.File, displayName: String, subtitleUrl: String?, subtitleFile: java.io.File?) {
+        if (released) {
+            videoFile.delete()
+            subtitleFile?.delete()
+            return
+        }
+        val safeTitle = displayName.substringAfterLast('/').substringAfterLast('\\').filterNot(Char::isISOControl).take(120).ifBlank { "Uploaded video" }
+        playUrl(Uri.fromFile(videoFile).toString(), subtitleUrl, uploadedSubtitleFile = subtitleFile, titleOverride = safeTitle, uploadedVideoFile = videoFile)
     }
 
     fun togglePlayPause() {
@@ -189,6 +222,19 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         playbackIntent = false
         publishState()
         saveHistoryNow()
+        if (hasTemporaryUploadSource) {
+            player.stop()
+            player.clearMediaItems()
+            subtitleJob?.cancel()
+            subtitleJob = null
+            subtitleRepository.discard(downloadedSubtitle)
+            downloadedSubtitle = null
+            currentVideoUrl = null
+            historyEntry = null
+            clearOwnedUploads()
+            sourceGeneration++
+            mutableState.value = PlaybackUiState()
+        }
     }
 
     fun seekBy(deltaMs: Long) {
@@ -354,6 +400,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         bufferingTimeoutJob?.cancel()
         player.removeListener(this)
         player.release()
+        clearOwnedUploads()
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
         if (finalEntry != null && finalPosition > 0L) {
@@ -369,6 +416,13 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     override fun onIsPlayingChanged(isPlaying: Boolean) = publishState()
     override fun onPlaybackStateChanged(playbackState: Int) {
         publishState()
+        if (playbackState == Player.STATE_ENDED && hasTemporaryUploadSource) {
+            val uploadedVideoEnded = ownedUploadVideo != null
+            clearOwnedUploads()
+            subtitleRepository.discard(downloadedSubtitle)
+            downloadedSubtitle = null
+            if (uploadedVideoEnded) currentVideoUrl = null
+        }
         if (playbackState == Player.STATE_BUFFERING) startBufferingTimeout(sourceGeneration)
         else {
             timedOutGeneration = null
@@ -400,11 +454,20 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     override fun onPlayerError(error: PlaybackException) {
         bufferingTimeoutJob?.cancel()
         bufferingTimeoutJob = null
+        val uploadedVideoFailure = ownedUploadVideo != null
+        val uploadedFailure = hasTemporaryUploadSource
+        if (uploadedFailure) {
+            if (uploadedVideoFailure) currentVideoUrl = null
+            clearOwnedUploads()
+            subtitleRepository.discard(downloadedSubtitle)
+            downloadedSubtitle = null
+        }
         mutableState.value = mutableState.value.copy(
             isPlaying = false,
             isBuffering = false,
-            error = playbackErrorMessage(error),
+            error = if (uploadedVideoFailure) "The uploaded video could not be played. Its temporary file was removed; send it again or try another file." else playbackErrorMessage(error),
             canRetry = currentVideoUrl != null,
+            hasMedia = currentVideoUrl != null,
         )
     }
 
@@ -418,6 +481,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         }
         mutableState.value = mutableState.value.copy(
             isPlaying = player.isPlaying,
+            hasMedia = currentVideoUrl != null,
             isBuffering = player.playbackState == Player.STATE_BUFFERING && timedOutGeneration != sourceGeneration,
             positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it > 0L } ?: 0L,
@@ -506,6 +570,14 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     private fun maybeSaveHistory() {
         if (released || !player.isPlaying || abs(player.currentPosition - lastHistorySaveMs) < 15_000L) return
         saveHistoryNow()
+    }
+
+    private fun clearOwnedUploads() {
+        ownedUploadVideo?.delete()
+        ownedUploadVideo = null
+        ownedUploadSubtitle?.delete()
+        ownedUploadSubtitle = null
+        hasTemporaryUploadSource = false
     }
 
     private fun saveHistoryNow() {

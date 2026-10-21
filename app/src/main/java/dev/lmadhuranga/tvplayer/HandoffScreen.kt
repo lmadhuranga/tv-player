@@ -47,6 +47,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun HandoffScreen(
+    cacheDirectory: java.io.File,
+    hasActiveMedia: Boolean,
     settingsRequester: FocusRequester,
     onVideoSubmitted: (SubmittedVideo) -> Unit,
     onBack: () -> Unit,
@@ -54,7 +56,7 @@ fun HandoffScreen(
     onOpenSettings: () -> Unit,
 ) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
-    val server = remember { LocalLinkServer { latestCallback(it) } }
+    val server = remember { LocalLinkServer(cacheDirectory) { latestCallback(it) } }
     val goToPlayerRequester = remember { FocusRequester() }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -67,8 +69,8 @@ fun HandoffScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        goToPlayerRequester.requestFocus()
+    LaunchedEffect(hasActiveMedia) {
+        if (hasActiveMedia) goToPlayerRequester.requestFocus() else settingsRequester.requestFocus()
     }
 
     DisposableEffect(server, lifecycleOwner) {
@@ -105,7 +107,7 @@ fun HandoffScreen(
                 Spacer(Modifier.height(18.dp))
                 Text("Use your phone to add a video", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(14.dp))
-                Text("Scan the QR code, then enter a direct video link. Your TV fetches the video itself.", color = Muted, fontSize = 18.sp)
+                Text("Scan the QR code to send a direct video or subtitle link, or upload files from your phone. URL media is fetched by the TV.", color = Muted, fontSize = 18.sp)
                 Spacer(Modifier.height(20.dp))
                 state.address?.let { address ->
                     Text("Open on your phone", color = Muted, fontSize = 16.sp)
@@ -133,8 +135,10 @@ fun HandoffScreen(
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(26.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AppButton(onClick = onGoToPlayer, modifier = Modifier.focusRequester(goToPlayerRequester)) {
-                        Text("Go to Player")
+                    if (hasActiveMedia) {
+                        AppButton(onClick = onGoToPlayer, modifier = Modifier.focusRequester(goToPlayerRequester)) {
+                            Text("Go to Player")
+                        }
                     }
                     AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
                     AppButton(onClick = onBack) { Text("Back") }

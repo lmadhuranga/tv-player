@@ -1,6 +1,6 @@
 # TV Player
 
-TV Player is a native Android TV app for entering a direct video URL and playing it on a Sony BRAVIA. A small page served by the TV will let a phone or laptop on the same Wi-Fi submit a video URL and, optionally, an external subtitle URL. The page is for link entry only: the TV retrieves the media and plays it locally through its player.
+TV Player is a native Android TV app for playing direct video URLs on Android TV. A small page served by the TV lets a paired phone or laptop on the same Wi-Fi submit a video URL or upload a video file, plus an optional subtitle URL or SRT/WebVTT file. URL media is fetched by the TV; uploaded files are streamed into private temporary TV cache and removed after playback or when the flow is cancelled/exits.
 
 The first release is centered on reliable remote control use, direct HTTP(S) links, external subtitles, and clear network and playback errors. It will not depend on Seedr or any cloud service.
 
@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation through milestone 19 is committed on sequential local branches. Player Back returns to the phone-send QR/PIN screen with Go to Player and Settings actions; handoff links still start playback immediately. Milestone 19 stabilizes the foreground handoff server around in-app Settings and reports port conflicts only on bind errors. Build/lint passed, and the APK was installed and launched on the Sony BRAVIA; reproducing the Settings issue and other runtime QA remain pending. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and remaining checks.
+Milestone 20 adds paired phone upload choices for both video and subtitle files while preserving URL submission. Video uploads are capped at 8 GiB and further limited by available TV cache space while reserving 512 MiB; subtitle uploads are capped at 8 MiB. Build/lint passed and the debug APK installed and launched on the Sony BRAVIA; phone-browser transfer, playback, and cleanup behavior remain unverified. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and remaining checks.
 
 ## Development workflow
 
