@@ -75,8 +75,10 @@ fun HandoffScreen(
         server.start()
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME -> server.start()
-                Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_PAUSE -> server.stop()
+                // An in-app Settings dialog can briefly pause the activity. Keep the
+                // handoff listener alive until the app actually leaves the foreground.
+                Lifecycle.Event.ON_START -> server.start()
+                Lifecycle.Event.ON_STOP -> server.stop()
                 else -> Unit
             }
         }

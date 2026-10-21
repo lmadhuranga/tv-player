@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `18-player-back-handoff-screen` (build/lint/install/launch command complete; runtime UI QA pending)
-- Current branch: `18-player-back-handoff-screen`
-- Planning baseline: `be2f7cc`; milestones 2–18 are committed sequentially on local branches (full mapping below).
+- Implemented through milestone: `19-handoff-server-settings-return` (in progress)
+- Current branch: `19-handoff-server-settings-return`
+- Planning baseline: `be2f7cc`; milestones 2–18 are committed sequentially on local branches; milestone 19 is in progress (full mapping below).
 - The milestone 18 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, or other functional runtime QA was performed.
 
 ## Decisions recorded
@@ -42,6 +42,7 @@
 | 16 | `16-dark-buttons-white-focus` | branch HEAD (`git rev-parse 16-dark-buttons-white-focus`) |
 | 17 | `17-subtitle-file-upload-filename-and-hidden-skip` | `8f5d72b` |
 | 18 | `18-player-back-handoff-screen` | `1019bf4` |
+| 19 | `19-handoff-server-settings-return` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -196,6 +197,16 @@ Verification record:
 - Before install, ADB identified `192.168.8.100:5555` as Sony BRAVIA VU3, API 34. `adb install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`; `pm path` and `dumpsys package` confirmed `dev.lmadhuranga.tvplayer`, version `0.1.0`, minSdk 26, targetSdk 36.
 - `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. No D-pad input, screenshot, visible UI inspection, playback, or feature QA was performed. Back routing, action focus, QR/URL freshness, and session rotation remain unverified at runtime.
 
+## Milestone 19: `19-handoff-server-settings-return`
+
+The handoff screen now keeps its existing listener alive during `ON_PAUSE`, because the in-app Settings dialog can cause a transient pause without leaving the app. It stops the listener on `ON_STOP` and when the screen is disposed, then idempotently starts again on `ON_START`. The listener enables address reuse for quick same-process rebind after recent connections. Startup reports the port conflict message only for `BindException`; other failures include a bounded, sanitized exception reason with network retry guidance. Pairing state continues to be invalidated on stop.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks); `git diff --check` passed.
+- Source and docs are ready on branch `19-handoff-server-settings-return`; authorized install/launch are pending after commit and fresh device identity check.
+- Runtime reproduction of the user's Settings error has not been performed. Verify repeated Settings open/close keeps the URL/QR working, and verify genuine port conflicts remain actionable.
+
 ## Current execution boundary
 
-Milestones 2–18 are committed on separate local branches, stacked sequentially. Manual functional/runtime QA remains pending. Optional Seedr discovery remains deferred.
+Milestones 2–18 are committed on separate local branches, stacked sequentially; milestone 19 is in progress. Manual functional/runtime QA remains pending. Optional Seedr discovery remains deferred.

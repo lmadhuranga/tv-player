@@ -11,6 +11,7 @@ import java.io.OutputStream
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.BindException
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -72,22 +73,41 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             mutableState.value = HandoffState(message = "Connect the TV to Wi-Fi or Ethernet to use link handoff.")
             return
         }
+        var socket: ServerSocket? = null
         try {
-            val socket = ServerSocket().apply {
-                reuseAddress = false
+            val listener = ServerSocket().apply {
+                // Permit a quick same-process restart after accepted connections close.
+                // This does not allow two live listeners to own the port.
+                reuseAddress = true
                 soTimeout = 0
                 bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
             }
-            server = socket
+            socket = listener
+            server = listener
             rotatePin(lanAddress)
-            Thread({ acceptLoop(socket, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
-        } catch (_: Exception) {
-            stopped.set(true)
-            generation.incrementAndGet()
-            pairingCode = ""
-            sessionToken = ""
-            mutableState.value = HandoffState(message = "The link handoff page could not start. Close another app using port $HANDOFF_PORT and try again.")
+            Thread({ acceptLoop(listener, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
+        } catch (_: BindException) {
+            failStart(socket, "Port $HANDOFF_PORT is already in use by another app. Close that app and retry link handoff.")
+        } catch (error: Exception) {
+            val reason = error.localizedMessage
+                ?.filterNot(Char::isISOControl)
+                ?.take(160)
+                ?.ifBlank { "Unknown startup error" }
+                ?: "Unknown startup error"
+            failStart(socket, "The link handoff could not start: $reason. Check the TV network connection and retry.")
         }
+    }
+
+    private fun failStart(socket: ServerSocket?, message: String) {
+        try { socket?.close() } catch (_: Exception) { }
+        server = null
+        stopped.set(true)
+        generation.incrementAndGet()
+        pairingCode = ""
+        sessionToken = ""
+        pairingExpiresAtMs = 0L
+        pairingAvailableAtMs = 0L
+        mutableState.value = HandoffState(message = message)
     }
 
     @Synchronized
