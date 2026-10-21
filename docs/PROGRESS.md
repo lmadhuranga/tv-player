@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `10-playback-errors` (source complete; uncommitted review in progress)
-- Current branch: `10-playback-errors`
-- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`, `205e978`, `345b715`, `1ee76f8`.
+- Implemented through milestone: `11-media-tracks` (source complete; uncommitted review in progress)
+- Current branch: `11-media-tracks`
+- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`, `205e978`, `345b715`, `1ee76f8`, `3caeaf9`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -97,6 +97,14 @@ Status: source implemented; DataStore persistence, lifecycle saves, replacement 
 Configured Media3 with a bounded 50-second maximum/64 MiB target buffer (15 seconds minimum, 2.5 seconds initial playback, 5 seconds rebuffer threshold). The player reports its buffered-through time and distinguishes active buffering from an initial error. A 45-second continuous buffering timeout exposes retry and fresh-link actions without auto-retry loops. HTTP 401/403, 404, other HTTP statuses, network errors, unsupported/decoding formats, and generic failures receive distinct sanitized messages; error text contains no URL. Retry reuses the current direct video and remembered position/play intent, and a fresh URL remains an explicit user action. Returning home or pressing Back from the player pauses playback and saves progress.
 
 Status: source implemented; bounded buffering, timeout, HTTP/codec classification, retry, and navigation recovery are unverified. No build, lint, or tests were run.
+
+## Milestone 11: `11-media-tracks`
+
+Added selectable audio tracks and stream variants from Media3's supported `Tracks.Group` data only; the options are hidden unless alternatives exist. Added Media3 HLS and DASH source modules at the pinned `1.10.1` version so adaptive manifest formats can be loaded; direct progressive URLs continue to use the base player. The variant list includes Media3 dimensions/bitrate when present and an Auto choice; the player separately reports decoded picture dimensions from `VideoSize`. There is no fabricated quality choice when Media3 reports one video track. Embedded text tracks now enable the general subtitle on/off control, while timing-offset controls remain available only for the app's external SRT/WebVTT track. Added Media3 audio-focus and becoming-noisy handling. Also fixed source review findings in the previous recovery path: the nested subtitle configuration type is imported, recovered stall messages clear on READY, and buffering timeout is paused/restarted with playback intent.
+
+API references: [Media3 TrackSelectionOverride](https://developer.android.com/reference/androidx/media3/common/TrackSelectionOverride), [Media3 Tracks.Group](https://developer.android.com/reference/androidx/media3/common/Tracks.Group), [Media3 TrackSelectionParameters.Builder](https://developer.android.com/reference/androidx/media3/common/TrackSelectionParameters.Builder).
+
+Status: source implemented; dependency resolution, actual track discovery/selection, HLS/DASH compatibility, external-versus-embedded subtitle controls, and audio-focus behavior are unverified. No build, lint, or tests were run.
 
 ## Current execution boundary
 

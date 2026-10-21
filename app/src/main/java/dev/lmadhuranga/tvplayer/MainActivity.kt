@@ -374,6 +374,9 @@ private fun PlayerScreen(playback: PlaybackController, onAddUrl: () -> Unit, onH
                 color = Muted,
                 fontSize = 14.sp,
             )
+            if (state.videoWidth > 0 && state.videoHeight > 0) {
+                Text("Decoded picture: ${state.videoWidth}×${state.videoHeight}", color = Muted, fontSize = 14.sp)
+            }
             if (state.error != null) {
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -415,10 +418,10 @@ private fun PlayerScreen(playback: PlaybackController, onAddUrl: () -> Unit, onH
                     Button(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
                         Text(if (state.subtitlesEnabled) "Subtitles: On" else "Subtitles: Off")
                     }
-                    Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.subtitlesAvailable) {
+                    Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.hasExternalSubtitles) {
                         Text("Subtitle timing: ${formatOffset(state.subtitleOffsetMs)} −")
                     }
-                    Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.subtitlesAvailable) { Text("Subtitle timing +") }
+                    Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.hasExternalSubtitles) { Text("Subtitle timing +") }
                     Button(onClick = playback::cycleSubtitleSize) {
                         Text("Subtitle size: ${listOf("Small", "Medium", "Large", "Extra large")[state.subtitleSizeIndex]}")
                     }
@@ -427,6 +430,25 @@ private fun PlayerScreen(playback: PlaybackController, onAddUrl: () -> Unit, onH
                     }
                     Button(onClick = playback::toggleSubtitleBackground) {
                         Text("Subtitle background: ${if (state.subtitleBackgroundEnabled) "On" else "Off"}")
+                    }
+                    if (state.audioChoices.size > 1) {
+                        Text("AUDIO TRACK", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
+                        state.audioChoices.forEach { choice ->
+                            Button(onClick = { playback.selectTrack(choice) }) {
+                                Text("${if (choice.selected) "✓ " else ""}${choice.label}")
+                            }
+                        }
+                    }
+                    if (state.videoVariantChoices.size > 1) {
+                        Text("STREAM VARIANT", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
+                        Button(onClick = playback::selectAutomaticVideoVariant) {
+                            Text("${if (state.selectedVideoVariantKey == null) "✓ " else ""}Auto select")
+                        }
+                        state.videoVariantChoices.forEach { choice ->
+                            Button(onClick = { playback.selectTrack(choice) }) {
+                                Text("${if (choice.selected) "✓ " else ""}${choice.label}")
+                            }
+                        }
                     }
                     state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
                     Button(onClick = { menuOpen = false }) { Text("Close options") }

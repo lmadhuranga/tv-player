@@ -5,9 +5,13 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaItem.SubtitleConfiguration
 import androidx.media3.common.C
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -33,10 +37,16 @@ data class PlaybackUiState(
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val bufferedPositionMs: Long = 0L,
+    val videoWidth: Int = 0,
+    val videoHeight: Int = 0,
+    val audioChoices: List<MediaTrackChoice> = emptyList(),
+    val videoVariantChoices: List<MediaTrackChoice> = emptyList(),
+    val selectedVideoVariantKey: String? = null,
     val speed: Float = 1f,
     val error: String? = null,
     val canRetry: Boolean = false,
     val subtitlesAvailable: Boolean = false,
+    val hasExternalSubtitles: Boolean = false,
     val subtitlesEnabled: Boolean = true,
     val subtitleOffsetMs: Long = 0L,
     val subtitleError: String? = null,
@@ -44,6 +54,15 @@ data class PlaybackUiState(
     val subtitleSizeIndex: Int = 1,
     val subtitleColorIndex: Int = 0,
     val subtitleBackgroundEnabled: Boolean = true,
+)
+
+data class MediaTrackChoice(
+    val key: String,
+    val type: Int,
+    val groupIndex: Int,
+    val trackIndex: Int,
+    val label: String,
+    val selected: Boolean,
 )
 
 @OptIn(UnstableApi::class)
@@ -61,7 +80,13 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         .setTargetBufferBytes(64 * 1024 * 1024)
         .setPrioritizeTimeOverSizeThresholds(false)
         .build()
-    val player: ExoPlayer = ExoPlayer.Builder(appContext).setLoadControl(loadControl).build()
+    val player: ExoPlayer = ExoPlayer.Builder(appContext).setLoadControl(loadControl).build().apply {
+        setAudioAttributes(
+            AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
+            true,
+        )
+        setHandleAudioBecomingNoisy(true)
+    }
     private val subtitleRepository = SubtitleRepository(appContext.cacheDir)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handler = Handler(Looper.getMainLooper())
@@ -85,6 +110,8 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     private var bufferingTimeoutJob: Job? = null
     private var playbackIntent = false
     private var timedOutGeneration: Long? = null
+    private val trackOverrides = mutableMapOf<String, TrackSelectionOverride>()
+    private var selectedVideoVariantKey: String? = null
 
     init {
         player.addListener(this)
@@ -100,11 +127,15 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         bufferingTimeoutJob = null
         subtitleJob?.cancel()
         subtitleJob = null
+        playbackIntent = true
         player.stop()
         player.clearMediaItems()
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
             .build()
+        selectedVideoVariantKey = null
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
         currentVideoUrl = url
@@ -129,7 +160,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
                         return@launch
                     }
                     downloadedSubtitle = cached
-                    mutableState.value = mutableState.value.copy(subtitlesAvailable = true, subtitleError = null)
+                    mutableState.value = mutableState.value.copy(subtitlesAvailable = true, hasExternalSubtitles = true, subtitleError = null)
                     replaceMediaWithSubtitle(cached, generation)
                 } catch (error: SubtitleLoadException) {
                     if (!released && generation == sourceGeneration) {
@@ -180,6 +211,25 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         mutableState.value = mutableState.value.copy(error = null, canRetry = false, isBuffering = true)
         val generation = sourceGeneration
         startBufferingTimeout(generation)
+    }
+
+    fun selectTrack(choice: MediaTrackChoice) {
+        if (released) return
+        val override = trackOverrides[choice.key] ?: return
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setOverrideForType(override)
+            .build()
+        if (choice.type == C.TRACK_TYPE_VIDEO) selectedVideoVariantKey = choice.key
+        publishState()
+    }
+
+    fun selectAutomaticVideoVariant() {
+        if (released) return
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+            .build()
+        selectedVideoVariantKey = null
+        publishState()
     }
 
     fun cycleSpeed() {
@@ -279,7 +329,27 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             timedOutGeneration = null
             bufferingTimeoutJob?.cancel()
             bufferingTimeoutJob = null
+            if (playbackState == Player.STATE_READY && mutableState.value.error == STALL_ERROR) {
+                mutableState.value = mutableState.value.copy(error = null, canRetry = false)
+            }
         }
+    }
+
+    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+        if (playWhenReady && player.playbackState == Player.STATE_BUFFERING) {
+            timedOutGeneration = null
+            startBufferingTimeout(sourceGeneration)
+        }
+        else if (!playWhenReady) {
+            bufferingTimeoutJob?.cancel()
+            bufferingTimeoutJob = null
+        }
+    }
+
+    override fun onTracksChanged(tracks: Tracks) = publishState()
+
+    override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+        mutableState.value = mutableState.value.copy(videoWidth = videoSize.width, videoHeight = videoSize.height)
     }
 
     override fun onPlayerError(error: PlaybackException) {
@@ -295,25 +365,36 @@ class PlaybackController(context: Context, private val historyRepository: Histor
 
     private fun publishState() {
         if (released) return
+        trackOverrides.clear()
+        val audioChoices = trackChoices(C.TRACK_TYPE_AUDIO)
+        val videoChoices = trackChoices(C.TRACK_TYPE_VIDEO).takeIf { it.size > 1 }.orEmpty()
+        val hasEmbeddedText = player.currentTracks.groups.any { group ->
+            group.type == C.TRACK_TYPE_TEXT && (0 until group.length).any(group::isTrackSupported)
+        }
         mutableState.value = mutableState.value.copy(
             isPlaying = player.isPlaying,
             isBuffering = player.playbackState == Player.STATE_BUFFERING && timedOutGeneration != sourceGeneration,
             positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it > 0L } ?: 0L,
             bufferedPositionMs = player.bufferedPosition.coerceAtLeast(player.currentPosition.coerceAtLeast(0L)),
+            audioChoices = audioChoices,
+            videoVariantChoices = videoChoices,
+            selectedVideoVariantKey = selectedVideoVariantKey,
+            subtitlesAvailable = hasEmbeddedText || downloadedSubtitle != null,
+            hasExternalSubtitles = downloadedSubtitle != null,
             speed = player.playbackParameters.speed,
         )
     }
 
     private fun startBufferingTimeout(generation: Long) {
-        if (released || bufferingTimeoutJob?.isActive == true) return
+        if (released || !playbackIntent || !player.playWhenReady || bufferingTimeoutJob?.isActive == true) return
         bufferingTimeoutJob = scope.launch {
             delay(BUFFERING_TIMEOUT_MS)
             if (!released && generation == sourceGeneration && player.playbackState == Player.STATE_BUFFERING) {
                 timedOutGeneration = generation
                 mutableState.value = mutableState.value.copy(
                     isBuffering = false,
-                    error = "Playback has been waiting for data for too long. Check the TV connection, then retry or enter a fresh link.",
+                    error = STALL_ERROR,
                     canRetry = currentVideoUrl != null,
                 )
             }
@@ -347,7 +428,35 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         return MediaItem.Builder().setUri(Uri.parse(url)).setSubtitleConfigurations(listOf(configuration)).build()
     }
 
-    companion object { private const val BUFFERING_TIMEOUT_MS = 45_000L }
+    private fun trackChoices(type: Int): List<MediaTrackChoice> {
+        val choices = mutableListOf<MediaTrackChoice>()
+        player.currentTracks.groups.forEachIndexed { groupIndex, group ->
+            if (group.type != type) return@forEachIndexed
+            repeat(group.length) { trackIndex ->
+                if (!group.isTrackSupported(trackIndex)) return@repeat
+                val format = group.mediaTrackGroup.getFormat(trackIndex)
+                val key = "$type:$groupIndex:$trackIndex"
+                trackOverrides[key] = TrackSelectionOverride(group.mediaTrackGroup, trackIndex)
+                val label = if (type == C.TRACK_TYPE_AUDIO) {
+                    val language = format.language?.takeIf { it.isNotBlank() && it != "und" } ?: "Audio ${choices.size + 1}"
+                    val channels = format.channelCount.takeIf { it > 0 }?.let { " · $it channels" }.orEmpty()
+                    "$language$channels"
+                } else {
+                    val dimensions = if (format.width > 0 && format.height > 0) "${format.width}×${format.height}" else "Variant ${choices.size + 1}"
+                    val bitrate = format.bitrate.takeIf { it > 0 }?.let { " · ${it / 1_000} kb/s" }.orEmpty()
+                    "$dimensions$bitrate"
+                }
+                val selected = if (type == C.TRACK_TYPE_VIDEO) key == selectedVideoVariantKey else group.isTrackSelected(trackIndex)
+                choices += MediaTrackChoice(key, type, groupIndex, trackIndex, label, selected)
+            }
+        }
+        return choices
+    }
+
+    companion object {
+        private const val BUFFERING_TIMEOUT_MS = 45_000L
+        private const val STALL_ERROR = "Playback has been waiting for data for too long. Check the TV connection, then retry or enter a fresh link."
+    }
 
     private fun maybeSaveHistory() {
         if (released || !player.isPlaying || abs(player.currentPosition - lastHistorySaveMs) < 15_000L) return
