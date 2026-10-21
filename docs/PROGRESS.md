@@ -175,14 +175,14 @@ Verification record:
 
 ## Milestone 17: `17-subtitle-file-upload-filename-and-hidden-skip`
 
-Added an Android document picker in the full-screen player's settings route. SRT/WebVTT files are copied to the app's private subtitle cache, validated using the existing bounded parser, and attached to the active Media3 item; cancellation/replacement cleanup and safe errors preserve video playback. This is a TV-side picker only: the phone/laptop handoff still accepts subtitle URLs, not file uploads. Removed the manual title field from the TV and handoff forms. The player header/history label now derives from the decoded final URL path segment, ignoring query strings, with host/“Video” fallbacks. With controls hidden, Left/Right seek by 30 seconds; visible-control navigation remains unchanged. A bottom timeline remains visible while controls are hidden, with dark gray played progress and light gray buffered progress.
+Added an Android document picker in the full-screen player's settings route. SRT/WebVTT files are copied to the app's private subtitle cache, validated using the existing bounded parser, and attached to the active Media3 item; cancellation/replacement cleanup and safe errors preserve video playback. This is a TV-side picker only: the phone/laptop handoff still accepts subtitle URLs, not file uploads. Removed the manual title field from the TV and handoff forms. The player header/history label now derives from the decoded final URL path segment, ignoring query strings, with host/“Video” fallbacks; the header truncates long filenames on one line with an ellipsis. Browser handoff submissions start playback directly, including when local resume history is enabled. With controls hidden, Left/Right seek by 30 seconds; visible-control navigation remains unchanged. A bottom timeline remains visible while controls are hidden, with dark gray played progress and light gray buffered progress.
 
 Verification record:
 
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
 - The first sandboxed Gradle invocation stopped before configuration because Gradle could not create its local lock service socket (`Operation not permitted`); the same command passed with the required local build permission.
-- After adding the always-visible hidden-controls timeline, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed again on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
-- `git diff --check` passed. The latest milestone 17 APK has not yet been installed/launched. The BRAVIA was previously identified as Sony BRAVIA VU3 at `192.168.8.100:5555`; identity/reachability will be rechecked before install and launch. Picker, subtitle, filename, seek, visual, and playback runtime behavior remain unverified.
+- After adding the timeline, filename ellipsis, and direct browser-handoff playback, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
+- `git diff --check` passed. An install attempt for the earlier binary was canceled when the user added required UI changes; no launch occurred. The latest milestone 17 APK is awaiting fresh BRAVIA identity confirmation and install/launch. Picker, subtitle, filename, seek, handoff, visual, and playback runtime behavior remain unverified.
 
 ## Current execution boundary
 

@@ -44,6 +44,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -332,7 +333,14 @@ fun FullscreenPlayerScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     AppButton(onClick = { interacted(onHome) }, modifier = Modifier.focusRequester(backFocus)) { Text("‹  Back", fontSize = 17.sp) }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(state.title ?: "TV PLAYER", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            state.title ?: "TV PLAYER",
+                            color = Color.White,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         Text(
                             when {
                                 state.isBuffering -> "Buffering · ${formatPlayerTime(state.bufferedPositionMs)} buffered"

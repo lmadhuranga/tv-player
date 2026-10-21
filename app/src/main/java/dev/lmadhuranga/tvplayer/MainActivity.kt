@@ -131,7 +131,9 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
 
         AppRoute.HANDOFF -> HandoffScreen(
             onVideoSubmitted = { submission ->
-                startVideo(submission.videoUrl, submission.subtitleUrl)
+                pendingStart = null
+                playback.playUrl(submission.videoUrl, submission.subtitleUrl)
+                route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },
         )
