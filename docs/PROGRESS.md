@@ -3,10 +3,10 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `15-four-digit-pairing` (debug build/lint passed; LAN/browser behavior remains unverified)
-- Current branch: `15-four-digit-pairing`
-- Planning baseline: `be2f7cc`; milestones 2–14 are committed sequentially on local branches; milestone 15 is built and being committed (full mapping below).
-- Milestone 13's APK was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. Milestone 14 and 15 debug APKs were built locally but not installed or launched. No current LAN/browser or player runtime behavior has been tested.
+- Implemented through milestone: `16-dark-buttons-white-focus` (debug build/lint passed; visual/runtime behavior remains unverified)
+- Current branch: `16-dark-buttons-white-focus`
+- Planning baseline: `be2f7cc`; milestones 2–15 are committed sequentially on local branches; milestone 16 is built and being committed (full mapping below).
+- The latest prior debug APK (milestone 15) was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. The milestone 16 APK was built locally but not installed or launched. Button colors/focus visuals remain unverified on device.
 
 ## Decisions recorded
 
@@ -38,7 +38,8 @@
 | 12 | `12-device-qa-release` | branch HEAD (`git rev-parse 12-device-qa-release`) |
 | 13 | `13-build-install` | branch HEAD (`git rev-parse 13-build-install`) |
 | 14 | `14-fullscreen-player-controls` | `e3f574c` |
-| 15 | `15-four-digit-pairing` | branch HEAD (`git rev-parse 15-four-digit-pairing`) |
+| 15 | `15-four-digit-pairing` | `ec708cb` |
+| 16 | `16-dark-buttons-white-focus` | branch HEAD (`git rev-parse 16-dark-buttons-white-focus`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -162,6 +163,15 @@ Verification record:
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; Gradle reported `BUILD SUCCESSFUL` with no errors. A nullable-host warning in the LAN address selector was corrected during implementation; the final build emitted no Kotlin compiler warnings.
 - `git diff --check` passed. No tests, emulator/device commands, TV actions, or phone-browser LAN requests were run. The updated APK remains local and has not been installed or launched. PIN expiry, cooldown, one-time exchange, QR behavior, and server lifecycle remain unverified at runtime.
 
+## Milestone 16: `16-dark-buttons-white-focus`
+
+Added one shared TV button wrapper used by all button controls across Home, player playback/settings, privacy/history, resume, URL entry, and LAN handoff. Buttons use a dark neutral fill with white content at rest, switch to white with dark content when focused or pressed, and retain readable muted colors when disabled. Labels and checkmarks continue to express values such as selected audio/quality without a persistent selected fill; white is the current remote focus treatment. The full-screen playback canvas, PlayerView shutter, and top/bottom scrims use black so letterboxed video has a black surround; Fit/Fill/Zoom scaling behavior is unchanged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; Gradle reported `BUILD SUCCESSFUL` with no errors.
+- `git diff --check` passed. No tests or device actions were run. The milestone 16 APK remains local and is not installed or launched; focused/unfocused colors, disabled contrast, and black video surround remain unverified visually.
+
 ## Current execution boundary
 
-Milestones 2–14 are committed on separate local branches, stacked sequentially; milestone 15 source and local build/lint are complete on its own branch. Do not connect to, install on, launch, or send input to a TV for this feature unless separately authorized. No app launch or runtime QA has occurred. Do not push or merge. Optional Seedr discovery remains deferred.
+Milestones 2–15 are committed on separate local branches, stacked sequentially; milestone 16 source and local build/lint are complete on its own branch. Do not connect to, install on, launch, or send input to a TV for this feature unless separately authorized. No app launch or runtime QA has occurred. Do not push or merge. Optional Seedr discovery remains deferred.

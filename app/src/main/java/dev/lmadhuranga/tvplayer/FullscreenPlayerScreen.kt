@@ -53,7 +53,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
-import androidx.tv.material3.Button
+
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
@@ -192,6 +192,7 @@ fun FullscreenPlayerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .focusRequester(rootFocus)
             .focusProperties { canFocus = !controlsVisible }
             .onPreviewKeyEvent { event ->
@@ -235,6 +236,8 @@ fun FullscreenPlayerScreen(
                     useController = false
                     isFocusable = false
                     isFocusableInTouchMode = false
+                    setBackgroundColor(android.graphics.Color.BLACK)
+                    setShutterBackgroundColor(android.graphics.Color.BLACK)
                     player = playback.player
                 }
             },
@@ -283,18 +286,18 @@ fun FullscreenPlayerScreen(
         if (controlsVisible) {
             Box(
                 modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().height(190.dp)
-                    .background(Brush.verticalGradient(listOf(Color(0xDD07111F), Color.Transparent))),
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.86f), Color.Transparent))),
             )
             Box(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(270.dp)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xF207111F)))),
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.95f)))),
             )
             Column(
                 modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 58.dp, vertical = 26.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Button(onClick = { interacted(onHome) }, modifier = Modifier.focusRequester(backFocus)) { Text("‹  Back", fontSize = 17.sp) }
+                    AppButton(onClick = { interacted(onHome) }, modifier = Modifier.focusRequester(backFocus)) { Text("‹  Back", fontSize = 17.sp) }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(state.title ?: "TV PLAYER", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                         Text(
@@ -308,7 +311,7 @@ fun FullscreenPlayerScreen(
                             fontSize = 15.sp,
                         )
                     }
-                    Button(
+                    AppButton(
                         onClick = { interacted { openOptions() } },
                         modifier = Modifier.focusRequester(optionsFocus),
                     ) { Text("⚙  Options", fontSize = 17.sp) }
@@ -331,37 +334,37 @@ fun FullscreenPlayerScreen(
                     onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
+                    AppButton(
                         onClick = { interacted(playback::toggleSubtitles) },
                         enabled = state.subtitlesAvailable,
                     ) { Text(if (state.subtitlesEnabled) "CC  On" else "CC  Off", fontSize = 16.sp) }
                     if (state.audioChoices.size > 1) {
-                        Button(
+                        AppButton(
                             onClick = { interacted { openOptions(fromAudioButton = true) } },
                             modifier = Modifier.focusRequester(audioFocus),
                         ) { Text("Audio", fontSize = 16.sp) }
                     }
                     Spacer(Modifier.weight(1f))
-                    Button(onClick = { interacted { playback.seekBy(-30_000L) } }, enabled = state.title != null) {
+                    AppButton(onClick = { interacted { playback.seekBy(-30_000L) } }, enabled = state.title != null) {
                         Text("−30 sec", fontSize = 17.sp)
                     }
-                    Button(
+                    AppButton(
                         onClick = { interacted(playback::togglePlayPause) },
                         enabled = state.title != null,
                         modifier = Modifier.focusRequester(playFocus),
                     ) { Text(if (state.isPlaying) "Ⅱ  Pause" else "▶  Play", fontSize = 20.sp) }
-                    Button(onClick = { interacted { playback.seekBy(30_000L) } }, enabled = state.title != null) {
+                    AppButton(onClick = { interacted { playback.seekBy(30_000L) } }, enabled = state.title != null) {
                         Text("+30 sec", fontSize = 17.sp)
                     }
-                    Button(onClick = { interacted(playback::cycleSpeed) }, enabled = state.title != null) {
+                    AppButton(onClick = { interacted(playback::cycleSpeed) }, enabled = state.title != null) {
                         Text("${state.speed}×", fontSize = 16.sp)
                     }
                 }
                 state.error?.let { message ->
                     Text(message, color = Color(0xFFFFC2B7), fontSize = 16.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = { interacted(playback::retryPlayback) }, enabled = state.canRetry, modifier = Modifier.focusRequester(retryFocus)) { Text("Retry") }
-                        Button(onClick = { interacted(onAddUrl) }, modifier = Modifier.focusRequester(newLinkFocus)) { Text("Enter another link") }
+                        AppButton(onClick = { interacted(playback::retryPlayback) }, enabled = state.canRetry, modifier = Modifier.focusRequester(retryFocus)) { Text("Retry") }
+                        AppButton(onClick = { interacted(onAddUrl) }, modifier = Modifier.focusRequester(newLinkFocus)) { Text("Enter another link") }
                     }
                 }
                 state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
@@ -405,7 +408,7 @@ private fun StatusPill(text: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        colors = SurfaceDefaults.colors(containerColor = Color(0xCC07111F)),
+        colors = SurfaceDefaults.colors(containerColor = Color(0xCC000000)),
     ) {
         Text(text, color = Color.White, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 24.dp, vertical = 15.dp))
     }
@@ -431,53 +434,53 @@ private fun PlayerOptionsScreen(
             state.error?.let { error ->
                 Text(error, color = Color(0xFFFFC2B7), fontSize = 17.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = playback::retryPlayback, enabled = state.canRetry) { Text("Retry") }
-                    Button(onClick = onAddUrl) { Text("Enter another link") }
+                    AppButton(onClick = playback::retryPlayback, enabled = state.canRetry) { Text("Retry") }
+                    AppButton(onClick = onAddUrl) { Text("Enter another link") }
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Button(onClick = playback::cycleDisplayMode, modifier = Modifier.focusRequester(firstFocus)) {
+            AppButton(onClick = playback::cycleDisplayMode, modifier = Modifier.focusRequester(firstFocus)) {
                 Text("Picture size: ${state.displayMode.label}")
             }
-            Button(onClick = playback::cycleSpeed, enabled = state.title != null) { Text("Playback speed: ${state.speed}×") }
-            Button(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
+            AppButton(onClick = playback::cycleSpeed, enabled = state.title != null) { Text("Playback speed: ${state.speed}×") }
+            AppButton(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
                 Text(if (state.subtitlesEnabled) "Subtitles: On" else "Subtitles: Off")
             }
-            Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.hasExternalSubtitles) {
+            AppButton(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.hasExternalSubtitles) {
                 Text("Subtitle timing: ${formatPlayerOffset(state.subtitleOffsetMs)} −")
             }
-            Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.hasExternalSubtitles) { Text("Subtitle timing +") }
-            Button(onClick = playback::cycleSubtitleSize) {
+            AppButton(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.hasExternalSubtitles) { Text("Subtitle timing +") }
+            AppButton(onClick = playback::cycleSubtitleSize) {
                 Text("Subtitle size: ${listOf("Small", "Medium", "Large", "Extra large")[state.subtitleSizeIndex]}")
             }
-            Button(onClick = playback::cycleSubtitleColor) {
+            AppButton(onClick = playback::cycleSubtitleColor) {
                 Text("Subtitle color: ${listOf("White", "Yellow", "Cyan", "Green")[state.subtitleColorIndex]}")
             }
-            Button(onClick = playback::toggleSubtitleBackground) {
+            AppButton(onClick = playback::toggleSubtitleBackground) {
                 Text("Subtitle background: ${if (state.subtitleBackgroundEnabled) "On" else "Off"}")
             }
             if (state.audioChoices.size > 1) {
                 Text("AUDIO TRACK", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
                 state.audioChoices.forEach { choice ->
-                    Button(onClick = { playback.selectTrack(choice) }) {
+                    AppButton(onClick = { playback.selectTrack(choice) }) {
                         Text("${if (choice.selected) "✓ " else ""}${choice.label}")
                     }
                 }
             }
             if (state.videoVariantChoices.size > 1) {
                 Text("STREAM VARIANT", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
-                Button(onClick = playback::selectAutomaticVideoVariant) {
+                AppButton(onClick = playback::selectAutomaticVideoVariant) {
                     Text("${if (state.selectedVideoVariantKey == null) "✓ " else ""}Auto select")
                 }
                 state.videoVariantChoices.forEach { choice ->
-                    Button(onClick = { playback.selectTrack(choice) }) {
+                    AppButton(onClick = { playback.selectTrack(choice) }) {
                         Text("${if (choice.selected) "✓ " else ""}${choice.label}")
                     }
                 }
             }
             state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
             Spacer(Modifier.height(6.dp))
-            Button(onClick = onClose) { Text("Back to video") }
+            AppButton(onClick = onClose) { Text("Back to video") }
         }
     }
 }

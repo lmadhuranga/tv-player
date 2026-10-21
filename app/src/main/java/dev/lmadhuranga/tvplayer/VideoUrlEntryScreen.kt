@@ -29,7 +29,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Button
+
 import androidx.tv.material3.Text
 
 @Composable
@@ -145,8 +145,8 @@ fun VideoUrlEntryScreen(onStart: (url: String, subtitleUrl: String?, title: Stri
                 Spacer(Modifier.height(8.dp))
             }
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Button(onClick = submit) { Text("Play video") }
-                Button(onClick = onBack) { Text("Cancel") }
+                AppButton(onClick = submit) { Text("Play video") }
+                AppButton(onClick = onBack) { Text("Cancel") }
             }
         }
     }

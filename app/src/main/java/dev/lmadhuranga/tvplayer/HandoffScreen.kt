@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.tv.material3.Button
+
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
@@ -108,11 +108,11 @@ fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit
                         Text("Code used. Generate a new code to pair another browser.", color = Muted, fontSize = 14.sp)
                     }
                     Spacer(Modifier.height(10.dp))
-                    Button(onClick = server::regeneratePin, enabled = cooldownSeconds == 0L) { Text("Generate new code") }
+                    AppButton(onClick = server::regeneratePin, enabled = cooldownSeconds == 0L) { Text("Generate new code") }
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(26.dp))
-                Button(onClick = onBack) { Text("Back") }
+                AppButton(onClick = onBack) { Text("Back") }
             }
             Spacer(Modifier.width(40.dp))
             val qr = remember(state.pageUrl) { state.pageUrl?.let(::createQrBitmap) }

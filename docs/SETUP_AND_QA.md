@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint and authorized installation, plus checks still pending. The milestone 13 debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched; the milestone 14 and 15 debug APKs were built locally and not installed. No tests, LAN/browser pairing, playback, D-pad interaction, screenshots, or runtime checks were performed.
+This guide records completed local build/lint and authorized installation, plus checks still pending. The milestone 13 debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched; milestone 14 and 15 debug APKs were built locally and not installed. Milestone 16 changes button colors and its visual behavior has not yet been checked. No LAN/browser pairing, playback, D-pad interaction, screenshots, or runtime checks were performed for this change.
 
 ## Local toolchain
 
@@ -47,6 +47,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [x] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions. Lint emitted 22 warnings.
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
 - [ ] Confirm focus visibility and D-pad reachability on Home, URL entry, options/settings dialogs, history and handoff screens; Back restores focus or returns safely.
+- [ ] Verify every button is dark at rest, white only while focused/pressed, has readable disabled contrast, and returns to dark when focus moves. Check Home, player controls/settings, history/resume, URL entry, and handoff. Confirm selected audio/quality remains indicated by its check/label rather than a sticky white fill.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
 - [ ] Confirm video starts, pauses, seeks, supports each listed speed, and pauses when leaving the player or backgrounding the app.
 - [ ] Test same-Wi-Fi phone/laptop link handoff, four-digit PIN (including a leading zero), QR, optional title, optional subtitle, invalid PIN/session/origin, oversized request, five failed PIN attempts plus cooldown, expiry/regeneration, one-time PIN exchange, and server stop/restart invalidation. Confirm the local page sends links only and no full URLs or pairing secrets are logged.
@@ -58,7 +59,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
 - [ ] Install the newer fullscreen player / four-digit pairing APK from milestone 15 after separate authorization. The older milestone 13 package remains installed; no app launch has occurred.
-- [ ] Confirm fullscreen video extends under hidden system bars and bars restore after leaving the player.
+- [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
 - [ ] Verify media Play/Pause works with controls hidden; Back closes player settings, hides visible controls, then returns Home.

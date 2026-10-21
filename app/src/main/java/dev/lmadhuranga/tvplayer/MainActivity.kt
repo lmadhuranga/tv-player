@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import androidx.media3.common.util.UnstableApi
-import androidx.tv.material3.Button
+
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -210,13 +210,13 @@ private fun HomeScreen(
                     fontSize = 21.sp,
                 )
                 Spacer(Modifier.height(34.dp))
-                Button(onClick = onAddVideo) { Text("Add video URL", fontSize = 18.sp) }
+                AppButton(onClick = onAddVideo) { Text("Add video URL", fontSize = 18.sp) }
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onOpenHandoff) { Text("Send link from phone", fontSize = 18.sp) }
+                AppButton(onClick = onOpenHandoff) { Text("Send link from phone", fontSize = 18.sp) }
                 Spacer(Modifier.height(10.dp))
-                Button(onClick = onOpenPlayer) { Text("Open player", fontSize = 18.sp) }
+                AppButton(onClick = onOpenPlayer) { Text("Open player", fontSize = 18.sp) }
                 Spacer(Modifier.height(10.dp))
-                Button(
+                AppButton(
                     onClick = onOpenSettings,
                     modifier = Modifier.focusRequester(settingsRequester),
                 ) {
@@ -266,7 +266,7 @@ private fun SettingsScreen(
             ) {
                 Text("PRIVACY & HISTORY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
                 Text("Position history stays on this device. Full video and subtitle URLs are never saved.", color = Muted, fontSize = 18.sp)
-                Button(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
+                AppButton(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
                     Text("Remember positions: ${if (rememberPositions) "On" else "Off"}")
                 }
                 if (entries.isNotEmpty()) {
@@ -274,11 +274,11 @@ private fun SettingsScreen(
                     entries.forEach { entry ->
                         Text("${entry.title} · ${entry.sourceHost} · ${formatTime(entry.positionMs)}", color = Color.White, fontSize = 17.sp)
                     }
-                    Button(onClick = onClearHistory) { Text("Clear history") }
+                    AppButton(onClick = onClearHistory) { Text("Clear history") }
                 } else {
                     Text("No saved positions.", color = Muted, fontSize = 17.sp)
                 }
-                Button(onClick = onDismiss) { Text("Close") }
+                AppButton(onClick = onDismiss) { Text("Close") }
             }
         }
     }
@@ -299,12 +299,12 @@ private fun ResumePrompt(entries: List<HistoryEntry>, onResume: (HistoryEntry) -
                 Text("Choose a saved position. No link matching is inferred, and the new link may point to different content.", color = Muted, fontSize = 17.sp)
                 entries.forEachIndexed { index, entry ->
                     val label = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }
-                    Button(onClick = { onResume(entry) }, modifier = if (index == 0) Modifier.focusRequester(resumeRequester) else Modifier) {
+                    AppButton(onClick = { onResume(entry) }, modifier = if (index == 0) Modifier.focusRequester(resumeRequester) else Modifier) {
                         Text("Resume $label · ${formatTime(entry.positionMs)}")
                     }
                 }
-                Button(onClick = onStartOver) { Text("Start from the beginning") }
-                Button(onClick = onCancel) { Text("Cancel") }
+                AppButton(onClick = onStartOver) { Text("Start from the beginning") }
+                AppButton(onClick = onCancel) { Text("Cancel") }
             }
         }
     }

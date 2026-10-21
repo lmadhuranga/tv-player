@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation through milestone 15 is committed on sequential local branches. Fullscreen controls and four-digit LAN pairing pass the local debug build and lint; LAN/browser and player runtime behavior remain unverified. An earlier debug APK is installed on a Sony BRAVIA VU3 without launch. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
+Source implementation through milestone 16 is committed on sequential local branches. The app's buttons use dark fills at rest and white fills while focused or pressed; the debug build and lint pass. Device visuals remain unverified. The previous debug APK is installed on a Sony BRAVIA VU3 without launch; the milestone 16 APK remains local pending its separate installation. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
 
 ## Development workflow
 
