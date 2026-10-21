@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `21-limits-origin-fix` (build/lint/install/launch and read-only Origin checks complete; browser media flow remains unverified)
-- Current branch: `21-limits-origin-fix`
+- Implemented through milestone: `22-buffering-choice` (source implementation; local build/lint recorded below, TV not contacted)
+- Current branch: `22-buffering-choice`
 - Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
 - The milestone 19 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, Settings reopen, or other functional runtime QA was performed.
 
@@ -45,6 +45,7 @@
 | 19 | `19-handoff-server-settings-return` | `1d929e2` |
 | 20 | `20-phone-video-subtitle-upload` | `773c65f` |
 | 21 | `21-limits-origin-fix` | branch HEAD (`git rev-parse 21-limits-origin-fix`) |
+| 22 | `22-buffering-choice` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -223,7 +224,7 @@ Verification record:
 
 ## Current execution boundary
 
-Milestones 2–20 are committed on separate local branches, stacked sequentially. Milestone 21 is built, linted, installed, and launched on the approved BRAVIA. Read-only Origin regression requests passed; phone-browser upload and all other behavioral/runtime QA remain pending. Optional Seedr discovery remains deferred.
+Milestones 2–21 are committed on separate local branches, stacked sequentially. Milestone 21 was built, linted, installed, and launched on the approved BRAVIA; read-only Origin regression requests passed. Phone-browser upload and other behavioral/runtime QA remain pending. Milestone 22 changes have not been installed or launched; the TV was not contacted for this milestone. Optional Seedr discovery remains deferred.
 
 ## Milestone 21: `21-limits-origin-fix`
 
@@ -234,3 +235,13 @@ Verification record:
 - `git diff --check` passed. With JDK `17.0.17`, Gradle `8.13`, SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks); lint passed.
 - Before install, ADB identified `192.168.8.100:5555` as Sony BRAVIA VU3, API 34. The debug install returned `Success`; `pm path` confirmed `dev.lmadhuranga.tvplayer` was installed. `am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned the expected `Starting: Intent`.
 - Read-only GET checks against the running TV server returned HTTP 401 with Origin absent and no token, proving the request reached authentication, and HTTP 403 with a mismatched Origin. The existing browser form was not used. No phone upload, playback, or UI QA was performed.
+
+## Milestone 22: `22-buffering-choice`
+
+Added a persisted Settings choice for a 1-, 2-, or 5-minute maximum forward buffer, defaulting to 1 minute. The selected policy is applied when the next video starts; this avoids replacing the active Media3 player while it owns a current stream or temporary uploaded files. The 15-second minimum buffer, 2.5-second initial startup threshold, and 5-second rebuffer threshold are unchanged, so playback does not wait for the selected duration. The existing 64 MiB target-buffer byte estimate remains (it is not a strict byte cap); memory availability and stream characteristics can shorten actual buffered time, so the selected duration is a maximum target rather than a guarantee.
+
+Verification record:
+
+- `git diff --check` passed. With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks). Lint passed with 0 errors and 25 warnings.
+- Debug APK: `app/build/outputs/apk/debug/app-debug.apk` (16 MiB).
+- No TV connection, install, launch, or interaction was performed for this milestone; persistence and playback behavior need manual verification.

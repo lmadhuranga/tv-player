@@ -79,18 +79,10 @@ enum class VideoDisplayMode(val label: String, val resizeMode: Int) {
 class PlaybackController(context: Context, private val historyRepository: HistoryRepository) : Player.Listener {
     private val appContext = context.applicationContext
     val cacheDirectory: java.io.File get() = appContext.cacheDir
-    private val loadControl = DefaultLoadControl.Builder()
-        .setBufferDurationsMs(15_000, 50_000, 2_500, 5_000)
-        .setTargetBufferBytes(64 * 1024 * 1024)
-        .setPrioritizeTimeOverSizeThresholds(false)
-        .build()
-    val player: ExoPlayer = ExoPlayer.Builder(appContext).setLoadControl(loadControl).build().apply {
-        setAudioAttributes(
-            AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
-            true,
-        )
-        setHandleAudioBecomingNoisy(true)
-    }
+    private var selectedBufferMinutes = PlayerSettingsRepository.DEFAULT_BUFFER_MINUTES
+    private var activeBufferMinutes = PlayerSettingsRepository.DEFAULT_BUFFER_MINUTES
+    var player: ExoPlayer = createPlayer(activeBufferMinutes)
+        private set
     private val subtitleRepository = SubtitleRepository(appContext.cacheDir)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handler = Handler(Looper.getMainLooper())
@@ -143,6 +135,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         bufferingTimeoutJob = null
         subtitleJob?.cancel()
         subtitleJob = null
+        applySelectedBufferPolicy()
         playbackIntent = true
         player.stop()
         player.clearMediaItems()
@@ -214,6 +207,38 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         playbackIntent = !(player.isPlaying || player.playWhenReady)
         if (playbackIntent) player.play() else player.pause()
         publishState()
+    }
+
+    /** Keep the existing player intact until a new video is selected. */
+    fun setMaximumBufferMinutes(minutes: Int) {
+        if (minutes in PlayerSettingsRepository.BUFFER_CHOICES) selectedBufferMinutes = minutes
+    }
+
+    private fun applySelectedBufferPolicy() {
+        if (activeBufferMinutes == selectedBufferMinutes) return
+        player.removeListener(this)
+        player.release()
+        trackOverrides.clear()
+        selectedVideoVariantKey = null
+        activeBufferMinutes = selectedBufferMinutes
+        player = createPlayer(activeBufferMinutes)
+        player.addListener(this)
+    }
+
+    private fun createPlayer(bufferMinutes: Int): ExoPlayer {
+        val maxBufferMs = bufferMinutes * 60_000
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(15_000, maxBufferMs, 2_500, 5_000)
+            .setTargetBufferBytes(64 * 1024 * 1024)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .build()
+        return ExoPlayer.Builder(appContext).setLoadControl(loadControl).build().apply {
+            setAudioAttributes(
+                AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
+                true,
+            )
+            setHandleAudioBecomingNoisy(true)
+        }
     }
 
     fun pauseForBackground() {

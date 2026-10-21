@@ -59,10 +59,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val history = HistoryRepository(applicationContext)
+        val playerSettings = PlayerSettingsRepository(applicationContext)
         playback = PlaybackController(applicationContext, history)
         setContent {
             MaterialTheme {
-                TVPlayerApp(playback, history, window)
+                TVPlayerApp(playback, history, playerSettings, window)
             }
         }
     }
@@ -82,7 +83,12 @@ private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 
 @Composable
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-private fun TVPlayerApp(playback: PlaybackController, historyRepository: HistoryRepository, window: Window) {
+private fun TVPlayerApp(
+    playback: PlaybackController,
+    historyRepository: HistoryRepository,
+    playerSettingsRepository: PlayerSettingsRepository,
+    window: Window,
+) {
     var route by remember { mutableStateOf(AppRoute.HANDOFF) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
@@ -91,11 +97,18 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     val rememberPositions by historyRepository.enabled.collectAsState(initial = false)
     val recentEntries by historyRepository.entries.collectAsState(initial = emptyList())
     val playbackState by playback.state.collectAsState()
+    val maximumBufferMinutes by playerSettingsRepository.maximumBufferMinutes.collectAsState(
+        initial = PlayerSettingsRepository.DEFAULT_BUFFER_MINUTES,
+    )
     val appScope = rememberCoroutineScope()
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playback.loadSubtitleFile(uri)
     }
     var pendingStart by remember { mutableStateOf<PendingPlayback?>(null) }
+
+    LaunchedEffect(maximumBufferMinutes) {
+        playback.setMaximumBufferMinutes(maximumBufferMinutes)
+    }
 
     fun startVideo(url: String, subtitleUrl: String?) {
         val candidates = recentEntries.filter { it.positionMs > 5_000L }
@@ -166,8 +179,13 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         SettingsScreen(
             focusRequester = settingsCloseRequester,
             rememberPositions = rememberPositions,
+            maximumBufferMinutes = maximumBufferMinutes,
             entries = recentEntries,
             onToggleRemember = { appScope.launch { historyRepository.setEnabled(!rememberPositions) } },
+            onMaximumBufferMinutesChange = { minutes ->
+                playback.setMaximumBufferMinutes(minutes)
+                appScope.launch { playerSettingsRepository.setMaximumBufferMinutes(minutes) }
+            },
             onClearHistory = { appScope.launch { historyRepository.clear() } },
             onDismiss = { settingsOpen = false },
         )
@@ -258,8 +276,10 @@ private fun HomeScreen(
 private fun SettingsScreen(
     focusRequester: FocusRequester,
     rememberPositions: Boolean,
+    maximumBufferMinutes: Int,
     entries: List<HistoryEntry>,
     onToggleRemember: () -> Unit,
+    onMaximumBufferMinutesChange: (Int) -> Unit,
     onClearHistory: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -278,6 +298,19 @@ private fun SettingsScreen(
                 Text("Position history stays on this device. Full video and subtitle URLs are never saved.", color = Muted, fontSize = 18.sp)
                 AppButton(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
                     Text("Remember positions: ${if (rememberPositions) "On" else "Off"}")
+                }
+                Text("MAXIMUM BUFFER", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
+                Text(
+                    "Buffers up to the selected time. Playback starts as soon as enough video is ready. Memory and stream limits may reduce the buffer. Applies to the next video.",
+                    color = Muted,
+                    fontSize = 16.sp,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(1, 2, 5).forEach { minutes ->
+                        AppButton(onClick = { onMaximumBufferMinutesChange(minutes) }) {
+                            Text("$minutes minute${if (minutes == 1) "" else "s"}${if (maximumBufferMinutes == minutes) " · Selected" else ""}")
+                        }
+                    }
                 }
                 if (entries.isNotEmpty()) {
                     Text("RECENT POSITIONS", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
