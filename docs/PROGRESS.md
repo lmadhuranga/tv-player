@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `5-tv-url-entry`
-- Current branch: `5-tv-url-entry`
-- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`.
+- Implemented through milestone: `6-lan-link-handoff`
+- Current branch: `6-lan-link-handoff`
+- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -65,6 +65,12 @@ Status: source implemented and reviewed; build, lint, playback, and device behav
 Added a remote-operable direct URL entry screen and a bounded validator. It trims outer whitespace, caps links at 4,096 characters, rejects control characters, non-HTTP(S) schemes, malformed or missing hosts, and embedded user-info credentials. Errors are shown inline; the URL is sent to the playback controller only after validation. The app now permits cleartext traffic for the planned HTTP as well as HTTPS playback path. The source label shown by the player is only the URL host; the complete URL is not displayed in that label or written to disk.
 
 Status: source implemented and reviewed; URL parsing and playback behavior are unverified because no tests or builds are being run.
+
+## Milestone 6: `6-lan-link-handoff`
+
+Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, generates a fresh 256-bit pairing code per session, and accepts only bounded JSON link submissions. Requests are limited to an 8 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links. The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
+
+Status: source implemented and reviewed; request handling, LAN interface selection, QR usability, browser compatibility, and lifecycle shutdown remain unverified.
 
 ## Current execution boundary
 

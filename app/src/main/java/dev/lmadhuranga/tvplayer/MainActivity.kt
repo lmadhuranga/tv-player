@@ -65,12 +65,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppRoute { HOME, ADD_URL, PLAYER }
+private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 
 @Composable
 private fun TVPlayerApp(playback: PlaybackController) {
     var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var pendingSubtitleUrl by remember { mutableStateOf<String?>(null) }
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
     val settingsCloseRequester = remember { FocusRequester() }
@@ -84,12 +85,24 @@ private fun TVPlayerApp(playback: PlaybackController) {
             settingsRequester = settingsOpenerRequester,
             onOpenPlayer = { route = AppRoute.PLAYER },
             onAddVideo = { route = AppRoute.ADD_URL },
+            onOpenHandoff = { route = AppRoute.HANDOFF },
             onOpenSettings = { settingsOpen = true },
         )
 
         AppRoute.ADD_URL -> VideoUrlEntryScreen(
             onStart = { url, label ->
+                pendingSubtitleUrl = null
                 playback.playUrl(url, "Video from $label")
+                route = AppRoute.PLAYER
+            },
+            onBack = { route = AppRoute.HOME },
+        )
+
+        AppRoute.HANDOFF -> HandoffScreen(
+            onVideoSubmitted = { submission ->
+                pendingSubtitleUrl = submission.subtitleUrl
+                val host = (validateVideoUrl(submission.videoUrl) as? VideoUrlValidation.Valid)?.sourceLabel ?: "TV Player"
+                playback.playUrl(submission.videoUrl, "Video from $host")
                 route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },
@@ -112,6 +125,7 @@ private fun HomeScreen(
     settingsRequester: FocusRequester,
     onOpenPlayer: () -> Unit,
     onAddVideo: () -> Unit,
+    onOpenHandoff: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     TVBackground {
@@ -140,6 +154,8 @@ private fun HomeScreen(
                 )
                 Spacer(Modifier.height(34.dp))
                 Button(onClick = onAddVideo) { Text("Add video URL", fontSize = 18.sp) }
+                Spacer(Modifier.height(10.dp))
+                Button(onClick = onOpenHandoff) { Text("Send link from phone", fontSize = 18.sp) }
                 Spacer(Modifier.height(10.dp))
                 Button(onClick = onOpenPlayer) { Text("Open player", fontSize = 18.sp) }
                 Spacer(Modifier.height(10.dp))
