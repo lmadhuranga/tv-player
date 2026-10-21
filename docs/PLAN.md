@@ -9,7 +9,7 @@ The working product name is **TV Player**. Choose a new package/application ID d
 ## Product boundaries
 
 - Native Android TV app in Kotlin, using Compose for TV for the interface, AndroidX Media3 ExoPlayer for playback, and DataStore for small persistent settings and history. Confirm compatible library versions and platform requirements when scaffolding.
-- Prefer a conservative minimum Android API level of 26 initially. Verify the chosen level against the selected Compose for TV and Media3 versions and target-device requirements before fixing it in the project.
+- The current source configuration uses minimum Android API level 26, compile/target API 36, and pinned Compose for TV/Media3 versions. Verify dependency resolution and target-device compatibility during the deferred build and QA pass.
 - Support direct HTTP(S) video URLs that the TV can access and Media3 can decode. This is not a general-purpose crawler, cloud downloader, transcoder, or file-hosting service.
 - Support external SRT and WebVTT subtitles when compatible with the selected media/player path. Treat subtitle URL credentials as sensitive and avoid persisting authenticated subtitle URLs unless the user explicitly opts into history that stores them.
 - Keep all app UI, settings, errors, documentation, and examples in English. Do not add localization, Sinhala UI, or a language toggle. Subtitle content may use any language and Unicode supported by the playback stack.
@@ -27,7 +27,7 @@ Persist playback position and recent-item metadata locally. Prefer a stable user
 
 ## Milestones and branches
 
-Work sequentially from the previous accepted commit. Each milestone below gets its own branch and focused commit; do not begin the next milestone until the current one is reviewed and accepted. The first branch is the current planning branch, `1-plan-docs`. Branches after it are created locally from the last accepted milestone. Keep branches local unless publishing is explicitly requested.
+Work sequentially from the previous milestone commit. Each milestone gets its own numbered branch and focused commit. The user explicitly authorized continuous source implementation of milestones 2–12, so this pass does not pause for intermediate acceptance; all branches stay local and unmerged.
 
 | Branch | Scope | Depends on | Acceptance and verification | Suggested commit |
 | --- | --- | --- | --- | --- |
@@ -42,7 +42,7 @@ Work sequentially from the previous accepted commit. Each milestone below gets i
 | `9-history-resume` | Add recent items, remembered position, clear-history, local privacy choice, and replacement-URL resume prompt. Keep authenticated subtitle URLs out of history by default. | Stable direct playback and persistence setup. | Restart restores intended history/settings; clear history removes records; a replacement URL can be resumed or restarted without pretending signed-link renewal is supported. | `feat: add private playback history` |
 | `10-playback-errors` | Bound Media3's in-memory playback buffer; report buffering progress and stalled playback; improve connectivity, expired/forbidden URL, unsupported format, and subtitle failures with actionable messages, explicit retry/re-entry, and recovery that preserves useful state. | Player, handoff, history. | Exercise representative network and media failures; app remains navigable and provides a path back to playback. Do not log secrets or download complete media to app storage. | `feat: improve playback recovery` |
 | `11-media-tracks` | Expose audio track selection and genuine quality/variant selection only when Media3 reports alternatives. Clearly label available stream variants separately from file pixel dimensions. | Playback errors and player menus. | On media with multiple tracks/variants, choices match reported capabilities; on single-track media, no fake menu/options appear. | `feat: expose available media tracks` |
-| `12-device-qa-release` | Complete TV layout/accessibility review, network/security checks, manifest/privacy review, release configuration, and user-facing setup/help notes. Fix issues discovered without expanding product scope. | Core v1 milestones. | Release build succeeds; approved real-TV pass covers D-pad, playback, handoff, subtitles and recovery. Record device/model, network conditions, test media capabilities, and remaining limits. | `chore: prepare TV Player v1` |
+| `12-device-qa-release` | Add release configuration, setup/help notes, and a repeatable TV layout/accessibility, network/security, manifest/privacy, and playback QA checklist. Fix source issues without expanding product scope. | Core v1 milestones. | Document exact local build/install steps and outstanding checks; record that build, lint, tests, emulator and real-TV QA remain pending for the user to run. Do not claim release readiness or device acceptance from source review. | `chore: prepare TV Player v1` |
 | `13-seedr-discovery` (optional) | Investigate whether a supported Seedr auth/API integration is available and design a separate proposal only if verified. Implementation requires a later explicit scope decision. | Core v1, separate approval. | Document authoritative API/auth evidence and credential handling; do not reuse another app's tokens. Stop at discovery if support cannot be proven. | `docs: assess optional Seedr integration` |
 
 ## Release-one acceptance
@@ -51,7 +51,7 @@ The first useful release is complete when a user can enter a direct video URL ei
 
 ## Validation policy
 
-- For every milestone, run focused static/build checks and unit tests only where they exercise meaningful logic such as URL validation, request bounds, history decisions, or state transitions.
+- Normally run focused static/build checks and meaningful unit tests for URL validation, request bounds, history decisions, or state transitions. For the current user-authorized implementation pass, defer all builds, lint, tests, emulator work, and device commands; report the exact checks that remain pending.
 - Emulator evidence is useful for navigation and media plumbing but is not proof of Sony BRAVIA compatibility.
 - Real-TV installation, network access, input, playback, subtitle rendering, and focus checks must be recorded separately and require explicit approval before connecting to or using the TV.
 - Do not claim playback or device behavior based on a successful compile. Record test streams and their actual available tracks/codecs without committing user URLs, credentials, or signed links.

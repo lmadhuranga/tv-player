@@ -94,10 +94,11 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     val appScope = rememberCoroutineScope()
     var pendingStart by remember { mutableStateOf<PendingPlayback?>(null) }
 
-    fun startVideo(url: String, title: String, subtitleUrl: String?) {
-        val candidate = recentEntries.firstOrNull { it.positionMs > 5_000L }
-        if (rememberPositions && candidate != null) {
-            pendingStart = PendingPlayback(url, title, subtitleUrl, candidate)
+    fun startVideo(url: String, requestedTitle: String?, subtitleUrl: String?, sourceLabel: String) {
+        val title = requestedTitle?.takeIf(String::isNotBlank) ?: "Video from $sourceLabel"
+        val candidates = recentEntries.filter { it.positionMs > 5_000L }
+        if (rememberPositions && candidates.isNotEmpty()) {
+            pendingStart = PendingPlayback(url, title, subtitleUrl, candidates)
         } else {
             playback.playUrl(url, title, subtitleUrl)
             route = AppRoute.PLAYER
@@ -121,8 +122,8 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         )
 
         AppRoute.ADD_URL -> VideoUrlEntryScreen(
-            onStart = { url, subtitleUrl, label ->
-                startVideo(url, "Video from $label", subtitleUrl)
+            onStart = { url, subtitleUrl, title, label ->
+                startVideo(url, title, subtitleUrl, label)
             },
             onBack = { route = AppRoute.HOME },
         )
@@ -130,7 +131,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         AppRoute.HANDOFF -> HandoffScreen(
             onVideoSubmitted = { submission ->
                 val host = (validateVideoUrl(submission.videoUrl) as? VideoUrlValidation.Valid)?.sourceLabel ?: "TV Player"
-                startVideo(submission.videoUrl, "Video from $host", submission.subtitleUrl)
+                startVideo(submission.videoUrl, submission.title, submission.subtitleUrl, host)
             },
             onBack = { route = AppRoute.HOME },
         )
@@ -161,9 +162,9 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
 
     pendingStart?.let { pending ->
         ResumePrompt(
-            entry = pending.entry,
-            onResume = {
-                playback.playUrl(pending.url, pending.title, pending.subtitleUrl, pending.entry.positionMs)
+            entries = pending.entries,
+            onResume = { entry ->
+                playback.playUrl(pending.url, pending.title, pending.subtitleUrl, entry.positionMs)
                 pendingStart = null
                 route = AppRoute.PLAYER
             },
@@ -177,7 +178,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     }
 }
 
-private data class PendingPlayback(val url: String, val title: String, val subtitleUrl: String?, val entry: HistoryEntry)
+private data class PendingPlayback(val url: String, val title: String, val subtitleUrl: String?, val entries: List<HistoryEntry>)
 
 @Composable
 private fun HomeScreen(
@@ -287,7 +288,7 @@ private fun SettingsScreen(
 }
 
 @Composable
-private fun ResumePrompt(entry: HistoryEntry, onResume: () -> Unit, onStartOver: () -> Unit, onCancel: () -> Unit) {
+private fun ResumePrompt(entries: List<HistoryEntry>, onResume: (HistoryEntry) -> Unit, onStartOver: () -> Unit, onCancel: () -> Unit) {
     val resumeRequester = remember { FocusRequester() }
     Dialog(onDismissRequest = onCancel) {
         LaunchedEffect(Unit) { resumeRequester.requestFocus() }
@@ -296,11 +297,15 @@ private fun ResumePrompt(entry: HistoryEntry, onResume: () -> Unit, onStartOver:
             shape = RoundedCornerShape(24.dp),
             colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
         ) {
-            Column(Modifier.padding(36.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.padding(36.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("RESUME VIDEO?", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
-                Text("A saved position is available from ${entry.sourceHost.ifBlank { "a previous video" }} at ${formatTime(entry.positionMs)}.", color = Color.White, fontSize = 21.sp)
-                Text("The new link may point to different content. Choose where to begin.", color = Muted, fontSize = 17.sp)
-                Button(onClick = onResume, modifier = Modifier.focusRequester(resumeRequester)) { Text("Resume at ${formatTime(entry.positionMs)}") }
+                Text("Choose a saved position. No link matching is inferred, and the new link may point to different content.", color = Muted, fontSize = 17.sp)
+                entries.forEachIndexed { index, entry ->
+                    val label = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }
+                    Button(onClick = { onResume(entry) }, modifier = if (index == 0) Modifier.focusRequester(resumeRequester) else Modifier) {
+                        Text("Resume $label · ${formatTime(entry.positionMs)}")
+                    }
+                }
                 Button(onClick = onStartOver) { Text("Start from the beginning") }
                 Button(onClick = onCancel) { Text("Cancel") }
             }

@@ -3,22 +3,39 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `11-media-tracks` (source complete; uncommitted review in progress)
-- Current branch: `11-media-tracks`
-- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`, `205e978`, `345b715`, `1ee76f8`, `3caeaf9`.
+- Implemented through milestone: `12-device-qa-release` (source complete; all verification pending)
+- Current branch: `12-device-qa-release`
+- Planning baseline: `be2f7cc`; milestones 2–12 are committed sequentially on separate local branches (full commit mapping below).
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
 
 - Native Kotlin Android TV app; Compose for TV, Media3 ExoPlayer, and DataStore are the initial technology direction.
-- Tentative minimum API level 26; verify against selected versions and the target device during scaffolding.
+- App configuration uses minimum API 26 and compile/target API 36. Build compatibility and target-device behavior remain unverified.
 - A TV-hosted page accepts links from a same-Wi-Fi browser. It submits only the URLs; video and subtitle data are fetched by the TV.
 - Direct HTTP(S) playback is the baseline. Seedr integration is deferred behind a verified authentication/support gate.
 - Remote navigation and reliable focus behavior are core requirements.
 - Recent history is local and privacy-conscious, with clear-history and deliberate handling of signed URL replacement/resume.
 - Feature work proceeds in numbered branches stacked from the last accepted commit; commit each feature before proceeding. No pushes, repository creation, or merge without an explicit request.
 - The app UI, settings, errors, documentation, and examples are English-only; subtitle content may use any language/Unicode supported by playback.
-- Build and test commands are deferred during this source-only implementation pass. Do not describe implementation as compiled, tested, or device-validated until those checks are explicitly run and recorded.
+- The user authorized continuous source implementation through milestone 12 without intermediate approvals. Build and test commands were deferred during this source-only pass. Do not describe implementation as compiled, tested, or device-validated until those checks are explicitly run and recorded.
+
+## Numbered branches and commits
+
+| Milestone | Branch | Commit |
+| --- | --- | --- |
+| 1 | `1-plan-docs` | `be2f7cc` |
+| 2 | `2-android-tv-skeleton` | `715bd34` |
+| 3 | `3-tv-shell-focus` | `2a35592` |
+| 4 | `4-direct-url-player` | `0e032cd` |
+| 5 | `5-link-entry-screen` | `8812c25` |
+| 6 | `6-lan-link-handoff` | `3e20ddc` |
+| 7 | `7-external-subtitles` | `205e978` |
+| 8 | `8-player-menus-display` | `345b715` |
+| 9 | `9-history-resume` | `1ee76f8` |
+| 10 | `10-playback-errors` | `3caeaf9` |
+| 11 | `11-media-tracks` | `7aa31b2` |
+| 12 | `12-device-qa-release` | pending this commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -68,7 +85,7 @@ Status: source implemented and reviewed; URL parsing and playback behavior are u
 
 ## Milestone 6: `6-lan-link-handoff`
 
-Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, generates a fresh 256-bit pairing code per session, and accepts only bounded JSON link submissions. Requests are limited to an 8 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links. The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
+Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, generates a fresh 256-bit pairing code per session, and accepts only bounded JSON link submissions. Requests are limited to a 12 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links plus an optional 100-character title. The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
 
 Status: source implemented and reviewed; request handling, LAN interface selection, QR usability, browser compatibility, and lifecycle shutdown remain unverified.
 
@@ -106,6 +123,12 @@ API references: [Media3 TrackSelectionOverride](https://developer.android.com/re
 
 Status: source implemented; dependency resolution, actual track discovery/selection, HLS/DASH compatibility, external-versus-embedded subtitle controls, and audio-focus behavior are unverified. No build, lint, or tests were run.
 
+## Milestone 12: `12-device-qa-release`
+
+Added release-variant minification/resource shrinking configuration without signing credentials. TV and phone/laptop link forms now accept an optional 100-character user label. Resume selection presents the saved positions and requires the user to choose one or start from the beginning; it warns that the new link may be different and does not silently resume based on a title match. Added [the local build and TV QA guide](SETUP_AND_QA.md) with toolchain setup, exact debug/lint and release commands, expected APK location, optional installation commands, a manual TV checklist, and known limitations. Updated this checkpoint to show that core source work through milestone 12 is committed, while all requested builds, tests, and device verification remain pending.
+
+Status: source implemented and reviewed; no APK was produced. The scaffold build timed out during dependency metadata resolution, and the retry was stopped before Kotlin compilation. No build, lint, test, emulator, or device command was run after the user directed source-only continuation. Release signing is intentionally unconfigured; debug/release packaging, manifest behavior, playback, focus, subtitles, handoff, history, and device compatibility remain unverified.
+
 ## Current execution boundary
 
-Continue the core roadmap sequentially, with each numbered milestone committed on its own branch stacked on the preceding commit. This implementation pass is source-only: do not run builds, lint, tests, emulator actions, or device commands. Update this log after each milestone and label source-complete milestones as unverified until the user requests and the checks are actually run. The user has authorized the implementation scope through milestone 12. Do not push or merge. Milestone 13 remains optional and out of scope. Real-TV installation and live testing remain pending explicit approval.
+Milestones 2–12 are source-complete on separate numbered branches, each stacked from its predecessor. This implementation pass is source-only: builds, lint, tests, emulator actions, and device commands were deferred. The initial scaffold build encountered Google Maven timeouts, and its retry was canceled before compilation. No APK was produced. Do not push or merge. Milestone 13 remains optional and out of scope. Real-TV installation and live testing remain pending explicit approval.

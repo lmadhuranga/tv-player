@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-data class SubmittedVideo(val videoUrl: String, val subtitleUrl: String?)
+data class SubmittedVideo(val videoUrl: String, val subtitleUrl: String?, val title: String? = null)
 
 data class HandoffState(
     val address: String? = null,
@@ -39,7 +39,7 @@ data class HandoffState(
 
 private const val HANDOFF_PORT = 8765
 private const val MAX_HEADER_BYTES = 16 * 1024
-private const val MAX_BODY_BYTES = 8 * 1024
+private const val MAX_BODY_BYTES = 12 * 1024
 
 /** Small foreground-only URL receiver. It accepts links, never media bytes. */
 class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
@@ -196,9 +196,10 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             is VideoUrlValidation.Valid -> result.normalizedUrl
             is VideoUrlValidation.Invalid -> return respond(socket.getOutputStream(), 422, "Unprocessable Entity", result.message)
         }
+        val title = payload.optString("title").filterNot(Char::isISOControl).trim().take(100).takeIf(String::isNotBlank)
         respond(socket.getOutputStream(), 202, "Accepted", "The TV is opening your video.")
         mainHandler.post {
-            if (isCurrent(listener, runId)) onVideoSubmitted(SubmittedVideo(videoUrl, subtitleUrl))
+            if (isCurrent(listener, runId)) onVideoSubmitted(SubmittedVideo(videoUrl, subtitleUrl, title))
         }
     }
 
@@ -273,13 +274,14 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             <style>body{font:18px system-ui;max-width:680px;margin:2rem auto;padding:0 1rem;background:#07111f;color:#fff}label{display:block;margin:1rem 0 .35rem}input{box-sizing:border-box;width:100%;padding:.85rem;border-radius:.6rem;border:1px solid #6b829d;font:inherit}button{margin-top:1.2rem;padding:.8rem 1.2rem;border:0;border-radius:.6rem;background:#5bd5c6;color:#07111f;font:inherit;font-weight:700}small{color:#b9c8d9}#status{min-height:2rem}</style>
             <h1>Send a video to your TV</h1><p>Enter direct links. The TV fetches and plays the media; this page only sends the links.</p>
             <label for="code">TV pairing code</label><input id="code" autocomplete="off" required>
-            <label for="video">Video URL</label><input id="video" type="url" autocomplete="url" required placeholder="https://example.com/video.mp4">
-            <label for="subtitle">Subtitle URL (optional SRT or WebVTT)</label><input id="subtitle" type="url" placeholder="https://example.com/subtitles.srt">
+            <label for="video">Video URL</label><input id="video" type="url" autocomplete="url" maxlength="4096" required placeholder="https://example.com/video.mp4">
+            <label for="title">Video title (optional)</label><input id="title" maxlength="100" placeholder="For example, Movie night">
+            <label for="subtitle">Subtitle URL (optional SRT or WebVTT)</label><input id="subtitle" type="url" maxlength="4096" placeholder="https://example.com/subtitles.srt">
             <button id="send">Send to TV</button><p id="status" role="status"></p>
             <script>
             const params=new URLSearchParams(location.hash.slice(1));const pairing=params.get('pairing');history.replaceState(null,'',location.pathname);
             if(pairing)document.querySelector('#code').value=pairing;
-            document.querySelector('#send').onclick=async()=>{const status=document.querySelector('#status');status.textContent='Sending…';try{const response=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':document.querySelector('#code').value},body:JSON.stringify({videoUrl:document.querySelector('#video').value,subtitleUrl:document.querySelector('#subtitle').value})});status.textContent=await response.text()}catch(e){status.textContent='Could not reach the TV. Check that both devices are on the same network.'}};
+            document.querySelector('#send').onclick=async()=>{const status=document.querySelector('#status');status.textContent='Sending…';try{const response=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':document.querySelector('#code').value},body:JSON.stringify({videoUrl:document.querySelector('#video').value,title:document.querySelector('#title').value,subtitleUrl:document.querySelector('#subtitle').value})});status.textContent=await response.text()}catch(e){status.textContent='Could not reach the TV. Check that both devices are on the same network.'}};
             </script></html>
         """.trimIndent()
     }

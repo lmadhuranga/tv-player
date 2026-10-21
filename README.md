@@ -8,15 +8,15 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-The source now covers direct link entry and playback, same-Wi-Fi link handoff, external subtitles, display controls, and opt-in local resume history. The remaining core milestones are being implemented sequentially on their numbered branches. This work has not yet been built or device-tested; see [the implementation plan](docs/PLAN.md) for scope and [the progress log](docs/PROGRESS.md) for evidence and verification status.
+Source implementation for core milestones 2–12 is complete and committed sequentially on local numbered branches. This pass did not compile, lint, test, install, or launch the app, so the source remains unverified. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for scope, exact evidence, and deferred checks.
 
 ## Development workflow
 
-- Implement one planned milestone at a time, on its numbered branch, stacked from the latest accepted milestone.
+- The core milestones were implemented one at a time on numbered branches, each stacked from the previous milestone commit.
 - Keep each branch focused; commit every completed feature before starting the next milestone.
 - Keep implementation and verification status distinct. Record exactly which checks ran and which remain pending; a source review does not prove that a build or device behavior works.
 - Do not push branches, create a GitHub repository, or merge to `main` without an explicit request.
-- TV connection, installation, or live testing requires explicit user approval for that work. The current authorization covers source implementation only; builds and tests are deferred until requested.
+- Source implementation was authorized through milestone 12. Builds, tests, installation, and TV connection remain pending; TV access requires explicit approval before device interaction.
 
 ## Tentative product identity
 
