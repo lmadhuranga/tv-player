@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `17-subtitle-file-upload-filename-and-hidden-skip` (build/lint/install/launch command complete; runtime UI QA pending)
-- Current branch: `17-subtitle-file-upload-filename-and-hidden-skip`
-- Planning baseline: `be2f7cc`; milestones 2–16 are committed sequentially on local branches; milestone 17 source, build/lint, install, and launch command are complete on its feature branch (full mapping below).
+- Implemented through milestone: `18-player-back-handoff-screen` (in progress)
+- Current branch: `18-player-back-handoff-screen`
+- Planning baseline: `be2f7cc`; milestones 2–17 are committed sequentially on local branches; milestone 18 is in progress (full mapping below).
 - The milestone 17 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, or other functional runtime QA was performed.
 
 ## Decisions recorded
@@ -40,7 +40,8 @@
 | 14 | `14-fullscreen-player-controls` | `e3f574c` |
 | 15 | `15-four-digit-pairing` | `ec708cb` |
 | 16 | `16-dark-buttons-white-focus` | branch HEAD (`git rev-parse 16-dark-buttons-white-focus`) |
-| 17 | `17-subtitle-file-upload-filename-and-hidden-skip` | pending commit |
+| 17 | `17-subtitle-file-upload-filename-and-hidden-skip` | `8f5d72b` |
+| 18 | `18-player-back-handoff-screen` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -185,6 +186,16 @@ Verification record:
 - `git diff --check` passed. Before install, ADB identified `192.168.8.100:5555` as manufacturer Sony, model BRAVIA VU3, API 34. `adb install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`; `pm path` and `dumpsys package` confirmed `dev.lmadhuranga.tvplayer`, version `0.1.0`, minSdk 26, targetSdk 36.
 - `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. No D-pad input, screenshot, visible UI inspection, playback, or feature QA was performed. Picker, subtitle rendering/cleanup, title display, seek, handoff, visual, and playback runtime behavior remain unverified.
 
+## Milestone 18: `18-player-back-handoff-screen`
+
+When the player exits through Back, the app returns to the phone-send handoff route instead of Home. The existing handoff screen continues to own its current QR, displayed phone URL, short PIN and foreground-only server. It now initially focuses a focusable “Go to Player” action and also exposes “Settings”; the player can be opened empty and Settings returns focus to its handoff button. Leaving the handoff route still disposes its server and pairing session; returning creates a fresh session through the existing lifecycle. Browser submissions continue to start playback immediately.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks); `git diff --check` passed.
+- Install/launch are pending after commit and fresh BRAVIA identity confirmation.
+- Device runtime behavior is not being inferred from source. Verify Back-to-handoff, action focus, empty-player return, Settings focus restoration, QR/URL freshness, and pairing-session rotation after build/install.
+
 ## Current execution boundary
 
-Milestones 2–16 are committed on separate local branches, stacked sequentially; milestone 17 is committed on its own branch and built/linted, installed, and launched. Manual functional/runtime QA remains pending. Optional Seedr discovery remains deferred.
+Milestones 2–17 are committed on separate local branches, stacked sequentially; milestone 18 is in progress. Manual functional/runtime QA remains pending. Optional Seedr discovery remains deferred.

@@ -48,6 +48,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
 - [ ] Visually confirm the phone-send QR/PIN screen is the default; Back to Home and confirm “Add Video URL” and “Open player” are absent.
 - [ ] Confirm focus visibility and D-pad reachability on Home, URL entry, options/settings dialogs, history and handoff screens; Back restores focus or returns safely.
+- [ ] From active and empty player states, use Back to return to handoff and confirm the current phone URL/QR plus focusable Go to Player and Settings actions. Confirm Go to Player has initial focus. Open Settings and confirm focus returns to its button; choose Go to Player with no media and confirm the empty player remains usable.
 - [ ] Verify every button is dark at rest, white only while focused/pressed, has readable disabled contrast, and returns to dark when focus moves. Check Home, player controls/settings, history/resume, URL entry, and handoff. Confirm selected audio/quality remains indicated by its check/label rather than a sticky white fill.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
 - [ ] Confirm video starts, pauses, seeks, supports each listed speed, and pauses when leaving the player or backgrounding the app.
@@ -67,7 +68,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
-- [ ] Verify media Play/Pause works with controls hidden; Back closes player settings, hides visible controls, then returns Home.
+- [ ] Verify media Play/Pause works with controls hidden; Back closes player settings, hides visible controls, then returns to the phone-send handoff screen.
 - [ ] Verify full-screen player settings contain no floating panels and Back restores focus to the originating Options or Audio control.
 - [ ] Complete a separate authorized Sony BRAVIA runtime pass; the installation does not demonstrate launcher visibility, playback, focus, network, or subtitle behavior.
 

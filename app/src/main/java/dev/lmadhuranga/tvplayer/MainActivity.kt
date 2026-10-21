@@ -127,12 +127,15 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         )
 
         AppRoute.HANDOFF -> HandoffScreen(
+            settingsRequester = settingsOpenerRequester,
             onVideoSubmitted = { submission ->
                 pendingStart = null
                 playback.playUrl(submission.videoUrl, submission.subtitleUrl)
                 route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },
+            onGoToPlayer = { route = AppRoute.PLAYER },
+            onOpenSettings = { settingsOpen = true },
         )
 
         AppRoute.PLAYER -> FullscreenPlayerScreen(playback = playback, window = window, onChooseSubtitleFile = {
@@ -142,7 +145,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
             route = AppRoute.ADD_URL
         }, onHome = {
             playback.pauseForBackground()
-            route = AppRoute.HOME
+            route = AppRoute.HANDOFF
         })
     }
 

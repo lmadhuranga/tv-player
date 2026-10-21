@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -26,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,9 +46,16 @@ import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.delay
 
 @Composable
-fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit) {
+fun HandoffScreen(
+    settingsRequester: FocusRequester,
+    onVideoSubmitted: (SubmittedVideo) -> Unit,
+    onBack: () -> Unit,
+    onGoToPlayer: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
     val server = remember { LocalLinkServer { latestCallback(it) } }
+    val goToPlayerRequester = remember { FocusRequester() }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
@@ -54,6 +65,10 @@ fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit
             now = SystemClock.elapsedRealtime()
             delay(1_000)
         }
+    }
+
+    LaunchedEffect(Unit) {
+        goToPlayerRequester.requestFocus()
     }
 
     DisposableEffect(server, lifecycleOwner) {
@@ -80,7 +95,10 @@ fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit
             modifier = Modifier.fillMaxSize().padding(horizontal = 64.dp, vertical = 36.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text("SEND A LINK TO YOUR TV", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
                 Spacer(Modifier.height(18.dp))
                 Text("Use your phone to add a video", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
@@ -112,7 +130,13 @@ fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(26.dp))
-                AppButton(onClick = onBack) { Text("Back") }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AppButton(onClick = onGoToPlayer, modifier = Modifier.focusRequester(goToPlayerRequester)) {
+                        Text("Go to Player")
+                    }
+                    AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
+                    AppButton(onClick = onBack) { Text("Back") }
+                }
             }
             Spacer(Modifier.width(40.dp))
             val qr = remember(state.pageUrl) { state.pageUrl?.let(::createQrBitmap) }
