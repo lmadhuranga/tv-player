@@ -63,6 +63,11 @@ class MainActivity : ComponentActivity() {
         playback.release()
         super.onDestroy()
     }
+
+    override fun onStop() {
+        if (::playback.isInitialized) playback.pauseForBackground()
+        super.onStop()
+    }
 }
 
 private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
@@ -71,7 +76,6 @@ private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 private fun TVPlayerApp(playback: PlaybackController) {
     var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
-    var pendingSubtitleUrl by remember { mutableStateOf<String?>(null) }
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
     val settingsCloseRequester = remember { FocusRequester() }
@@ -90,9 +94,8 @@ private fun TVPlayerApp(playback: PlaybackController) {
         )
 
         AppRoute.ADD_URL -> VideoUrlEntryScreen(
-            onStart = { url, label ->
-                pendingSubtitleUrl = null
-                playback.playUrl(url, "Video from $label")
+            onStart = { url, subtitleUrl, label ->
+                playback.playUrl(url, "Video from $label", subtitleUrl)
                 route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },
@@ -100,9 +103,8 @@ private fun TVPlayerApp(playback: PlaybackController) {
 
         AppRoute.HANDOFF -> HandoffScreen(
             onVideoSubmitted = { submission ->
-                pendingSubtitleUrl = submission.subtitleUrl
                 val host = (validateVideoUrl(submission.videoUrl) as? VideoUrlValidation.Valid)?.sourceLabel ?: "TV Player"
-                playback.playUrl(submission.videoUrl, "Video from $host")
+                playback.playUrl(submission.videoUrl, "Video from $host", submission.subtitleUrl)
                 route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },
@@ -252,6 +254,7 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                 color = Muted,
                 fontSize = 16.sp,
             )
+            state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = { playback.seekBy(-30_000L) }, enabled = state.title != null) { Text("−30 sec") }
@@ -262,7 +265,16 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                 Button(onClick = playback::cycleSpeed, enabled = state.title != null) {
                     Text("${state.speed}×")
                 }
+                Button(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
+                    Text(if (state.subtitlesEnabled) "Subtitles on" else "Subtitles off")
+                }
+                Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.subtitlesAvailable) { Text("Subs −") }
+                Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.subtitlesAvailable) { Text("Subs +") }
                 Button(onClick = onHome) { Text("Home") }
+            }
+            if (state.subtitlesAvailable) {
+                Spacer(Modifier.height(4.dp))
+                Text("Subtitle timing: ${formatOffset(state.subtitleOffsetMs)}", color = Muted, fontSize = 14.sp)
             }
         }
     }
@@ -276,6 +288,9 @@ private fun formatTime(milliseconds: Long): String {
     return if (hours > 0) String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
     else String.format(Locale.US, "%d:%02d", minutes, seconds)
 }
+
+private fun formatOffset(milliseconds: Long): String =
+    String.format(Locale.US, "%+.1f sec", milliseconds / 1_000.0)
 
 @Composable
 private fun Brand() {

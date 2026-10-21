@@ -13,13 +13,15 @@ import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.URI
+import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,12 +47,15 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
     private val mutableState = MutableStateFlow(HandoffState())
     val state: StateFlow<HandoffState> = mutableState.asStateFlow()
     private val stopped = AtomicBoolean(true)
+    private val generation = AtomicLong(0L)
     @Volatile private var server: ServerSocket? = null
+    @Volatile private var activeSocket: Socket? = null
     @Volatile private var pairingCode: String = ""
 
     @Synchronized
     fun start() {
         if (!stopped.compareAndSet(true, false)) return
+        val runId = generation.incrementAndGet()
         val lanAddress = findLanAddress()
         if (lanAddress == null) {
             stopped.set(true)
@@ -68,9 +73,10 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             }
             server = socket
             mutableState.value = HandoffState(address = lanAddress, pairingCode = pairingCode, isRunning = true)
-            Thread({ acceptLoop(socket) }, "tv-player-link-server").apply { isDaemon = true; start() }
+            Thread({ acceptLoop(socket, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
         } catch (_: Exception) {
             stopped.set(true)
+            generation.incrementAndGet()
             pairingCode = ""
             mutableState.value = HandoffState(message = "The link handoff page could not start. Close another app using port $HANDOFF_PORT and try again.")
         }
@@ -79,28 +85,65 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
     @Synchronized
     fun stop() {
         if (stopped.getAndSet(true)) return
+        generation.incrementAndGet()
         pairingCode = ""
+        try { activeSocket?.close() } catch (_: Exception) { }
+        activeSocket = null
         val current = server
         server = null
         try { current?.close() } catch (_: Exception) { }
         mutableState.value = HandoffState()
     }
 
-    private fun acceptLoop(listener: ServerSocket) {
-        while (!stopped.get()) {
+    private fun acceptLoop(listener: ServerSocket, runId: Long) {
+        while (isCurrent(listener, runId)) {
+            val client = try {
+                listener.accept()
+            } catch (_: SocketException) {
+                stopAfterListenerFailure(listener, runId)
+                return
+            } catch (_: Exception) {
+                stopAfterListenerFailure(listener, runId)
+                return
+            }
+            activeSocket = client
             try {
-                listener.accept().use { socket ->
+                client.use { socket ->
                     socket.soTimeout = 4_000
-                    if (isAllowedPeer(socket.inetAddress)) handleRequest(socket)
+                    if (!isCurrent(listener, runId)) return
+                    if (isAllowedPeer(socket.inetAddress)) handleRequest(socket, listener, runId)
                     else respond(socket.getOutputStream(), 403, "Forbidden", "Local network only")
                 }
+            } catch (_: SocketTimeoutException) {
+                // Drop partial requests without affecting the next local client.
             } catch (_: Exception) {
-                if (!stopped.get()) continue
+                // The peer may close early. Continue accepting only while this server generation is current.
+            } finally {
+                if (activeSocket === client) activeSocket = null
             }
         }
     }
 
-    private fun handleRequest(socket: Socket) {
+    private fun isCurrent(listener: ServerSocket, runId: Long): Boolean =
+        !stopped.get() && generation.get() == runId && server === listener
+
+    @Synchronized
+    private fun stopAfterListenerFailure(listener: ServerSocket, runId: Long) {
+        if (!isCurrent(listener, runId)) return
+        stopped.set(true)
+        val failedGeneration = generation.incrementAndGet()
+        server = null
+        activeSocket = null
+        pairingCode = ""
+        try { listener.close() } catch (_: Exception) { }
+        mainHandler.post {
+            if (stopped.get() && generation.get() == failedGeneration) {
+                mutableState.value = HandoffState(message = "The link handoff stopped. Reopen this screen to start a new session.")
+            }
+        }
+    }
+
+    private fun handleRequest(socket: Socket, listener: ServerSocket, runId: Long) {
         val input = BufferedInputStream(socket.getInputStream())
         val requestLine = readBoundedLine(input, MAX_HEADER_BYTES) ?: return
         val request = requestLine.split(' ', limit = 3)
@@ -115,7 +158,7 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             if (line.isEmpty()) break
             val colon = line.indexOf(':')
             if (colon <= 0) return respond(socket.getOutputStream(), 400, "Bad Request", "Invalid headers")
-            headers[line.substring(0, colon).trim().lowercase()] = line.substring(colon + 1).trim()
+            headers[line.substring(0, colon).trim().lowercase(Locale.ROOT)] = line.substring(colon + 1).trim()
         }
 
         val method = request[0]
@@ -154,22 +197,15 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             is VideoUrlValidation.Invalid -> return respond(socket.getOutputStream(), 422, "Unprocessable Entity", result.message)
         }
         respond(socket.getOutputStream(), 202, "Accepted", "The TV is opening your video.")
-        mainHandler.post { if (!stopped.get()) onVideoSubmitted(SubmittedVideo(videoUrl, subtitleUrl)) }
-    }
-
-    private fun validateSubtitleUrl(value: String): VideoUrlValidation {
-        if (value.length > 4_096) return VideoUrlValidation.Invalid("The subtitle link is too long.")
-        val result = validateVideoUrl(value)
-        if (result is VideoUrlValidation.Invalid) return result
-        val path = runCatching { URI(value).path.orEmpty().lowercase() }.getOrDefault("")
-        return if (path.endsWith(".srt") || path.endsWith(".vtt")) result
-        else VideoUrlValidation.Invalid("Subtitle links must end in .srt or .vtt.")
+        mainHandler.post {
+            if (isCurrent(listener, runId)) onVideoSubmitted(SubmittedVideo(videoUrl, subtitleUrl))
+        }
     }
 
     private fun isSameOrigin(origin: String?, localAddress: InetAddress): Boolean {
         if (origin == null) return false
-        val uri = runCatching { URI(origin) }.getOrNull() ?: return false
-        return uri.scheme == "http" && uri.host == localAddress.hostAddress && (uri.port == -1 || uri.port == HANDOFF_PORT)
+        val uri = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
+        return uri.scheme == "http" && uri.host == localAddress.hostAddress && uri.port == HANDOFF_PORT
     }
 
     private fun isAllowedPeer(peer: InetAddress): Boolean = peer is Inet4Address && peer.isSiteLocalAddress && sharesSubnet(peer)

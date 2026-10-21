@@ -2,6 +2,7 @@ package dev.lmadhuranga.tvplayer
 
 import java.net.URI
 import java.util.Locale
+import java.net.URI
 
 sealed interface VideoUrlValidation {
     data class Valid(val normalizedUrl: String, val sourceLabel: String) : VideoUrlValidation
@@ -15,9 +16,7 @@ fun validateVideoUrl(input: String): VideoUrlValidation {
     if (value.length > 4_096) return VideoUrlValidation.Invalid("That URL is too long.")
     if (value.any(Char::isISOControl)) return VideoUrlValidation.Invalid("The URL contains an invalid character.")
 
-    val uri = try {
-        URI(value)
-    } catch (_: Exception) {
+    val uri = parseHttpUri(value) ?: run {
         return VideoUrlValidation.Invalid("Enter a valid HTTP or HTTPS URL.")
     }
     val scheme = uri.scheme?.lowercase(Locale.ROOT)
@@ -29,3 +28,15 @@ fun validateVideoUrl(input: String): VideoUrlValidation {
     }
     return VideoUrlValidation.Valid(value, uri.host)
 }
+
+fun validateSubtitleUrl(input: String): VideoUrlValidation {
+    val result = validateVideoUrl(input)
+    if (result is VideoUrlValidation.Invalid) return result
+    val value = (result as VideoUrlValidation.Valid).normalizedUrl
+    if (value.length > 4_096) return VideoUrlValidation.Invalid("The subtitle link is too long.")
+    val path = parseHttpUri(value)?.path.orEmpty().lowercase(Locale.ROOT)
+    return if (path.endsWith(".srt") || path.endsWith(".vtt")) result
+    else VideoUrlValidation.Invalid("Subtitle links must end in .srt or .vtt.")
+}
+
+private fun parseHttpUri(value: String): URI? = try { URI(value) } catch (_: Exception) { null }
