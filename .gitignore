@@ -1,5 +1,6 @@
 # Gradle and Android build outputs
 .gradle/
+.kotlin/
 **/build/
 local.properties
 .externalNativeBuild/

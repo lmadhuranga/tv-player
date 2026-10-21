@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation through milestone 14 is committed on sequential local branches. The latest fullscreen player build and lint pass; an earlier debug APK is installed on a Sony BRAVIA VU3 without launch, while the updated fullscreen build remains local. Player runtime behavior and QA remain unverified. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
+Source implementation through milestone 15 is committed on sequential local branches. Fullscreen controls and four-digit LAN pairing pass the local debug build and lint; LAN/browser and player runtime behavior remain unverified. An earlier debug APK is installed on a Sony BRAVIA VU3 without launch. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
 
 ## Development workflow
 

@@ -1,6 +1,7 @@
 package dev.lmadhuranga.tvplayer
 
 import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,10 +16,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,6 +39,7 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import kotlinx.coroutines.delay
 
 @Composable
 fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit) {
@@ -42,6 +47,14 @@ fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit
     val server = remember { LocalLinkServer { latestCallback(it) } }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+
+    LaunchedEffect(state.pairingExpiresAtMs, state.pairingAvailableAtMs) {
+        while (state.isRunning) {
+            now = SystemClock.elapsedRealtime()
+            delay(1_000)
+        }
+    }
 
     DisposableEffect(server, lifecycleOwner) {
         server.start()
@@ -79,7 +92,23 @@ fun HandoffScreen(onVideoSubmitted: (SubmittedVideo) -> Unit, onBack: () -> Unit
                     Text("http://$address:8765", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
                     Spacer(Modifier.height(12.dp))
                     Text("PAIRING CODE", color = Muted, fontSize = 13.sp, letterSpacing = 2.sp)
-                    Text(state.pairingCode, color = Teal, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Text(state.pairingCode.ifBlank { "----" }, color = Teal, fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
+                    val cooldownSeconds = ((state.pairingAvailableAtMs - now).coerceAtLeast(0L) / 1_000L)
+                    if (cooldownSeconds > 0) {
+                        Text("New code ready in ${cooldownSeconds}s", color = Muted, fontSize = 14.sp)
+                    } else if (state.pairingCode.isNotBlank()) {
+                        val remainingSeconds = ((state.pairingExpiresAtMs - now).coerceAtLeast(0L) / 1_000L)
+                        Text(
+                            if (remainingSeconds == 0L) "Code expired. Generate a new code."
+                            else "Expires in ${remainingSeconds / 60}:${(remainingSeconds % 60).toString().padStart(2, '0')}",
+                            color = Muted,
+                            fontSize = 14.sp,
+                        )
+                    } else {
+                        Text("Code used. Generate a new code to pair another browser.", color = Muted, fontSize = 14.sp)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Button(onClick = server::regeneratePin, enabled = cooldownSeconds == 0L) { Text("Generate new code") }
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(26.dp))

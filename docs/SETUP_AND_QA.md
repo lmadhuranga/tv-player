@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records the completed local build/lint and authorized installation, plus checks still pending. The milestone 13 debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched; the newer milestone 14 APK is built locally and not installed. No tests, playback, D-pad interaction, screenshots, or runtime checks were performed.
+This guide records completed local build/lint and authorized installation, plus checks still pending. The milestone 13 debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched; the milestone 14 and 15 debug APKs were built locally and not installed. No tests, LAN/browser pairing, playback, D-pad interaction, screenshots, or runtime checks were performed.
 
 ## Local toolchain
 
@@ -49,7 +49,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Confirm focus visibility and D-pad reachability on Home, URL entry, options/settings dialogs, history and handoff screens; Back restores focus or returns safely.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
 - [ ] Confirm video starts, pauses, seeks, supports each listed speed, and pauses when leaving the player or backgrounding the app.
-- [ ] Test same-Wi-Fi phone/laptop link handoff, pairing code, QR, optional title, optional subtitle, invalid token/origin, oversized request, and server stop/restart. Confirm the local page sends links only and no full URLs or pairing token are logged.
+- [ ] Test same-Wi-Fi phone/laptop link handoff, four-digit PIN (including a leading zero), QR, optional title, optional subtitle, invalid PIN/session/origin, oversized request, five failed PIN attempts plus cooldown, expiry/regeneration, one-time PIN exchange, and server stop/restart invalidation. Confirm the local page sends links only and no full URLs or pairing secrets are logged.
 - [ ] Test valid SRT and WebVTT, malformed/unreachable subtitle URLs, on/off, size/color/background, ± timing offset, external-track seek/speed behavior, and available embedded subtitle tracks.
 - [ ] Test Fit/Fill/Zoom with different aspect ratios and compare decoded picture dimensions with available stream variant labels.
 - [ ] Use media with multiple supported audio tracks and HLS/DASH variants; confirm actual choices switch correctly. Use a single-variant source and confirm no quality selector is shown.
@@ -57,7 +57,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
-- [ ] Install the newer fullscreen player APK from milestone 14 after separate authorization. The older milestone 13 package remains installed; no app launch has occurred.
+- [ ] Install the newer fullscreen player / four-digit pairing APK from milestone 15 after separate authorization. The older milestone 13 package remains installed; no app launch has occurred.
 - [ ] Confirm fullscreen video extends under hidden system bars and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.

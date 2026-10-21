@@ -3,10 +3,10 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `14-fullscreen-player-controls` (debug build/lint passed; runtime behavior remains unverified)
-- Current branch: `14-fullscreen-player-controls`
-- Planning baseline: `be2f7cc`; milestones 2–14 are committed sequentially on local branches (full mapping below).
-- Milestone 13's APK was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. Milestone 14's updated APK was built locally but not installed or launched; no player runtime behavior has been tested.
+- Implemented through milestone: `15-four-digit-pairing` (debug build/lint passed; LAN/browser behavior remains unverified)
+- Current branch: `15-four-digit-pairing`
+- Planning baseline: `be2f7cc`; milestones 2–14 are committed sequentially on local branches; milestone 15 is built and being committed (full mapping below).
+- Milestone 13's APK was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. Milestone 14 and 15 debug APKs were built locally but not installed or launched. No current LAN/browser or player runtime behavior has been tested.
 
 ## Decisions recorded
 
@@ -37,7 +37,8 @@
 | 11 | `11-media-tracks` | `7aa31b2` |
 | 12 | `12-device-qa-release` | branch HEAD (`git rev-parse 12-device-qa-release`) |
 | 13 | `13-build-install` | branch HEAD (`git rev-parse 13-build-install`) |
-| 14 | `14-fullscreen-player-controls` | branch HEAD (`git rev-parse 14-fullscreen-player-controls`) |
+| 14 | `14-fullscreen-player-controls` | `e3f574c` |
+| 15 | `15-four-digit-pairing` | branch HEAD (`git rev-parse 15-four-digit-pairing`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -152,6 +153,15 @@ Verification record:
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; the lint report has no errors and 22 warnings.
 - No emulator/device commands were run for milestone 14. The prior milestone 13 APK remains installed on BRAVIA VU3; this updated APK has not been installed or launched. Fullscreen layout, system bars, remote focus, timer, Back behavior, media key handling, menus, and playback remain unverified at runtime.
 
+## Milestone 15: `15-four-digit-pairing`
+
+Replaced the long code shown on the TV with a uniformly random, exactly four-digit PIN, preserving leading zeroes. The phone page exchanges the PIN once at same-origin `POST /api/pair` for a fresh 256-bit session token; the page retains that token only in memory and sends it in the existing `/api/play` header. PINs expire after five minutes, the TV can generate a new PIN, and the server invalidates PIN and session token when stopped or restarted. Five wrong guesses rotate the PIN and enforce a 30-second server-side cooldown. Same-origin and same-subnet checks remain in effect, and responses are marked `no-store`; no pairing secrets or full media URLs are logged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; Gradle reported `BUILD SUCCESSFUL` with no errors. A nullable-host warning in the LAN address selector was corrected during implementation; the final build emitted no Kotlin compiler warnings.
+- `git diff --check` passed. No tests, emulator/device commands, TV actions, or phone-browser LAN requests were run. The updated APK remains local and has not been installed or launched. PIN expiry, cooldown, one-time exchange, QR behavior, and server lifecycle remain unverified at runtime.
+
 ## Current execution boundary
 
-Milestones 2–14 are committed on separate local branches, stacked sequentially. Milestone 14 debug build/lint passed. Do not connect to, install on, launch, or send input to a TV for this feature unless separately authorized. No app launch or runtime QA has occurred. Do not push or merge. Optional Seedr discovery remains deferred.
+Milestones 2–14 are committed on separate local branches, stacked sequentially; milestone 15 source and local build/lint are complete on its own branch. Do not connect to, install on, launch, or send input to a TV for this feature unless separately authorized. No app launch or runtime QA has occurred. Do not push or merge. Optional Seedr discovery remains deferred.

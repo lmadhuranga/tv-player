@@ -2,6 +2,7 @@ package dev.lmadhuranga.tvplayer
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Base64
 import org.json.JSONObject
 import java.io.BufferedInputStream
@@ -33,13 +34,18 @@ data class HandoffState(
     val pairingCode: String = "",
     val isRunning: Boolean = false,
     val message: String? = null,
+    val pairingExpiresAtMs: Long = 0L,
+    val pairingAvailableAtMs: Long = 0L,
 ) {
-    val pageUrl: String? get() = address?.let { "http://$it:$HANDOFF_PORT/#pairing=$pairingCode" }
+    val pageUrl: String? get() = address?.let { "http://$it:$HANDOFF_PORT/#pin=$pairingCode" }
 }
 
 private const val HANDOFF_PORT = 8765
 private const val MAX_HEADER_BYTES = 16 * 1024
 private const val MAX_BODY_BYTES = 12 * 1024
+private const val PIN_LIFETIME_MS = 5 * 60 * 1000L
+private const val PIN_COOLDOWN_MS = 30 * 1000L
+private const val MAX_PIN_FAILURES = 5
 
 /** Small foreground-only URL receiver. It accepts links, never media bytes. */
 class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
@@ -51,6 +57,10 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
     @Volatile private var server: ServerSocket? = null
     @Volatile private var activeSocket: Socket? = null
     @Volatile private var pairingCode: String = ""
+    @Volatile private var sessionToken: String = ""
+    @Volatile private var pairingExpiresAtMs: Long = 0L
+    @Volatile private var pairingAvailableAtMs: Long = 0L
+    private var failedPinAttempts = 0
 
     @Synchronized
     fun start() {
@@ -62,9 +72,6 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             mutableState.value = HandoffState(message = "Connect the TV to Wi-Fi or Ethernet to use link handoff.")
             return
         }
-        val tokenBytes = ByteArray(32)
-        SecureRandom().nextBytes(tokenBytes)
-        pairingCode = Base64.encodeToString(tokenBytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         try {
             val socket = ServerSocket().apply {
                 reuseAddress = false
@@ -72,12 +79,13 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
                 bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
             }
             server = socket
-            mutableState.value = HandoffState(address = lanAddress, pairingCode = pairingCode, isRunning = true)
+            rotatePin(lanAddress)
             Thread({ acceptLoop(socket, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
         } catch (_: Exception) {
             stopped.set(true)
             generation.incrementAndGet()
             pairingCode = ""
+            sessionToken = ""
             mutableState.value = HandoffState(message = "The link handoff page could not start. Close another app using port $HANDOFF_PORT and try again.")
         }
     }
@@ -87,6 +95,9 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
         if (stopped.getAndSet(true)) return
         generation.incrementAndGet()
         pairingCode = ""
+        sessionToken = ""
+        pairingExpiresAtMs = 0L
+        pairingAvailableAtMs = 0L
         try { activeSocket?.close() } catch (_: Exception) { }
         activeSocket = null
         val current = server
@@ -135,6 +146,7 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
         server = null
         activeSocket = null
         pairingCode = ""
+        sessionToken = ""
         try { listener.close() } catch (_: Exception) { }
         mainHandler.post {
             if (stopped.get() && generation.get() == failedGeneration) {
@@ -164,10 +176,15 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
         val method = request[0]
         val path = request[1].substringBefore('?')
         if (method == "GET" && path == "/") return respond(socket.getOutputStream(), 200, "OK", LINK_ENTRY_PAGE, "text/html; charset=utf-8")
+        if (method == "POST" && path == "/api/pair") {
+            if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
+            val pin = headers["x-pairing-pin"].orEmpty()
+            return exchangePin(socket, listener, runId, pin)
+        }
         if (method != "POST" || path != "/api/play") return respond(socket.getOutputStream(), 404, "Not Found", "Not found")
         if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
         val receivedToken = headers["x-pairing-token"].orEmpty().toByteArray(StandardCharsets.UTF_8)
-        val expectedToken = pairingCode.toByteArray(StandardCharsets.UTF_8)
+        val expectedToken = sessionToken.toByteArray(StandardCharsets.UTF_8)
         if (expectedToken.isEmpty() || !MessageDigest.isEqual(expectedToken, receivedToken)) {
             return respond(socket.getOutputStream(), 401, "Unauthorized", "Pair this browser with the code shown on the TV")
         }
@@ -203,6 +220,63 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
         }
     }
 
+    @Synchronized
+    private fun exchangePin(socket: Socket, listener: ServerSocket, runId: Long, pin: String) {
+        val now = SystemClock.elapsedRealtime()
+        val output = socket.getOutputStream()
+        if (!isCurrent(listener, runId)) return respond(output, 410, "Gone", "The TV pairing session has ended")
+        if (now < pairingAvailableAtMs) return respond(output, 429, "Too Many Requests", "Wait briefly before trying a new code")
+        if (pairingCode.isEmpty()) {
+            return respond(output, 409, "Conflict", "This code was already used. Generate a new code on the TV to pair another browser")
+        }
+        if (now >= pairingExpiresAtMs) {
+            rotatePin(mutableState.value.address)
+            return respond(output, 410, "Gone", "This code expired. Use the new code shown on the TV")
+        }
+        if (pin.length != 4 || pin.any { !it.isDigit() } || !MessageDigest.isEqual(
+                pairingCode.toByteArray(StandardCharsets.US_ASCII), pin.toByteArray(StandardCharsets.US_ASCII)
+            )) {
+            failedPinAttempts++
+            if (failedPinAttempts >= MAX_PIN_FAILURES) {
+                pairingAvailableAtMs = now + PIN_COOLDOWN_MS
+                rotatePin(mutableState.value.address, preserveCooldown = true)
+            }
+            return respond(output, 401, "Unauthorized", "That code is not correct")
+        }
+        pairingCode = "" // The short PIN is one-use; subsequent submissions require the exchanged token.
+        failedPinAttempts = 0
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        sessionToken = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        publishPairingState()
+        respond(output, 200, "OK", JSONObject(mapOf("token" to sessionToken)).toString(), "application/json; charset=utf-8")
+    }
+
+    @Synchronized
+    fun regeneratePin() {
+        if (stopped.get()) return
+        rotatePin(mutableState.value.address)
+    }
+
+    private fun rotatePin(address: String?, preserveCooldown: Boolean = false) {
+        pairingCode = SecureRandom().nextInt(10_000).toString().padStart(4, '0')
+        pairingExpiresAtMs = SystemClock.elapsedRealtime() + PIN_LIFETIME_MS
+        sessionToken = ""
+        failedPinAttempts = 0
+        if (!preserveCooldown) pairingAvailableAtMs = 0L
+        publishPairingState(address)
+    }
+
+    private fun publishPairingState(address: String? = mutableState.value.address) {
+        mutableState.value = HandoffState(
+            address = address,
+            pairingCode = pairingCode,
+            isRunning = !stopped.get(),
+            pairingExpiresAtMs = pairingExpiresAtMs,
+            pairingAvailableAtMs = pairingAvailableAtMs,
+        )
+    }
+
     private fun isSameOrigin(origin: String?, localAddress: InetAddress): Boolean {
         if (origin == null) return false
         val uri = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
@@ -234,7 +308,8 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
                 .filter { it.isSiteLocalAddress }
         }.getOrDefault(emptyList())
         return candidates.firstOrNull { address ->
-            address.hostAddress.startsWith("192.168.") || address.hostAddress.startsWith("10.") || address.hostAddress.startsWith("172.")
+            val host = address.hostAddress ?: return@firstOrNull false
+            host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("172.")
         }?.hostAddress
     }
 
@@ -273,15 +348,16 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             <meta charset="utf-8"><title>TV Player</title>
             <style>body{font:18px system-ui;max-width:680px;margin:2rem auto;padding:0 1rem;background:#07111f;color:#fff}label{display:block;margin:1rem 0 .35rem}input{box-sizing:border-box;width:100%;padding:.85rem;border-radius:.6rem;border:1px solid #6b829d;font:inherit}button{margin-top:1.2rem;padding:.8rem 1.2rem;border:0;border-radius:.6rem;background:#5bd5c6;color:#07111f;font:inherit;font-weight:700}small{color:#b9c8d9}#status{min-height:2rem}</style>
             <h1>Send a video to your TV</h1><p>Enter direct links. The TV fetches and plays the media; this page only sends the links.</p>
-            <label for="code">TV pairing code</label><input id="code" autocomplete="off" required>
+            <label for="code">4-digit TV pairing code</label><input id="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="one-time-code" required>
             <label for="video">Video URL</label><input id="video" type="url" autocomplete="url" maxlength="4096" required placeholder="https://example.com/video.mp4">
             <label for="title">Video title (optional)</label><input id="title" maxlength="100" placeholder="For example, Movie night">
             <label for="subtitle">Subtitle URL (optional SRT or WebVTT)</label><input id="subtitle" type="url" maxlength="4096" placeholder="https://example.com/subtitles.srt">
             <button id="send">Send to TV</button><p id="status" role="status"></p>
             <script>
-            const params=new URLSearchParams(location.hash.slice(1));const pairing=params.get('pairing');history.replaceState(null,'',location.pathname);
-            if(pairing)document.querySelector('#code').value=pairing;
-            document.querySelector('#send').onclick=async()=>{const status=document.querySelector('#status');status.textContent='Sending…';try{const response=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':document.querySelector('#code').value},body:JSON.stringify({videoUrl:document.querySelector('#video').value,title:document.querySelector('#title').value,subtitleUrl:document.querySelector('#subtitle').value})});status.textContent=await response.text()}catch(e){status.textContent='Could not reach the TV. Check that both devices are on the same network.'}};
+            const params=new URLSearchParams(location.hash.slice(1));const pin=params.get('pin');history.replaceState(null,'',location.pathname);
+            if(pin&&/^[0-9]{4}$/.test(pin))document.querySelector('#code').value=pin;
+            let pairingToken=null;
+            document.querySelector('#send').onclick=async()=>{const status=document.querySelector('#status');status.textContent='Sending…';try{if(!pairingToken){const pair=await fetch('/api/pair',{method:'POST',cache:'no-store',headers:{'X-Pairing-Pin':document.querySelector('#code').value}});if(!pair.ok){status.textContent=await pair.text();return}pairingToken=(await pair.json()).token}const response=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':pairingToken},body:JSON.stringify({videoUrl:document.querySelector('#video').value,title:document.querySelector('#title').value,subtitleUrl:document.querySelector('#subtitle').value})});if(response.status===401){pairingToken=null;document.querySelector('#code').value='';status.textContent='TV session ended. Enter the new 4-digit code shown on the TV, then send again.';return}status.textContent=await response.text()}catch(e){status.textContent='Could not reach the TV. Check that both devices are on the same network.'}};
             </script></html>
         """.trimIndent()
     }
