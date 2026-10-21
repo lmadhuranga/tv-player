@@ -17,7 +17,7 @@ export ANDROID_SDK_ROOT="$ANDROID_HOME"
 
 Install Android SDK Platform 36 and Android SDK Build Tools 36 through Android Studio's SDK Manager if they are missing. The Gradle wrapper pins Gradle 8.13; AGP 8.13.2 and Kotlin 2.2.21 are pinned in the version catalog. The debug APK, if the build succeeds, should be at `app/build/outputs/apk/debug/app-debug.apk`.
 
-The previous scaffold-only build attempt reached Gradle dependency metadata resolution but timed out while accessing Google Maven. A retry was stopped before Kotlin compilation at the user's direction. Therefore this source pass has no compile or lint result; allow Gradle network access and retry the commands above when the user requests verification.
+During milestone 2, a scaffold-only build attempt reached Gradle dependency metadata resolution but timed out while accessing Google Maven; its retry was stopped before Kotlin compilation at the user's direction. No build, lint, or test was run for the completed milestone 2–12 source. Allow Gradle network access and retry the commands above when the user requests verification.
 
 ## Optional local installation
 

@@ -35,7 +35,7 @@
 | 9 | `9-history-resume` | `1ee76f8` |
 | 10 | `10-playback-errors` | `3caeaf9` |
 | 11 | `11-media-tracks` | `7aa31b2` |
-| 12 | `12-device-qa-release` | pending this commit |
+| 12 | `12-device-qa-release` | branch HEAD (`git rev-parse 12-device-qa-release`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
