@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint, install, and launch commands, plus checks still pending. The final milestone 18 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). No visual inspection, D-pad interaction, playback, local subtitle import, Back routing, or other runtime QA was performed.
+This guide records completed local build/lint, install, and launch commands, plus checks still pending. The final milestone 19 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). No visual inspection, D-pad interaction, playback, local subtitle import, Settings reopen, Back routing, or other runtime QA was performed.
 
 ## Local toolchain
 
@@ -65,7 +65,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
-- [x] Install and launch the latest milestone 18 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
+- [x] Install and launch the latest milestone 19 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
