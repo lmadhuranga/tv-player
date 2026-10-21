@@ -3,10 +3,10 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `13-build-install` (debug build/lint and package installation verified; app behavior remains unverified)
-- Current branch: `13-build-install`
-- Planning baseline: `be2f7cc`; core milestones 2–12 and build/install milestone 13 are committed sequentially on local branches (full mapping below).
-- The debug APK was installed on the authorized Sony BRAVIA VU3 (Android API 34). It was not launched; no app input, navigation, playback, screenshot, or runtime behavior was tested.
+- Implemented through milestone: `14-fullscreen-player-controls` (debug build/lint passed; runtime behavior remains unverified)
+- Current branch: `14-fullscreen-player-controls`
+- Planning baseline: `be2f7cc`; milestones 2–14 are committed sequentially on local branches (full mapping below).
+- Milestone 13's APK was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. Milestone 14's updated APK was built locally but not installed or launched; no player runtime behavior has been tested.
 
 ## Decisions recorded
 
@@ -18,7 +18,7 @@
 - Recent history is local and privacy-conscious, with clear-history and deliberate handling of signed URL replacement/resume.
 - Feature work proceeds in numbered branches stacked from the last accepted commit; commit each feature before proceeding. No pushes, repository creation, or merge without an explicit request.
 - The app UI, settings, errors, documentation, and examples are English-only; subtitle content may use any language/Unicode supported by playback.
-- The user later authorized local build/lint and installing the matching debug package to the TV, while explicitly disallowing launch. Installation is recorded below; tests, launch, and runtime behavior remain unverified.
+- The user authorized the milestone 13 debug build/lint/install without launch. For milestone 14, only local build/lint is authorized; the updated APK remains local. Player tests and runtime behavior remain unverified.
 
 ## Numbered branches and commits
 
@@ -37,6 +37,7 @@
 | 11 | `11-media-tracks` | `7aa31b2` |
 | 12 | `12-device-qa-release` | branch HEAD (`git rev-parse 12-device-qa-release`) |
 | 13 | `13-build-install` | branch HEAD (`git rev-parse 13-build-install`) |
+| 14 | `14-fullscreen-player-controls` | branch HEAD (`git rev-parse 14-fullscreen-player-controls`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -142,6 +143,15 @@ Verification record:
 - ADB read-only identification confirmed Sony BRAVIA VU3, Android API `34`; no package was installed beforehand. `adb install -r` returned `Success`. Post-install `pm path` and `dumpsys package` confirmed the package path and version `1` / `0.1.0`, minSdk `26`, targetSdk `36`.
 - The app was not launched. No app input, navigation, playback, screenshots, or runtime behavior were tested. Existing build/lint warnings and device runtime behavior remain open for QA.
 
+## Milestone 14: `14-fullscreen-player-controls`
+
+Replaced the boxed player and always-visible controls with a full-bleed Media3 surface, immersive system bars, top/bottom branded gradient scrims, a title/back/options header, buffered seek/time row, and playback controls. Controls start visible and hide after four seconds only while actively playing; pause, buffering, video/subtitle errors, and the full-screen options page hold the timeout. Hidden controls are removed from composition/focus traversal; Down reveals them and transfers focus to Play/Pause, while a matching key-up is consumed. Media Play/Pause is handled even when controls are hidden. The focused progress row seeks in ten-second steps with left/right. Back closes player settings, then hides visible controls, then returns Home. CC remains accessible on the control row; gear/audio entry opens the full-screen player settings page, and Back returns focus to its opener. Buffering remains visible while controls hide; incoming playback errors outside the settings page reveal controls and focus Retry or new link, while errors inside settings remain visible there.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; the lint report has no errors and 22 warnings.
+- No emulator/device commands were run for milestone 14. The prior milestone 13 APK remains installed on BRAVIA VU3; this updated APK has not been installed or launched. Fullscreen layout, system bars, remote focus, timer, Back behavior, media key handling, menus, and playback remain unverified at runtime.
+
 ## Current execution boundary
 
-Milestones 2–13 are committed on separate local branches, stacked sequentially. The debug build, lint, and package installation have been verified; tests, app launch and all runtime behavior remain unverified. Do not launch the TV app unless separately authorized. Do not push or merge. Optional Seedr discovery remains deferred. No additional device interaction is authorized by this checkpoint.
+Milestones 2–14 are committed on separate local branches, stacked sequentially. Milestone 14 debug build/lint passed. Do not connect to, install on, launch, or send input to a TV for this feature unless separately authorized. No app launch or runtime QA has occurred. Do not push or merge. Optional Seedr discovery remains deferred.

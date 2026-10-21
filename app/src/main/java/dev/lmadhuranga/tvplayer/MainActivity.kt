@@ -1,6 +1,7 @@
 package dev.lmadhuranga.tvplayer
 
 import android.os.Bundle
+import android.view.Window
 import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -31,18 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.media3.ui.PlayerView
-import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
@@ -64,7 +60,7 @@ class MainActivity : ComponentActivity() {
         playback = PlaybackController(applicationContext, history)
         setContent {
             MaterialTheme {
-                TVPlayerApp(playback, history)
+                TVPlayerApp(playback, history, window)
             }
         }
     }
@@ -84,7 +80,7 @@ private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 
 @Composable
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-private fun TVPlayerApp(playback: PlaybackController, historyRepository: HistoryRepository) {
+private fun TVPlayerApp(playback: PlaybackController, historyRepository: HistoryRepository, window: Window) {
     var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
@@ -106,7 +102,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         }
     }
 
-    BackHandler(enabled = settingsOpen || route != AppRoute.HOME) {
+    BackHandler(enabled = settingsOpen || (route != AppRoute.HOME && route != AppRoute.PLAYER)) {
         if (settingsOpen) settingsOpen = false else {
             if (route == AppRoute.PLAYER) playback.pauseForBackground()
             route = AppRoute.HOME
@@ -137,7 +133,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
             onBack = { route = AppRoute.HOME },
         )
 
-        AppRoute.PLAYER -> PlayerScreen(playback = playback, onAddUrl = {
+        AppRoute.PLAYER -> FullscreenPlayerScreen(playback = playback, window = window, onAddUrl = {
             playback.pauseForBackground()
             route = AppRoute.ADD_URL
         }, onHome = {
@@ -314,161 +310,6 @@ private fun ResumePrompt(entries: List<HistoryEntry>, onResume: (HistoryEntry) -
     }
 }
 
-@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
-@Composable
-private fun PlayerScreen(playback: PlaybackController, onAddUrl: () -> Unit, onHome: () -> Unit) {
-    val state by playback.state.collectAsState()
-    var menuOpen by remember { mutableStateOf(false) }
-    var menuWasOpen by remember { mutableStateOf(false) }
-    val menuOpener = remember { FocusRequester() }
-    val menuFirst = remember { FocusRequester() }
-    BackHandler(enabled = menuOpen) { menuOpen = false }
-    Surface(modifier = Modifier.fillMaxSize(), colors = SurfaceDefaults.colors(containerColor = Ink)) {
-        Box(Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize().focusProperties { canFocus = !menuOpen }.padding(horizontal = 56.dp, vertical = 32.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(state.title ?: "PLAYER", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.weight(1f))
-                Text(if (state.isBuffering) "Buffering…" else "", color = Muted, fontSize = 16.sp)
-            }
-            Spacer(Modifier.height(18.dp))
-            Box(
-                modifier = Modifier.weight(1f).fillMaxSize().background(Color.Black, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { context ->
-                        PlayerView(context).apply {
-                            useController = false
-                            isFocusable = false
-                            isFocusableInTouchMode = false
-                            player = playback.player
-                        }
-                    },
-                    update = { view ->
-                        if (view.player !== playback.player) view.player = playback.player
-                        view.resizeMode = state.displayMode.resizeMode
-                        view.subtitleView?.apply {
-                            setApplyEmbeddedStyles(false)
-                            setApplyEmbeddedFontSizes(false)
-                            val color = listOf(Color.White, Color.Yellow, Color.Cyan, Color.Green)[state.subtitleColorIndex].toArgb()
-                            val background = if (state.subtitleBackgroundEnabled) 0xB8000000.toInt() else android.graphics.Color.TRANSPARENT
-                            setStyle(CaptionStyleCompat(color, background, android.graphics.Color.TRANSPARENT,
-                                CaptionStyleCompat.EDGE_TYPE_OUTLINE, android.graphics.Color.BLACK, null))
-                            setFractionalTextSize(listOf(0.045f, 0.06f, 0.075f, 0.09f)[state.subtitleSizeIndex])
-                        }
-                    },
-                    onRelease = { view -> view.player = null },
-                )
-                if (state.title == null) {
-                    Text("Nothing is playing yet", color = Color.White, fontSize = 28.sp)
-                }
-                state.error?.let { message ->
-                    Text(message, color = Color.White, fontSize = 21.sp, modifier = Modifier.padding(40.dp))
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "${formatTime(state.positionMs)}  /  ${formatTime(state.durationMs)}",
-                color = Muted,
-                fontSize = 16.sp,
-            )
-            Text(
-                if (state.isBuffering) "Buffering · buffered to ${formatTime(state.bufferedPositionMs)}"
-                else "Buffered to ${formatTime(state.bufferedPositionMs)}",
-                color = Muted,
-                fontSize = 14.sp,
-            )
-            if (state.videoWidth > 0 && state.videoHeight > 0) {
-                Text("Decoded picture: ${state.videoWidth}×${state.videoHeight}", color = Muted, fontSize = 14.sp)
-            }
-            if (state.error != null) {
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(onClick = playback::retryPlayback, enabled = state.canRetry) { Text("Retry") }
-                    Button(onClick = onAddUrl) { Text("Enter another link") }
-                }
-            }
-            state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = { playback.seekBy(-30_000L) }, enabled = state.title != null) { Text("−30 sec") }
-                Button(onClick = playback::togglePlayPause, enabled = state.title != null) {
-                    Text(if (state.isPlaying) "Pause" else "Play")
-                }
-                Button(onClick = { playback.seekBy(30_000L) }, enabled = state.title != null) { Text("+30 sec") }
-                Button(onClick = playback::cycleSpeed, enabled = state.title != null) {
-                    Text("${state.speed}×")
-                }
-                Button(onClick = { menuOpen = true }, modifier = Modifier.focusRequester(menuOpener)) { Text("Options") }
-                Button(onClick = onHome) { Text("Home") }
-            }
-        }
-        if (menuOpen) {
-            LaunchedEffect(Unit) { menuFirst.requestFocus() }
-            Dialog(onDismissRequest = { menuOpen = false }) {
-                Surface(
-                    modifier = Modifier.width(600.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
-                ) {
-                Column(
-                    modifier = Modifier.padding(30.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("PLAYER OPTIONS", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
-                    Button(onClick = playback::cycleDisplayMode, modifier = Modifier.focusRequester(menuFirst)) {
-                        Text("Picture: ${state.displayMode.label}")
-                    }
-                    Button(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
-                        Text(if (state.subtitlesEnabled) "Subtitles: On" else "Subtitles: Off")
-                    }
-                    Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.hasExternalSubtitles) {
-                        Text("Subtitle timing: ${formatOffset(state.subtitleOffsetMs)} −")
-                    }
-                    Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.hasExternalSubtitles) { Text("Subtitle timing +") }
-                    Button(onClick = playback::cycleSubtitleSize) {
-                        Text("Subtitle size: ${listOf("Small", "Medium", "Large", "Extra large")[state.subtitleSizeIndex]}")
-                    }
-                    Button(onClick = playback::cycleSubtitleColor) {
-                        Text("Subtitle color: ${listOf("White", "Yellow", "Cyan", "Green")[state.subtitleColorIndex]}")
-                    }
-                    Button(onClick = playback::toggleSubtitleBackground) {
-                        Text("Subtitle background: ${if (state.subtitleBackgroundEnabled) "On" else "Off"}")
-                    }
-                    if (state.audioChoices.size > 1) {
-                        Text("AUDIO TRACK", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
-                        state.audioChoices.forEach { choice ->
-                            Button(onClick = { playback.selectTrack(choice) }) {
-                                Text("${if (choice.selected) "✓ " else ""}${choice.label}")
-                            }
-                        }
-                    }
-                    if (state.videoVariantChoices.size > 1) {
-                        Text("STREAM VARIANT", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
-                        Button(onClick = playback::selectAutomaticVideoVariant) {
-                            Text("${if (state.selectedVideoVariantKey == null) "✓ " else ""}Auto select")
-                        }
-                        state.videoVariantChoices.forEach { choice ->
-                            Button(onClick = { playback.selectTrack(choice) }) {
-                                Text("${if (choice.selected) "✓ " else ""}${choice.label}")
-                            }
-                        }
-                    }
-                    state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
-                    Button(onClick = { menuOpen = false }) { Text("Close options") }
-                }
-                }
-            }
-        } else if (menuWasOpen) {
-            LaunchedEffect(menuOpen) { menuOpener.requestFocus() }
-        }
-        LaunchedEffect(menuOpen) { menuWasOpen = menuOpen }
-        }
-    }
-}
-
 private fun formatTime(milliseconds: Long): String {
     val totalSeconds = milliseconds.coerceAtLeast(0L) / 1_000L
     val hours = totalSeconds / 3_600L
@@ -477,9 +318,6 @@ private fun formatTime(milliseconds: Long): String {
     return if (hours > 0) String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
     else String.format(Locale.US, "%d:%02d", minutes, seconds)
 }
-
-private fun formatOffset(milliseconds: Long): String =
-    String.format(Locale.US, "%+.1f sec", milliseconds / 1_000.0)
 
 @Composable
 private fun Brand() {

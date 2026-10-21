@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records the completed local build/lint and authorized installation, plus checks still pending. The debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched. No tests, playback, D-pad interaction, screenshots, or runtime checks were performed.
+This guide records the completed local build/lint and authorized installation, plus checks still pending. The milestone 13 debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched; the newer milestone 14 APK is built locally and not installed. No tests, playback, D-pad interaction, screenshots, or runtime checks were performed.
 
 ## Local toolchain
 
@@ -56,7 +56,13 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Test network loss/recovery, 401/403/404 server responses, unsupported codecs, prolonged buffering, explicit retry, fresh-link entry, and return navigation. Confirm no automatic retry loop.
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
-- [x] Install the debug APK on Sony BRAVIA VU3 and verify package metadata read-only. The app was not launched.
+- [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
+- [ ] Install the newer fullscreen player APK from milestone 14 after separate authorization. The older milestone 13 package remains installed; no app launch has occurred.
+- [ ] Confirm fullscreen video extends under hidden system bars and bars restore after leaving the player.
+- [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
+- [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
+- [ ] Verify media Play/Pause works with controls hidden; Back closes player settings, hides visible controls, then returns Home.
+- [ ] Verify full-screen player settings contain no floating panels and Back restores focus to the originating Options or Audio control.
 - [ ] Complete a separate authorized Sony BRAVIA runtime pass; the installation does not demonstrate launcher visibility, playback, focus, network, or subtitle behavior.
 
 ## Known boundaries
