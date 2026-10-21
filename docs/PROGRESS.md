@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `4-direct-url-player`
-- Current branch: `4-direct-url-player`
-- Planning baseline: `be2f7cc`; milestone 2 commit: `715bd34`; milestone 3 commit: `2a35592`.
+- Implemented through milestone: `5-tv-url-entry`
+- Current branch: `5-tv-url-entry`
+- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -59,6 +59,12 @@ Status: source implemented and reviewed; build, lint, emulator, and TV behavior 
 Added a Media3 ExoPlayer controller with direct URI loading, preparation, play/pause, position and duration state, 30-second skip controls, playback speed cycling (1×, 1.25×, 1.5×, 2×), a TV remote control row, and a PlayerView video surface without Media3's touch-oriented controls. The app now declares Internet access for direct media retrieval. Playback errors are presented generically so signed URLs are not reflected in UI text. The URL entry screen remains in milestone 5; the controller API is ready to be connected there.
 
 Status: source implemented and reviewed; build, lint, playback, and device behavior are unverified.
+
+## Milestone 5: `5-tv-url-entry`
+
+Added a remote-operable direct URL entry screen and a bounded validator. It trims outer whitespace, caps links at 4,096 characters, rejects control characters, non-HTTP(S) schemes, malformed or missing hosts, and embedded user-info credentials. Errors are shown inline; the URL is sent to the playback controller only after validation. The app now permits cleartext traffic for the planned HTTP as well as HTTPS playback path. The source label shown by the player is only the URL host; the complete URL is not displayed in that label or written to disk.
+
+Status: source implemented and reviewed; URL parsing and playback behavior are unverified because no tests or builds are being run.
 
 ## Current execution boundary
 

@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppRoute { HOME, PLAYER }
+private enum class AppRoute { HOME, ADD_URL, PLAYER }
 
 @Composable
 private fun TVPlayerApp(playback: PlaybackController) {
@@ -83,7 +83,16 @@ private fun TVPlayerApp(playback: PlaybackController) {
         AppRoute.HOME -> HomeScreen(
             settingsRequester = settingsOpenerRequester,
             onOpenPlayer = { route = AppRoute.PLAYER },
+            onAddVideo = { route = AppRoute.ADD_URL },
             onOpenSettings = { settingsOpen = true },
+        )
+
+        AppRoute.ADD_URL -> VideoUrlEntryScreen(
+            onStart = { url, label ->
+                playback.playUrl(url, "Video from $label")
+                route = AppRoute.PLAYER
+            },
+            onBack = { route = AppRoute.HOME },
         )
 
         AppRoute.PLAYER -> PlayerScreen(playback = playback, onHome = { route = AppRoute.HOME })
@@ -102,6 +111,7 @@ private fun TVPlayerApp(playback: PlaybackController) {
 private fun HomeScreen(
     settingsRequester: FocusRequester,
     onOpenPlayer: () -> Unit,
+    onAddVideo: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     TVBackground {
@@ -129,9 +139,9 @@ private fun HomeScreen(
                     fontSize = 21.sp,
                 )
                 Spacer(Modifier.height(34.dp))
-                Button(onClick = onOpenPlayer) {
-                    Text("Open player", fontSize = 18.sp)
-                }
+                Button(onClick = onAddVideo) { Text("Add video URL", fontSize = 18.sp) }
+                Spacer(Modifier.height(10.dp))
+                Button(onClick = onOpenPlayer) { Text("Open player", fontSize = 18.sp) }
                 Spacer(Modifier.height(10.dp))
                 Button(
                     onClick = onOpenSettings,
