@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `2-android-tv-skeleton`
-- Current branch: `2-android-tv-skeleton`
-- Milestone 2 source is present; its commit is being prepared. The planning baseline is `be2f7cc`.
+- Implemented through milestone: `3-tv-shell-focus`
+- Current branch: `3-tv-shell-focus`
+- Planning baseline: `be2f7cc`; milestone 2 commit: `715bd34`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -47,6 +47,12 @@ Verification record:
 - The same build/lint retry was stopped at the user's direction during resource processing (`:app:mergeDebugNativeLibs` was the last reported task); Kotlin compilation did not run, and no final build or lint result is available.
 - `adb devices -l` was attempted during initial toolchain inspection; the ADB daemon could not start because the sandbox denied its local socket (`Operation not permitted`). No device was contacted or queried. No APK was installed or launched.
 - No emulator or physical-TV behavior has been verified.
+
+## Milestone 3: `3-tv-shell-focus`
+
+Implemented a TV Material based home/player placeholder shell. The home and player routes have clear large-screen hierarchy, remote-focused buttons use TV Material focus behavior, and Back returns from player or settings. The settings overlay has its own close focus target and restores focus to the opener when dismissed. This establishes the screen structure and focus handoff for later controls; no playback or settings behavior is included yet.
+
+Status: source implemented and reviewed; build, lint, emulator, and TV behavior are unverified by the current source-only instruction.
 
 ## Current execution boundary
 
