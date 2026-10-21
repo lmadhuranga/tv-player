@@ -233,7 +233,11 @@ class LocalLinkServer(
             return exchangePin(socket, listener, runId, pin)
         }
         if (method == "GET" && path == "/api/limits") {
-            if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
+            // Same-origin GET fetches commonly omit Origin. The paired token still
+            // authenticates this read-only limit lookup; reject any supplied mismatch.
+            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) {
+                return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
+            }
             if (!isAuthorized(headers["x-pairing-token"].orEmpty())) return respond(socket.getOutputStream(), 401, "Unauthorized", "Pair this browser with the code shown on the TV")
             return respond(socket.getOutputStream(), 200, "OK", JSONObject(mapOf(
                 "videoBytes" to effectiveUploadLimit(UploadKind.VIDEO),

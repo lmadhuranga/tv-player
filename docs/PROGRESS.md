@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `20-phone-video-subtitle-upload` (build/lint/install/launch complete; phone upload and playback QA pending)
-- Current branch: `20-phone-video-subtitle-upload`
+- Implemented through milestone: `21-limits-origin-fix` (build/lint/install/launch and read-only Origin checks complete; browser media flow remains unverified)
+- Current branch: `21-limits-origin-fix`
 - Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
 - The milestone 19 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, Settings reopen, or other functional runtime QA was performed.
 
@@ -43,7 +43,8 @@
 | 17 | `17-subtitle-file-upload-filename-and-hidden-skip` | `8f5d72b` |
 | 18 | `18-player-back-handoff-screen` | `1019bf4` |
 | 19 | `19-handoff-server-settings-return` | `1d929e2` |
-| 20 | `20-phone-video-subtitle-upload` | pending commit |
+| 20 | `20-phone-video-subtitle-upload` | `773c65f` |
+| 21 | `21-limits-origin-fix` | branch HEAD (`git rev-parse 21-limits-origin-fix`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -222,4 +223,14 @@ Verification record:
 
 ## Current execution boundary
 
-Milestones 2–19 are committed on separate local branches, stacked sequentially. Milestone 20 implementation is built, linted, installed, and launched on the approved BRAVIA; phone-browser upload and all behavioral/runtime QA remain pending. Optional Seedr discovery remains deferred.
+Milestones 2–20 are committed on separate local branches, stacked sequentially. Milestone 21 is built, linted, installed, and launched on the approved BRAVIA. Read-only Origin regression requests passed; phone-browser upload and all other behavioral/runtime QA remain pending. Optional Seedr discovery remains deferred.
+
+## Milestone 21: `21-limits-origin-fix`
+
+Browsers can omit the `Origin` header on a same-origin GET. `/api/limits` now allows the header to be absent but still requires a valid high-entropy pairing token; if an Origin is present it must match the TV's exact HTTP origin and port. The existing subnet gate remains before request handling, and every POST endpoint retains its strict same-origin check. No video, upload, pairing form, or browser state was submitted or altered during verification.
+
+Verification record:
+
+- `git diff --check` passed. With JDK `17.0.17`, Gradle `8.13`, SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks); lint passed.
+- Before install, ADB identified `192.168.8.100:5555` as Sony BRAVIA VU3, API 34. The debug install returned `Success`; `pm path` confirmed `dev.lmadhuranga.tvplayer` was installed. `am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned the expected `Starting: Intent`.
+- Read-only GET checks against the running TV server returned HTTP 401 with Origin absent and no token, proving the request reached authentication, and HTTP 403 with a mismatched Origin. The existing browser form was not used. No phone upload, playback, or UI QA was performed.

@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 20 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). No visual inspection, D-pad interaction, playback, phone-browser upload, local subtitle import, Settings reopen, Back routing, or other runtime QA was performed.
+This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). A read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. No visual inspection, D-pad interaction, playback, phone-browser upload, local subtitle import, Settings reopen, Back routing, or other runtime QA was performed.
 
 ## Local toolchain
 
@@ -54,6 +54,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
 - [ ] Confirm video starts, pauses, seeks, supports each listed speed, and pauses when leaving the player or backgrounding the app.
 - [ ] Test same-Wi-Fi phone/laptop link handoff, four-digit PIN (including a leading zero), QR, optional subtitle URL, invalid PIN/session/origin, oversized request, five failed PIN attempts plus cooldown, expiry/regeneration, one-time PIN exchange, and server stop/restart invalidation. Confirm accepted links start playback immediately even when resume history is enabled, the local page sends links only, and no full URLs or pairing secrets are logged.
+- [x] Read-only `/api/limits` origin regression check: absent Origin reached authentication and returned 401 without a token; a supplied mismatched Origin returned 403. No existing browser form was submitted.
 - [ ] While a video is playing, use the TV's subtitle file picker to select valid SRT and WebVTT files; confirm cues render and subtitle enable/style/timing controls work. Try unsupported, malformed, and over-8-MiB files and verify a sanitized error plus continued video playback; replace a subtitle and leave the player to verify cache cleanup. This is an on-TV picker, not a phone/laptop file upload.
 - [ ] Confirm the player title is the decoded last filename from the URL path, query credentials are not shown, long titles remain one line with ellipsis, and host/“Video” fallback is sensible for URLs without a filename.
 - [ ] With player controls hidden, press Left/Right and verify one 30-second seek per press; with controls visible, verify existing D-pad focus navigation/seek-row behavior is unchanged.
@@ -67,7 +68,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
-- [x] Install and launch the latest milestone 19 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
+- [x] Install and launch the milestone 21 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
