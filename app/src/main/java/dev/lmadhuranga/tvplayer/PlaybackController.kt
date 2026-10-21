@@ -10,7 +10,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.common.MimeTypes
 import androidx.media3.common.MediaItem.SubtitleConfiguration
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +19,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import androidx.media3.ui.AspectRatioFrameLayout
 
 data class PlaybackUiState(
     val title: String? = null,
@@ -34,7 +35,18 @@ data class PlaybackUiState(
     val subtitlesEnabled: Boolean = true,
     val subtitleOffsetMs: Long = 0L,
     val subtitleError: String? = null,
+    val displayMode: VideoDisplayMode = VideoDisplayMode.FIT,
+    val subtitleSizeIndex: Int = 1,
+    val subtitleColorIndex: Int = 0,
+    val subtitleBackgroundEnabled: Boolean = true,
 )
+
+@OptIn(UnstableApi::class)
+enum class VideoDisplayMode(val label: String, val resizeMode: Int) {
+    FIT("Fit", AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    FILL("Fill", AspectRatioFrameLayout.RESIZE_MODE_FILL),
+    ZOOM("Zoom", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
+}
 
 @OptIn(UnstableApi::class)
 class PlaybackController(context: Context) : Player.Listener {
@@ -70,6 +82,9 @@ class PlaybackController(context: Context) : Player.Listener {
         subtitleJob = null
         player.stop()
         player.clearMediaItems()
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            .build()
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
         currentVideoUrl = url
@@ -95,6 +110,8 @@ class PlaybackController(context: Context) : Player.Listener {
                     if (!released && generation == sourceGeneration) {
                         mutableState.value = mutableState.value.copy(subtitleError = error.message)
                     }
+                } catch (error: CancellationException) {
+                    throw error
                 }
             }
         }
@@ -121,12 +138,10 @@ class PlaybackController(context: Context) : Player.Listener {
 
     fun cycleSpeed() {
         if (released) return
-        val next = when (player.playbackParameters.speed) {
-            1f -> 1.25f
-            1.25f -> 1.5f
-            1.5f -> 2f
-            else -> 1f
-        }
+        val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+        val current = player.playbackParameters.speed
+        val index = speeds.indexOfFirst { it == current }
+        val next = speeds[(index + 1).mod(speeds.size)]
         player.setPlaybackSpeed(next)
         publishState()
     }
@@ -158,8 +173,32 @@ class PlaybackController(context: Context) : Player.Listener {
                 if (!released && generation == sourceGeneration) {
                     mutableState.value = mutableState.value.copy(subtitleError = error.message)
                 }
+            } catch (error: CancellationException) {
+                throw error
             }
         }
+    }
+
+    fun cycleDisplayMode() {
+        if (released) return
+        val values = VideoDisplayMode.entries
+        val next = values[(values.indexOf(mutableState.value.displayMode) + 1) % values.size]
+        mutableState.value = mutableState.value.copy(displayMode = next)
+    }
+
+    fun cycleSubtitleSize() {
+        if (released) return
+        mutableState.value = mutableState.value.copy(subtitleSizeIndex = (mutableState.value.subtitleSizeIndex + 1) % 4)
+    }
+
+    fun cycleSubtitleColor() {
+        if (released) return
+        mutableState.value = mutableState.value.copy(subtitleColorIndex = (mutableState.value.subtitleColorIndex + 1) % 4)
+    }
+
+    fun toggleSubtitleBackground() {
+        if (released) return
+        mutableState.value = mutableState.value.copy(subtitleBackgroundEnabled = !mutableState.value.subtitleBackgroundEnabled)
     }
 
     fun release() {
@@ -221,5 +260,6 @@ class PlaybackController(context: Context) : Player.Listener {
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !mutableState.value.subtitlesEnabled)
             .build()
+        downloadedSubtitle = subtitleRepository.discardObsoleteAdjustedFiles(downloadedSubtitle ?: subtitle)
     }
 }

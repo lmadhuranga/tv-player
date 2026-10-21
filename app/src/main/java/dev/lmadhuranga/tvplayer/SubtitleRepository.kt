@@ -10,7 +10,10 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 
 data class CachedSubtitle(
     val sourceFile: File,
@@ -26,6 +29,7 @@ class SubtitleRepository(cacheDirectory: File) {
     suspend fun download(url: String): CachedSubtitle = withContext(Dispatchers.IO) {
         val mimeType = if (URI(url).path.orEmpty().lowercase(Locale.ROOT).endsWith(".vtt")) MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
         val source = File.createTempFile("tv-player-${UUID.randomUUID()}-", ".source", directory)
+        var adjusted: File? = null
         try {
             val connection = (URL(url).openConnection() as? HttpURLConnection)
                 ?: throw SubtitleLoadException("This subtitle link could not be opened.")
@@ -42,6 +46,7 @@ class SubtitleRepository(cacheDirectory: File) {
                         val buffer = ByteArray(8_192)
                         var count = 0
                         while (true) {
+                            coroutineContext.ensureActive()
                             val read = input.read(buffer)
                             if (read < 0) break
                             count += read
@@ -53,8 +58,15 @@ class SubtitleRepository(cacheDirectory: File) {
             } finally {
                 connection.disconnect()
             }
-        val result = CachedSubtitle(source, source, mimeType)
-            applyOffset(result, 0L)
+        coroutineContext.ensureActive()
+        val result = applyOffset(CachedSubtitle(source, source, mimeType), 0L)
+        adjusted = result.adjustedFile
+        coroutineContext.ensureActive()
+        result
+        } catch (error: CancellationException) {
+            source.delete()
+            adjusted?.delete()
+            throw error
         } catch (error: SubtitleLoadException) {
             source.delete()
             throw error
@@ -72,6 +84,7 @@ class SubtitleRepository(cacheDirectory: File) {
         var previousIndex = 0
         var cueCount = 0
         TIMESTAMP_LINE.findAll(raw).forEach { match ->
+            coroutineContext.ensureActive()
             output.append(raw, previousIndex, match.range.first)
             val start = shiftTimestamp(match.groupValues[1], offsetMs)
             val end = shiftTimestamp(match.groupValues[2], offsetMs)
@@ -85,6 +98,10 @@ class SubtitleRepository(cacheDirectory: File) {
         val adjusted = File(directory, "${UUID.randomUUID()}$extension")
         try {
             adjusted.writeText(output.toString(), StandardCharsets.UTF_8)
+            coroutineContext.ensureActive()
+        } catch (error: CancellationException) {
+            adjusted.delete()
+            throw error
         } catch (_: Exception) {
             adjusted.delete()
             throw SubtitleLoadException("The subtitle file could not be prepared.")
@@ -95,6 +112,13 @@ class SubtitleRepository(cacheDirectory: File) {
     fun discard(subtitle: CachedSubtitle?) {
         subtitle?.sourceFile?.delete()
         subtitle?.generatedFiles?.forEach(File::delete)
+    }
+
+    /** Call only after the player has switched away from its previous adjusted file. */
+    fun discardObsoleteAdjustedFiles(subtitle: CachedSubtitle): CachedSubtitle {
+        val obsolete = subtitle.generatedFiles - subtitle.adjustedFile
+        obsolete.forEach(File::delete)
+        return subtitle.copy(generatedFiles = setOf(subtitle.adjustedFile))
     }
 
     companion object {

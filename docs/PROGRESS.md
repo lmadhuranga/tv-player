@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `7-external-subtitles`
-- Current branch: `7-external-subtitles`
-- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`.
+- Implemented through milestone: `8-player-menus-display` (source complete; uncommitted review in progress)
+- Current branch: `8-player-menus-display`
+- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`, `205e978`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -79,6 +79,12 @@ Added optional SRT and WebVTT URLs to the on-TV form and connected optional subt
 The playback controller pauses on activity stop so playback does not continue in the background.
 
 Status: source implemented and reviewed; SRT/WebVTT parsing, offset behavior through seeks/speed changes, cleanup, browser-to-TV subtitle handoff, and actual rendering are unverified.
+
+## Milestone 8: `8-player-menus-display`
+
+Added a D-pad-accessible player options panel for Fit, Fill, and Zoom display modes; subtitle enablement and ±500 ms timing adjustment; subtitle text size, color, and background controls. The options panel takes focus while open and returns it to its opener when closed. Playback speed choices now cover 0.5×, 0.75×, 1×, 1.25×, 1.5×, 1.75×, and 2×. Subtitle timing generation checks cancellation and deletes partial cache output; prior adjusted files are pruned after Media3 switches items, and each new video clears any stale disabled text-track selection. These subtitle style controls were planned in the subtitle milestone but delivered here with the options panel.
+
+Status: source implemented; UI focus, display modes, subtitle style rendering, cancellation cleanup, and speed changes are unverified. No build, lint, or tests were run under the source-only instruction.
 
 ## Current execution boundary
 

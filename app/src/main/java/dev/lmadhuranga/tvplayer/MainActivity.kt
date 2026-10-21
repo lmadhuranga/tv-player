@@ -29,13 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.CaptionStyleCompat
+import androidx.media3.common.util.UnstableApi
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -180,7 +184,7 @@ private fun HomeScreen(
                 ) {
                     Text("READY WHEN YOU ARE", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
                     Spacer(Modifier.height(14.dp))
-                    Text("Player setup is coming next", color = Color.White, fontSize = 23.sp)
+                    Text("Play a direct video link", color = Color.White, fontSize = 23.sp)
                     Spacer(Modifier.height(8.dp))
                     Text("Enter a video link to get started.", color = Muted, fontSize = 17.sp)
                 }
@@ -211,14 +215,18 @@ private fun SettingsPlaceholder(focusRequester: FocusRequester, onDismiss: () ->
     }
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
     val state by playback.state.collectAsState()
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        colors = SurfaceDefaults.colors(containerColor = Ink),
-    ) {
-        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 32.dp)) {
+    var menuOpen by remember { mutableStateOf(false) }
+    var menuWasOpen by remember { mutableStateOf(false) }
+    val menuOpener = remember { FocusRequester() }
+    val menuFirst = remember { FocusRequester() }
+    BackHandler(enabled = menuOpen) { menuOpen = false }
+    Surface(modifier = Modifier.fillMaxSize(), colors = SurfaceDefaults.colors(containerColor = Ink)) {
+        Box(Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().focusProperties { canFocus = !menuOpen }.padding(horizontal = 56.dp, vertical = 32.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(state.title ?: "PLAYER", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.weight(1f))
@@ -239,7 +247,19 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                             player = playback.player
                         }
                     },
-                    update = { view -> if (view.player !== playback.player) view.player = playback.player },
+                    update = { view ->
+                        if (view.player !== playback.player) view.player = playback.player
+                        view.resizeMode = state.displayMode.resizeMode
+                        view.subtitleView?.apply {
+                            setApplyEmbeddedStyles(false)
+                            setApplyEmbeddedFontSizes(false)
+                            val color = listOf(Color.White, Color.Yellow, Color.Cyan, Color.Green)[state.subtitleColorIndex].toArgb()
+                            val background = if (state.subtitleBackgroundEnabled) 0xB8000000.toInt() else android.graphics.Color.TRANSPARENT
+                            setStyle(CaptionStyleCompat(color, background, android.graphics.Color.TRANSPARENT,
+                                CaptionStyleCompat.EDGE_TYPE_OUTLINE, android.graphics.Color.BLACK, null))
+                            setFractionalTextSize(listOf(0.045f, 0.06f, 0.075f, 0.09f)[state.subtitleSizeIndex])
+                        }
+                    },
                 )
                 if (state.title == null) {
                     Text("Nothing is playing yet", color = Color.White, fontSize = 28.sp)
@@ -265,17 +285,45 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                 Button(onClick = playback::cycleSpeed, enabled = state.title != null) {
                     Text("${state.speed}×")
                 }
-                Button(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
-                    Text(if (state.subtitlesEnabled) "Subtitles on" else "Subtitles off")
-                }
-                Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.subtitlesAvailable) { Text("Subs −") }
-                Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.subtitlesAvailable) { Text("Subs +") }
+                Button(onClick = { menuOpen = true }, modifier = Modifier.focusRequester(menuOpener)) { Text("Options") }
                 Button(onClick = onHome) { Text("Home") }
             }
-            if (state.subtitlesAvailable) {
-                Spacer(Modifier.height(4.dp))
-                Text("Subtitle timing: ${formatOffset(state.subtitleOffsetMs)}", color = Muted, fontSize = 14.sp)
+        }
+        if (menuOpen) {
+            LaunchedEffect(Unit) { menuFirst.requestFocus() }
+            Box(Modifier.fillMaxSize().background(Color(0xC807111F)), contentAlignment = Alignment.CenterEnd) {
+                Column(
+                    modifier = Modifier.width(440.dp).fillMaxSize().background(Color(0xFF102239), RoundedCornerShape(20.dp)).padding(30.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("PLAYER OPTIONS", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
+                    Button(onClick = playback::cycleDisplayMode, modifier = Modifier.focusRequester(menuFirst)) {
+                        Text("Picture: ${state.displayMode.label}")
+                    }
+                    Button(onClick = playback::toggleSubtitles, enabled = state.subtitlesAvailable) {
+                        Text(if (state.subtitlesEnabled) "Subtitles: On" else "Subtitles: Off")
+                    }
+                    Button(onClick = { playback.adjustSubtitleOffset(-500L) }, enabled = state.subtitlesAvailable) {
+                        Text("Subtitle timing: ${formatOffset(state.subtitleOffsetMs)} −")
+                    }
+                    Button(onClick = { playback.adjustSubtitleOffset(500L) }, enabled = state.subtitlesAvailable) { Text("Subtitle timing +") }
+                    Button(onClick = playback::cycleSubtitleSize) {
+                        Text("Subtitle size: ${listOf("Small", "Medium", "Large", "Extra large")[state.subtitleSizeIndex]}")
+                    }
+                    Button(onClick = playback::cycleSubtitleColor) {
+                        Text("Subtitle color: ${listOf("White", "Yellow", "Cyan", "Green")[state.subtitleColorIndex]}")
+                    }
+                    Button(onClick = playback::toggleSubtitleBackground) {
+                        Text("Subtitle background: ${if (state.subtitleBackgroundEnabled) "On" else "Off"}")
+                    }
+                    state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
+                    Button(onClick = { menuOpen = false }) { Text("Close options") }
+                }
             }
+        } else if (menuWasOpen) {
+            LaunchedEffect(menuOpen) { menuOpener.requestFocus() }
+        }
+        LaunchedEffect(menuOpen) { menuWasOpen = menuOpen }
         }
     }
 }
