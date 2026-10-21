@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). A read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. Milestone 22 is built/linted locally only; the TV was not contacted for it. No visual inspection, D-pad interaction, playback, phone-browser upload, local subtitle import, Settings reopen, Back routing, or other runtime QA was performed.
+This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). A read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. Milestones 22–23 are local-only builds; the TV was not contacted for them. No visual inspection, D-pad interaction, playback, phone-browser upload, local subtitle import, Settings reopen, Back routing, or other runtime QA was performed.
 
 ## Local toolchain
 
@@ -61,6 +61,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] With controls hidden, confirm the bottom timeline stays visible with dark gray played progress and light gray buffered progress.
 - [ ] Test valid SRT and WebVTT, malformed/unreachable subtitle URLs, on/off, size/color/background, ± timing offset, external-track seek/speed behavior, and available embedded subtitle tracks.
 - [ ] On the phone page, test video URL and video-file paths, subtitle URL and subtitle-file paths, optional combinations, pairing failures, progress and cancel, invalid file types/content, declared oversize rejection, changing free space, and the 512 MiB reserve behavior.
+- [ ] On the phone page, confirm video and subtitle each show a separate URL/File choice defaulting to URL; only one field per media type is visible and enabled. Switch modes after entering/selecting values and confirm the inactive value clears; submit URL/URL, URL/file, file/URL, and file/file combinations plus video without a subtitle. Verify network requests include only the currently selected modes and no stale file is staged.
 - [ ] Confirm uploaded videos are capped at 8 GiB and effective upload limits reflect currently available cache; subtitles are capped at 8 MiB. Verify files are removed after cancellation, failed/incomplete uploads, replacement, playback completion, player Back, app stop/release, and process restart. Confirm history contains no file path.
 - [ ] Test Fit/Fill/Zoom with different aspect ratios and compare decoded picture dimensions with available stream variant labels.
 - [ ] Use media with multiple supported audio tracks and HLS/DASH variants; confirm actual choices switch correctly. Use a single-variant source and confirm no quality selector is shown.
@@ -71,6 +72,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
 - [x] Install and launch the milestone 21 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
 - [ ] Milestone 22 was built/linted locally; no install, launch, or TV contact was performed for this version. Manual Settings persistence and buffering behavior remain pending.
+- [ ] Milestone 23 phone-page mode selectors were built/linted locally; no install, launch, or TV contact was performed for this version. Browser mode switching, submission combinations, and stale-upload behavior remain pending.
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
