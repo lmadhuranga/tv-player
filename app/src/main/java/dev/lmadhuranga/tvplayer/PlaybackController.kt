@@ -51,6 +51,7 @@ data class PlaybackUiState(
     val subtitlesEnabled: Boolean = true,
     val subtitleOffsetMs: Long = 0L,
     val subtitleError: String? = null,
+    val subtitleLoading: Boolean = false,
     val displayMode: VideoDisplayMode = VideoDisplayMode.FIT,
     val subtitleSizeIndex: Int = 1,
     val subtitleColorIndex: Int = 0,
@@ -119,7 +120,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         handler.post(ticker)
     }
 
-    fun playUrl(url: String, title: String? = null, subtitleUrl: String? = null, startPositionMs: Long = 0L) {
+    fun playUrl(url: String, subtitleUrl: String? = null, startPositionMs: Long = 0L) {
         if (released) return
         saveHistoryNow()
         val generation = ++sourceGeneration
@@ -140,13 +141,14 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         subtitleRepository.discard(downloadedSubtitle)
         downloadedSubtitle = null
         currentVideoUrl = url
-        val cleanTitle = title?.takeIf(String::isNotBlank) ?: "Video"
+        val cleanTitle = videoFilenameFromUrl(url)
         val host = Uri.parse(url).host.orEmpty()
         historyEntry = null
         historyEntry = historyRepository.newEntry(cleanTitle, host)
         mutableState.value = PlaybackUiState(
             title = cleanTitle,
             subtitlesEnabled = true,
+            subtitleLoading = subtitleUrl != null,
         )
         player.setMediaItem(MediaItem.fromUri(Uri.parse(url)), startPositionMs.coerceAtLeast(0L))
         player.prepare()
@@ -161,11 +163,11 @@ class PlaybackController(context: Context, private val historyRepository: Histor
                         return@launch
                     }
                     downloadedSubtitle = cached
-                    mutableState.value = mutableState.value.copy(subtitlesAvailable = true, hasExternalSubtitles = true, subtitleError = null)
+                    mutableState.value = mutableState.value.copy(subtitlesAvailable = true, hasExternalSubtitles = true, subtitleError = null, subtitleLoading = false)
                     replaceMediaWithSubtitle(cached, generation)
                 } catch (error: SubtitleLoadException) {
                     if (!released && generation == sourceGeneration) {
-                        mutableState.value = mutableState.value.copy(subtitleError = error.message)
+                        mutableState.value = mutableState.value.copy(subtitleError = error.message, subtitleLoading = false)
                     }
                 } catch (error: CancellationException) {
                     throw error
@@ -250,6 +252,48 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !enabled)
             .build()
         mutableState.value = mutableState.value.copy(subtitlesEnabled = enabled)
+    }
+
+    fun loadSubtitleFile(uri: Uri) {
+        if (released) return
+        if (currentVideoUrl == null) {
+            mutableState.value = mutableState.value.copy(subtitleError = "Start a video before adding a subtitle file.")
+            return
+        }
+        val generation = sourceGeneration
+        subtitleJob?.cancel()
+        mutableState.value = mutableState.value.copy(subtitleLoading = true, subtitleError = null)
+        subtitleJob = scope.launch {
+            try {
+                val imported = subtitleRepository.importLocal(uri, appContext.contentResolver)
+                if (released || generation != sourceGeneration) {
+                    subtitleRepository.discard(imported)
+                    return@launch
+                }
+                mutableState.value = mutableState.value.copy(
+                    subtitlesAvailable = true,
+                    hasExternalSubtitles = true,
+                    subtitlesEnabled = true,
+                    subtitleOffsetMs = 0L,
+                    subtitleLoading = false,
+                    subtitleError = null,
+                )
+                replaceMediaWithSubtitle(imported, generation)
+            } catch (error: SubtitleLoadException) {
+                if (!released && generation == sourceGeneration) {
+                    mutableState.value = mutableState.value.copy(subtitleLoading = false, subtitleError = error.message)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                if (!released && generation == sourceGeneration) {
+                    mutableState.value = mutableState.value.copy(
+                        subtitleLoading = false,
+                        subtitleError = "The selected subtitle file could not be read.",
+                    )
+                }
+            }
+        }
     }
 
     fun adjustSubtitleOffset(deltaMs: Long) {
@@ -482,6 +526,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     private fun replaceMediaWithSubtitle(subtitle: CachedSubtitle, generation: Long) {
         if (released || generation != sourceGeneration) return
         val url = currentVideoUrl ?: return
+        val previousSubtitle = downloadedSubtitle
         val wasPlaying = player.playWhenReady
         val position = player.currentPosition.coerceAtLeast(0L)
         val speed = player.playbackParameters.speed
@@ -492,6 +537,9 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !mutableState.value.subtitlesEnabled)
             .build()
-        downloadedSubtitle = subtitleRepository.discardObsoleteAdjustedFiles(downloadedSubtitle ?: subtitle)
+        downloadedSubtitle = subtitleRepository.discardObsoleteAdjustedFiles(subtitle)
+        if (previousSubtitle != null && previousSubtitle.sourceFile != subtitle.sourceFile) {
+            subtitleRepository.discard(previousSubtitle)
+        }
     }
 }

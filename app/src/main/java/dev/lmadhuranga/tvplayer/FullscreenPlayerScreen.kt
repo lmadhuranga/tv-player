@@ -67,6 +67,7 @@ private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 fun FullscreenPlayerScreen(
     playback: PlaybackController,
     window: Window,
+    onChooseSubtitleFile: () -> Unit,
     onAddUrl: () -> Unit,
     onHome: () -> Unit,
 ) {
@@ -77,6 +78,8 @@ fun FullscreenPlayerScreen(
     var returningFromOptions by remember { mutableStateOf(false) }
     var consumedDownKeyUp by remember { mutableStateOf(false) }
     var consumedMediaKeyUp by remember { mutableStateOf(false) }
+    var consumedHiddenLeftKeyUp by remember { mutableStateOf(false) }
+    var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
     var interactionSerial by remember { mutableIntStateOf(0) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
@@ -169,6 +172,7 @@ fun FullscreenPlayerScreen(
             playback = playback,
             state = state,
             firstFocus = optionsFirstFocus,
+            onChooseSubtitleFile = onChooseSubtitleFile,
             onAddUrl = onAddUrl,
             onClose = {
                 returningFromOptions = true
@@ -222,6 +226,24 @@ fun FullscreenPlayerScreen(
                     } else {
                         false
                     }
+                } else if (!controlsVisible && state.title != null && event.key == Key.DirectionLeft) {
+                    if (event.type == KeyEventType.KeyDown) {
+                        consumedHiddenLeftKeyUp = true
+                        if (event.nativeKeyEvent.repeatCount == 0) playback.seekBy(-30_000L)
+                        true
+                    } else if (event.type == KeyEventType.KeyUp && consumedHiddenLeftKeyUp) {
+                        consumedHiddenLeftKeyUp = false
+                        true
+                    } else false
+                } else if (!controlsVisible && state.title != null && event.key == Key.DirectionRight) {
+                    if (event.type == KeyEventType.KeyDown) {
+                        consumedHiddenRightKeyUp = true
+                        if (event.nativeKeyEvent.repeatCount == 0) playback.seekBy(30_000L)
+                        true
+                    } else if (event.type == KeyEventType.KeyUp && consumedHiddenRightKeyUp) {
+                        consumedHiddenRightKeyUp = false
+                        true
+                    } else false
                 } else {
                     if (event.type == KeyEventType.KeyDown) interactionSerial++
                     false
@@ -270,6 +292,17 @@ fun FullscreenPlayerScreen(
             StatusPill(
                 text = "Buffering · buffered to ${formatPlayerTime(state.bufferedPositionMs)}",
                 modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        if (!controlsVisible && state.title != null) {
+            HiddenPlaybackProgress(
+                positionMs = state.positionMs,
+                bufferedPositionMs = state.bufferedPositionMs,
+                durationMs = state.durationMs,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 58.dp, vertical = 18.dp),
             )
         }
 
@@ -398,8 +431,23 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
             }
             .focusable(),
     ) {
-        Box(Modifier.fillMaxWidth(buffered).height(if (focused) 14.dp else 7.dp).background(Color.White.copy(alpha = 0.5f), RoundedCornerShape(8.dp)))
-        Box(Modifier.fillMaxWidth(progress).height(if (focused) 14.dp else 7.dp).background(Teal, RoundedCornerShape(8.dp)))
+        Box(Modifier.fillMaxWidth(buffered).height(if (focused) 14.dp else 7.dp).background(Color(0xFFBDBDBD), RoundedCornerShape(8.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(if (focused) 14.dp else 7.dp).background(Color(0xFF454545), RoundedCornerShape(8.dp)))
+    }
+}
+
+@Composable
+private fun HiddenPlaybackProgress(
+    positionMs: Long,
+    bufferedPositionMs: Long,
+    durationMs: Long,
+    modifier: Modifier = Modifier,
+) {
+    val progress = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    val buffered = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs).coerceIn(progress, 1f) else 0f
+    Box(modifier.height(5.dp).background(Color(0x66444444), RoundedCornerShape(4.dp))) {
+        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color(0xFFBDBDBD), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color(0xFF454545), RoundedCornerShape(4.dp)))
     }
 }
 
@@ -420,6 +468,7 @@ private fun PlayerOptionsScreen(
     playback: PlaybackController,
     state: PlaybackUiState,
     firstFocus: FocusRequester,
+    onChooseSubtitleFile: () -> Unit,
     onAddUrl: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -431,6 +480,10 @@ private fun PlayerOptionsScreen(
             Text("PLAYER SETTINGS", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
             Text("Picture, audio and subtitles", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
             Text("Settings stay on this page; the video controls do not open floating panels.", color = Muted, fontSize = 17.sp)
+            AppButton(onClick = onChooseSubtitleFile, enabled = state.title != null && !state.subtitleLoading) {
+                Text(if (state.subtitleLoading) "Loading subtitle file…" else "Choose subtitle file (.srt or .vtt)")
+            }
+            state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
             state.error?.let { error ->
                 Text(error, color = Color(0xFFFFC2B7), fontSize = 17.sp)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -478,7 +531,6 @@ private fun PlayerOptionsScreen(
                     }
                 }
             }
-            state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
             Spacer(Modifier.height(6.dp))
             AppButton(onClick = onClose) { Text("Back to video") }
         }

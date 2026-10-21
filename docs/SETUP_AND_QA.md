@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint and authorized installation, plus checks still pending. The milestone 13 debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched; milestone 14 and 15 debug APKs were built locally and not installed. Milestone 16 changes button colors and its visual behavior has not yet been checked. No LAN/browser pairing, playback, D-pad interaction, screenshots, or runtime checks were performed for this change.
+This guide records completed local build/lint and authorized TV checks, plus checks still pending. Milestone 17's latest debug APK has built and linted; that exact revision is awaiting TV install and authorized launch. Player playback, local subtitle import, hidden-key, and visual runtime checks remain pending.
 
 ## Local toolchain
 
@@ -50,7 +50,11 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Verify every button is dark at rest, white only while focused/pressed, has readable disabled contrast, and returns to dark when focus moves. Check Home, player controls/settings, history/resume, URL entry, and handoff. Confirm selected audio/quality remains indicated by its check/label rather than a sticky white fill.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
 - [ ] Confirm video starts, pauses, seeks, supports each listed speed, and pauses when leaving the player or backgrounding the app.
-- [ ] Test same-Wi-Fi phone/laptop link handoff, four-digit PIN (including a leading zero), QR, optional title, optional subtitle, invalid PIN/session/origin, oversized request, five failed PIN attempts plus cooldown, expiry/regeneration, one-time PIN exchange, and server stop/restart invalidation. Confirm the local page sends links only and no full URLs or pairing secrets are logged.
+- [ ] Test same-Wi-Fi phone/laptop link handoff, four-digit PIN (including a leading zero), QR, optional subtitle URL, invalid PIN/session/origin, oversized request, five failed PIN attempts plus cooldown, expiry/regeneration, one-time PIN exchange, and server stop/restart invalidation. Confirm the local page sends links only and no full URLs or pairing secrets are logged.
+- [ ] While a video is playing, use the TV's subtitle file picker to select valid SRT and WebVTT files; confirm cues render and subtitle enable/style/timing controls work. Try unsupported, malformed, and over-8-MiB files and verify a sanitized error plus continued video playback; replace a subtitle and leave the player to verify cache cleanup. This is an on-TV picker, not a phone/laptop file upload.
+- [ ] Confirm the player title is the decoded last filename from the URL path, query credentials are not shown, and host/“Video” fallback is sensible for URLs without a filename.
+- [ ] With player controls hidden, press Left/Right and verify one 30-second seek per press; with controls visible, verify existing D-pad focus navigation/seek-row behavior is unchanged.
+- [ ] With controls hidden, confirm the bottom timeline stays visible with dark gray played progress and light gray buffered progress.
 - [ ] Test valid SRT and WebVTT, malformed/unreachable subtitle URLs, on/off, size/color/background, ± timing offset, external-track seek/speed behavior, and available embedded subtitle tracks.
 - [ ] Test Fit/Fill/Zoom with different aspect ratios and compare decoded picture dimensions with available stream variant labels.
 - [ ] Use media with multiple supported audio tracks and HLS/DASH variants; confirm actual choices switch correctly. Use a single-variant source and confirm no quality selector is shown.
@@ -58,7 +62,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
-- [ ] Install the newer fullscreen player / four-digit pairing APK from milestone 15 after separate authorization. The older milestone 13 package remains installed; no app launch has occurred.
+- [ ] Install and launch the latest milestone 17 APK on the Sony BRAVIA; verify playback UI and local subtitle behaviors.
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.

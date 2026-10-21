@@ -6,6 +6,8 @@ import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -89,15 +91,17 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     val rememberPositions by historyRepository.enabled.collectAsState(initial = false)
     val recentEntries by historyRepository.entries.collectAsState(initial = emptyList())
     val appScope = rememberCoroutineScope()
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) playback.loadSubtitleFile(uri)
+    }
     var pendingStart by remember { mutableStateOf<PendingPlayback?>(null) }
 
-    fun startVideo(url: String, requestedTitle: String?, subtitleUrl: String?, sourceLabel: String) {
-        val title = requestedTitle?.takeIf(String::isNotBlank) ?: "Video from $sourceLabel"
+    fun startVideo(url: String, subtitleUrl: String?) {
         val candidates = recentEntries.filter { it.positionMs > 5_000L }
         if (rememberPositions && candidates.isNotEmpty()) {
-            pendingStart = PendingPlayback(url, title, subtitleUrl, candidates)
+            pendingStart = PendingPlayback(url, subtitleUrl, candidates)
         } else {
-            playback.playUrl(url, title, subtitleUrl)
+            playback.playUrl(url, subtitleUrl)
             route = AppRoute.PLAYER
         }
     }
@@ -119,21 +123,22 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         )
 
         AppRoute.ADD_URL -> VideoUrlEntryScreen(
-            onStart = { url, subtitleUrl, title, label ->
-                startVideo(url, title, subtitleUrl, label)
+            onStart = { url, subtitleUrl ->
+                startVideo(url, subtitleUrl)
             },
             onBack = { route = AppRoute.HOME },
         )
 
         AppRoute.HANDOFF -> HandoffScreen(
             onVideoSubmitted = { submission ->
-                val host = (validateVideoUrl(submission.videoUrl) as? VideoUrlValidation.Valid)?.sourceLabel ?: "TV Player"
-                startVideo(submission.videoUrl, submission.title, submission.subtitleUrl, host)
+                startVideo(submission.videoUrl, submission.subtitleUrl)
             },
             onBack = { route = AppRoute.HOME },
         )
 
-        AppRoute.PLAYER -> FullscreenPlayerScreen(playback = playback, window = window, onAddUrl = {
+        AppRoute.PLAYER -> FullscreenPlayerScreen(playback = playback, window = window, onChooseSubtitleFile = {
+            subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
+        }, onAddUrl = {
             playback.pauseForBackground()
             route = AppRoute.ADD_URL
         }, onHome = {
@@ -161,12 +166,12 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
         ResumePrompt(
             entries = pending.entries,
             onResume = { entry ->
-                playback.playUrl(pending.url, pending.title, pending.subtitleUrl, entry.positionMs)
+                playback.playUrl(pending.url, pending.subtitleUrl, entry.positionMs)
                 pendingStart = null
                 route = AppRoute.PLAYER
             },
             onStartOver = {
-                playback.playUrl(pending.url, pending.title, pending.subtitleUrl)
+                playback.playUrl(pending.url, pending.subtitleUrl)
                 pendingStart = null
                 route = AppRoute.PLAYER
             },
@@ -175,7 +180,7 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     }
 }
 
-private data class PendingPlayback(val url: String, val title: String, val subtitleUrl: String?, val entries: List<HistoryEntry>)
+private data class PendingPlayback(val url: String, val subtitleUrl: String?, val entries: List<HistoryEntry>)
 
 @Composable
 private fun HomeScreen(

@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-data class SubmittedVideo(val videoUrl: String, val subtitleUrl: String?, val title: String? = null)
+data class SubmittedVideo(val videoUrl: String, val subtitleUrl: String?)
 
 data class HandoffState(
     val address: String? = null,
@@ -213,10 +213,9 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             is VideoUrlValidation.Valid -> result.normalizedUrl
             is VideoUrlValidation.Invalid -> return respond(socket.getOutputStream(), 422, "Unprocessable Entity", result.message)
         }
-        val title = payload.optString("title").filterNot(Char::isISOControl).trim().take(100).takeIf(String::isNotBlank)
         respond(socket.getOutputStream(), 202, "Accepted", "The TV is opening your video.")
         mainHandler.post {
-            if (isCurrent(listener, runId)) onVideoSubmitted(SubmittedVideo(videoUrl, subtitleUrl, title))
+            if (isCurrent(listener, runId)) onVideoSubmitted(SubmittedVideo(videoUrl, subtitleUrl))
         }
     }
 
@@ -350,14 +349,13 @@ class LocalLinkServer(private val onVideoSubmitted: (SubmittedVideo) -> Unit) {
             <h1>Send a video to your TV</h1><p>Enter direct links. The TV fetches and plays the media; this page only sends the links.</p>
             <label for="code">4-digit TV pairing code</label><input id="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="one-time-code" required>
             <label for="video">Video URL</label><input id="video" type="url" autocomplete="url" maxlength="4096" required placeholder="https://example.com/video.mp4">
-            <label for="title">Video title (optional)</label><input id="title" maxlength="100" placeholder="For example, Movie night">
             <label for="subtitle">Subtitle URL (optional SRT or WebVTT)</label><input id="subtitle" type="url" maxlength="4096" placeholder="https://example.com/subtitles.srt">
             <button id="send">Send to TV</button><p id="status" role="status"></p>
             <script>
             const params=new URLSearchParams(location.hash.slice(1));const pin=params.get('pin');history.replaceState(null,'',location.pathname);
             if(pin&&/^[0-9]{4}$/.test(pin))document.querySelector('#code').value=pin;
             let pairingToken=null;
-            document.querySelector('#send').onclick=async()=>{const status=document.querySelector('#status');status.textContent='Sending…';try{if(!pairingToken){const pair=await fetch('/api/pair',{method:'POST',cache:'no-store',headers:{'X-Pairing-Pin':document.querySelector('#code').value}});if(!pair.ok){status.textContent=await pair.text();return}pairingToken=(await pair.json()).token}const response=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':pairingToken},body:JSON.stringify({videoUrl:document.querySelector('#video').value,title:document.querySelector('#title').value,subtitleUrl:document.querySelector('#subtitle').value})});if(response.status===401){pairingToken=null;document.querySelector('#code').value='';status.textContent='TV session ended. Enter the new 4-digit code shown on the TV, then send again.';return}status.textContent=await response.text()}catch(e){status.textContent='Could not reach the TV. Check that both devices are on the same network.'}};
+            document.querySelector('#send').onclick=async()=>{const status=document.querySelector('#status');status.textContent='Sending…';try{if(!pairingToken){const pair=await fetch('/api/pair',{method:'POST',cache:'no-store',headers:{'X-Pairing-Pin':document.querySelector('#code').value}});if(!pair.ok){status.textContent=await pair.text();return}pairingToken=(await pair.json()).token}const response=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':pairingToken},body:JSON.stringify({videoUrl:document.querySelector('#video').value,subtitleUrl:document.querySelector('#subtitle').value})});if(response.status===401){pairingToken=null;document.querySelector('#code').value='';status.textContent='TV session ended. Enter the new 4-digit code shown on the TV, then send again.';return}status.textContent=await response.text()}catch(e){status.textContent='Could not reach the TV. Check that both devices are on the same network.'}};
             </script></html>
         """.trimIndent()
     }

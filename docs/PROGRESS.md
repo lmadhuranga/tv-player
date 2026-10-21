@@ -3,10 +3,10 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `16-dark-buttons-white-focus` (debug build/lint passed; visual/runtime behavior remains unverified)
-- Current branch: `16-dark-buttons-white-focus`
-- Planning baseline: `be2f7cc`; milestones 2–15 are committed sequentially on local branches; milestone 16 is built and being committed (full mapping below).
-- The latest prior debug APK (milestone 15) was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. The milestone 16 APK was built locally but not installed or launched. Button colors/focus visuals remain unverified on device.
+- Implemented through milestone: `17-subtitle-file-upload-filename-and-hidden-skip` (build/lint passed; install pending)
+- Current branch: `17-subtitle-file-upload-filename-and-hidden-skip`
+- Planning baseline: `be2f7cc`; milestones 2–16 are committed sequentially on local branches; milestone 17 implementation and local build/lint are complete on its feature branch (full mapping below).
+- The milestone 16 debug APK was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. Milestone 17 debug build/lint passed locally; after the always-visible timeline update, install/launch of this exact revision is pending fresh device identity confirmation. Player runtime behavior has not been tested.
 
 ## Decisions recorded
 
@@ -40,6 +40,7 @@
 | 14 | `14-fullscreen-player-controls` | `e3f574c` |
 | 15 | `15-four-digit-pairing` | `ec708cb` |
 | 16 | `16-dark-buttons-white-focus` | branch HEAD (`git rev-parse 16-dark-buttons-white-focus`) |
+| 17 | `17-subtitle-file-upload-filename-and-hidden-skip` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -89,7 +90,7 @@ Status: source implemented and reviewed; URL parsing and playback behavior are u
 
 ## Milestone 6: `6-lan-link-handoff`
 
-Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, generates a fresh 256-bit pairing code per session, and accepts only bounded JSON link submissions. Requests are limited to a 12 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links plus an optional 100-character title. The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
+Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, generates a fresh 256-bit pairing code per session, and accepts only bounded JSON link submissions. Requests are limited to a 12 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links. (A manual title field was added later, then removed in milestone 17.) The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
 
 Status: source implemented and reviewed; request handling, LAN interface selection, QR usability, browser compatibility, and lifecycle shutdown remain unverified.
 
@@ -129,7 +130,7 @@ Status: source implemented; dependency resolution, actual track discovery/select
 
 ## Milestone 12: `12-device-qa-release`
 
-Added release-variant minification/resource shrinking configuration without signing credentials. TV and phone/laptop link forms now accept an optional 100-character user label. Resume selection presents the saved positions and requires the user to choose one or start from the beginning; it warns that the new link may be different and does not silently resume based on a title match. Added [the local build and TV QA guide](SETUP_AND_QA.md) with toolchain setup, exact debug/lint and release commands, expected APK location, optional installation commands, a manual TV checklist, and known limitations. At this point source implementation through milestone 12 was committed, with verification deferred until milestone 13.
+Added release-variant minification/resource shrinking configuration without signing credentials. At that milestone, TV and phone/laptop forms accepted an optional 100-character user label; milestone 17 removes the manual title field. Resume selection presents saved positions and requires the user to choose one or start from the beginning; it warns the new link may be different and does not silently resume based on a title match. Added [the local build and TV QA guide](SETUP_AND_QA.md) with toolchain setup, exact debug/lint and release commands, expected APK location, optional installation commands, a manual TV checklist, and known limitations. At this point source implementation through milestone 12 was committed, with verification deferred until milestone 13.
 
 Status: source implemented and reviewed. The separate milestone 13 later built/linted the debug variant and installed it without launch. Release signing is intentionally unconfigured; release packaging, manifest behavior, playback, focus, subtitles, handoff, history, and device runtime compatibility remain unverified.
 
@@ -170,8 +171,19 @@ Added one shared TV button wrapper used by all button controls across Home, play
 Verification record:
 
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; Gradle reported `BUILD SUCCESSFUL` with no errors.
-- `git diff --check` passed. No tests or device actions were run. The milestone 16 APK remains local and is not installed or launched; focused/unfocused colors, disabled contrast, and black video surround remain unverified visually.
+- `git diff --check` passed. The milestone 16 APK was subsequently installed by the lead on the authorized Sony BRAVIA VU3 without launch. Focused/unfocused colors, disabled contrast, and black video surround remain unverified visually.
+
+## Milestone 17: `17-subtitle-file-upload-filename-and-hidden-skip`
+
+Added an Android document picker in the full-screen player's settings route. SRT/WebVTT files are copied to the app's private subtitle cache, validated using the existing bounded parser, and attached to the active Media3 item; cancellation/replacement cleanup and safe errors preserve video playback. This is a TV-side picker only: the phone/laptop handoff still accepts subtitle URLs, not file uploads. Removed the manual title field from the TV and handoff forms. The player header/history label now derives from the decoded final URL path segment, ignoring query strings, with host/“Video” fallbacks. With controls hidden, Left/Right seek by 30 seconds; visible-control navigation remains unchanged. A bottom timeline remains visible while controls are hidden, with dark gray played progress and light gray buffered progress.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
+- The first sandboxed Gradle invocation stopped before configuration because Gradle could not create its local lock service socket (`Operation not permitted`); the same command passed with the required local build permission.
+- After adding the always-visible hidden-controls timeline, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed again on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
+- `git diff --check` passed. The latest milestone 17 APK has not yet been installed/launched. The BRAVIA was previously identified as Sony BRAVIA VU3 at `192.168.8.100:5555`; identity/reachability will be rechecked before install and launch. Picker, subtitle, filename, seek, visual, and playback runtime behavior remain unverified.
 
 ## Current execution boundary
 
-Milestones 2–15 are committed on separate local branches, stacked sequentially; milestone 16 source and local build/lint are complete on its own branch. Do not connect to, install on, launch, or send input to a TV for this feature unless separately authorized. No app launch or runtime QA has occurred. Do not push or merge. Optional Seedr discovery remains deferred.
+Milestones 2–16 are committed on separate local branches, stacked sequentially; milestone 17 is implemented on its own branch and awaiting commit. Launch has been explicitly authorized after build/lint and a current device identity check. Optional Seedr discovery remains deferred.

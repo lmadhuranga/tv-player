@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation through milestone 16 is committed on sequential local branches. The app's buttons use dark fills at rest and white fills while focused or pressed; the debug build and lint pass. Device visuals remain unverified. The previous debug APK is installed on a Sony BRAVIA VU3 without launch; the milestone 16 APK remains local pending its separate installation. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
+Source implementation through milestone 16 is committed on sequential local branches. Buttons use dark fills at rest and white fills while focused or pressed. Milestone 17 adds local subtitles, URL-derived filenames, and hidden-control skip keys; its build/install and runtime behavior are pending. The milestone 16 debug APK is installed on a Sony BRAVIA VU3 without launch. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
 
 ## Development workflow
 

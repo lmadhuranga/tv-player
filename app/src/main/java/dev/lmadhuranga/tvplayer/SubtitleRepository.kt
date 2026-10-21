@@ -1,8 +1,12 @@
 package dev.lmadhuranga.tvplayer
 
+import android.content.ContentResolver
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.media3.common.MimeTypes
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URI
@@ -73,6 +77,62 @@ class SubtitleRepository(cacheDirectory: File) {
         } catch (_: Exception) {
             source.delete()
             throw SubtitleLoadException("The subtitle could not be downloaded. Check the link and try again.")
+        }
+    }
+
+    suspend fun importLocal(uri: Uri, resolver: ContentResolver): CachedSubtitle = withContext(Dispatchers.IO) {
+        val name = runCatching {
+            resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+            }
+        }.getOrNull()
+        val extension = name?.substringAfterLast('.', "")?.lowercase(Locale.ROOT)
+        val declaredMime = runCatching { resolver.getType(uri) }.getOrNull()
+        val mimeType = when {
+            extension == "vtt" || declaredMime?.equals(MimeTypes.TEXT_VTT, ignoreCase = true) == true -> MimeTypes.TEXT_VTT
+            extension == "srt" || declaredMime?.equals(MimeTypes.APPLICATION_SUBRIP, ignoreCase = true) == true -> MimeTypes.APPLICATION_SUBRIP
+            else -> throw SubtitleLoadException("Choose an SRT or WebVTT subtitle file.")
+        }
+        val source = File.createTempFile("tv-player-${UUID.randomUUID()}-", ".source", directory)
+        var adjusted: File? = null
+        try {
+            val input = resolver.openInputStream(uri) ?: throw SubtitleLoadException("The selected subtitle file could not be opened.")
+            input.use { copyBoundedSubtitle(it, source) }
+            coroutineContext.ensureActive()
+            val result = applyOffset(CachedSubtitle(source, source, mimeType), 0L)
+            adjusted = result.adjustedFile
+            coroutineContext.ensureActive()
+            result
+        } catch (error: CancellationException) {
+            source.delete()
+            adjusted?.delete()
+            throw error
+        } catch (error: SubtitleLoadException) {
+            source.delete()
+            adjusted?.delete()
+            throw error
+        } catch (_: Exception) {
+            source.delete()
+            adjusted?.delete()
+            throw SubtitleLoadException("The selected subtitle file could not be read.")
+        }
+    }
+
+    private suspend fun copyBoundedSubtitle(input: InputStream, destination: File) {
+        input.use { stream ->
+            destination.outputStream().buffered().use { output ->
+                val buffer = ByteArray(8_192)
+                var count = 0
+                while (true) {
+                    coroutineContext.ensureActive()
+                    val read = stream.read(buffer)
+                    if (read < 0) break
+                    count += read
+                    if (count > MAX_SUBTITLE_BYTES) throw SubtitleLoadException("This subtitle file is too large.")
+                    output.write(buffer, 0, read)
+                }
+            }
         }
     }
 
