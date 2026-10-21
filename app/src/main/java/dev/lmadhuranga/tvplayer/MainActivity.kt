@@ -1,6 +1,7 @@
 package dev.lmadhuranga.tvplayer
 
 import android.os.Bundle
+import java.util.Locale
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -15,10 +16,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -31,9 +34,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
+import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 
 private val Ink = Color(0xFF07111F)
@@ -41,20 +47,28 @@ private val Teal = Color(0xFF5BD5C6)
 private val Muted = Color(0xFFB9C8D9)
 
 class MainActivity : ComponentActivity() {
+    private lateinit var playback: PlaybackController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        playback = PlaybackController(applicationContext)
         setContent {
             MaterialTheme {
-                TVPlayerApp()
+                TVPlayerApp(playback)
             }
         }
+    }
+
+    override fun onDestroy() {
+        playback.release()
+        super.onDestroy()
     }
 }
 
 private enum class AppRoute { HOME, PLAYER }
 
 @Composable
-private fun TVPlayerApp() {
+private fun TVPlayerApp(playback: PlaybackController) {
     var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
@@ -72,7 +86,7 @@ private fun TVPlayerApp() {
             onOpenSettings = { settingsOpen = true },
         )
 
-        AppRoute.PLAYER -> PlayerPlaceholder(onHome = { route = AppRoute.HOME })
+        AppRoute.PLAYER -> PlayerScreen(playback = playback, onHome = { route = AppRoute.HOME })
     }
 
     if (settingsOpen) {
@@ -130,7 +144,7 @@ private fun HomeScreen(
             Surface(
                 modifier = Modifier.size(width = 390.dp, height = 250.dp),
                 shape = RoundedCornerShape(28.dp),
-                color = Color(0xFF12243A),
+                colors = SurfaceDefaults.colors(containerColor = Color(0xFF12243A)),
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize().padding(28.dp),
@@ -148,34 +162,14 @@ private fun HomeScreen(
 }
 
 @Composable
-private fun PlayerPlaceholder(onHome: () -> Unit) {
-    TVBackground {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("PLAYER", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
-            Spacer(Modifier.height(18.dp))
-            Text("Nothing is playing yet", color = Color.White, fontSize = 36.sp)
-            Spacer(Modifier.height(12.dp))
-            Text("Your video will appear here.", color = Muted, fontSize = 20.sp)
-            Spacer(Modifier.height(28.dp))
-            Button(onClick = onHome) { Text("Back to home") }
-        }
-    }
-}
-
-@Composable
 private fun SettingsPlaceholder(focusRequester: FocusRequester, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xD907111F),
-        onClick = onDismiss,
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color(0xD907111F)),
+        contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(72.dp),
+            modifier = Modifier.padding(72.dp),
             verticalArrangement = Arrangement.Center,
         ) {
             Text("SETTINGS", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
@@ -187,6 +181,74 @@ private fun SettingsPlaceholder(focusRequester: FocusRequester, onDismiss: () ->
             }
         }
     }
+}
+
+@Composable
+private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
+    val state by playback.state.collectAsState()
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        colors = SurfaceDefaults.colors(containerColor = Ink),
+    ) {
+        Column(modifier = Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 32.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(state.title ?: "PLAYER", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.weight(1f))
+                Text(if (state.isBuffering) "Buffering…" else "", color = Muted, fontSize = 16.sp)
+            }
+            Spacer(Modifier.height(18.dp))
+            Box(
+                modifier = Modifier.weight(1f).fillMaxSize().background(Color.Black, RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { context ->
+                        PlayerView(context).apply {
+                            useController = false
+                            isFocusable = false
+                            isFocusableInTouchMode = false
+                            player = playback.player
+                        }
+                    },
+                    update = { view -> if (view.player !== playback.player) view.player = playback.player },
+                )
+                if (state.title == null) {
+                    Text("Nothing is playing yet", color = Color.White, fontSize = 28.sp)
+                }
+                state.error?.let { message ->
+                    Text(message, color = Color.White, fontSize = 21.sp, modifier = Modifier.padding(40.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "${formatTime(state.positionMs)}  /  ${formatTime(state.durationMs)}",
+                color = Muted,
+                fontSize = 16.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = { playback.seekBy(-30_000L) }, enabled = state.title != null) { Text("−30 sec") }
+                Button(onClick = playback::togglePlayPause, enabled = state.title != null) {
+                    Text(if (state.isPlaying) "Pause" else "Play")
+                }
+                Button(onClick = { playback.seekBy(30_000L) }, enabled = state.title != null) { Text("+30 sec") }
+                Button(onClick = playback::cycleSpeed, enabled = state.title != null) {
+                    Text("${state.speed}×")
+                }
+                Button(onClick = onHome) { Text("Home") }
+            }
+        }
+    }
+}
+
+private fun formatTime(milliseconds: Long): String {
+    val totalSeconds = milliseconds.coerceAtLeast(0L) / 1_000L
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0) String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
+    else String.format(Locale.US, "%d:%02d", minutes, seconds)
 }
 
 @Composable
@@ -205,7 +267,10 @@ private fun Brand() {
 
 @Composable
 private fun TVBackground(content: @Composable () -> Unit) {
-    Surface(modifier = Modifier.fillMaxSize(), color = Ink) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        colors = SurfaceDefaults.colors(containerColor = Ink),
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()

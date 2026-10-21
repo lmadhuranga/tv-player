@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `3-tv-shell-focus`
-- Current branch: `3-tv-shell-focus`
-- Planning baseline: `be2f7cc`; milestone 2 commit: `715bd34`.
+- Implemented through milestone: `4-direct-url-player`
+- Current branch: `4-direct-url-player`
+- Planning baseline: `be2f7cc`; milestone 2 commit: `715bd34`; milestone 3 commit: `2a35592`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -53,6 +53,12 @@ Verification record:
 Implemented a TV Material based home/player placeholder shell. The home and player routes have clear large-screen hierarchy, remote-focused buttons use TV Material focus behavior, and Back returns from player or settings. The settings overlay has its own close focus target and restores focus to the opener when dismissed. This establishes the screen structure and focus handoff for later controls; no playback or settings behavior is included yet.
 
 Status: source implemented and reviewed; build, lint, emulator, and TV behavior are unverified by the current source-only instruction.
+
+## Milestone 4: `4-direct-url-player`
+
+Added a Media3 ExoPlayer controller with direct URI loading, preparation, play/pause, position and duration state, 30-second skip controls, playback speed cycling (1×, 1.25×, 1.5×, 2×), a TV remote control row, and a PlayerView video surface without Media3's touch-oriented controls. The app now declares Internet access for direct media retrieval. Playback errors are presented generically so signed URLs are not reflected in UI text. The URL entry screen remains in milestone 5; the controller API is ready to be connected there.
+
+Status: source implemented and reviewed; build, lint, playback, and device behavior are unverified.
 
 ## Current execution boundary
 
