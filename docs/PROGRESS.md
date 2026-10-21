@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `9-history-resume` (source complete; uncommitted review in progress)
-- Current branch: `9-history-resume`
-- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`, `205e978`, `345b715`.
+- Implemented through milestone: `10-playback-errors` (source complete; uncommitted review in progress)
+- Current branch: `10-playback-errors`
+- Planning baseline: `be2f7cc`; milestone commits: `715bd34`, `2a35592`, `0e032cd`, `8812c25`, `3e20ddc`, `205e978`, `345b715`, `1ee76f8`.
 - No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
 
 ## Decisions recorded
@@ -91,6 +91,12 @@ Status: source implemented; UI focus, display modes, subtitle style rendering, c
 Added opt-in local playback-position history through Preferences DataStore. It retains at most 20 recent records containing a user-facing label, source host, position, duration, and update time; no video URL, query, subtitle URL, or credential is saved. Settings exposes the local privacy toggle and clear-history action. When a remembered position is available, a newly entered link prompts the user to resume or start over and warns that the replacement may point to different content. The player saves progress periodically and when paused, replaced, or released. Returning from player to Home pauses playback; leaving a player route detaches the view from the controller-owned Media3 player.
 
 Status: source implemented; DataStore persistence, lifecycle saves, replacement prompt and resume behavior are unverified. No build, lint, or tests were run.
+
+## Milestone 10: `10-playback-errors`
+
+Configured Media3 with a bounded 50-second maximum/64 MiB target buffer (15 seconds minimum, 2.5 seconds initial playback, 5 seconds rebuffer threshold). The player reports its buffered-through time and distinguishes active buffering from an initial error. A 45-second continuous buffering timeout exposes retry and fresh-link actions without auto-retry loops. HTTP 401/403, 404, other HTTP statuses, network errors, unsupported/decoding formats, and generic failures receive distinct sanitized messages; error text contains no URL. Retry reuses the current direct video and remembered position/play intent, and a fresh URL remains an explicit user action. Returning home or pressing Back from the player pauses playback and saves progress.
+
+Status: source implemented; bounded buffering, timeout, HTTP/codec classification, retry, and navigation recovery are unverified. No build, lint, or tests were run.
 
 ## Current execution boundary
 

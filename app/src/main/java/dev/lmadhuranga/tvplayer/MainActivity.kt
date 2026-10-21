@@ -105,7 +105,10 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     }
 
     BackHandler(enabled = settingsOpen || route != AppRoute.HOME) {
-        if (settingsOpen) settingsOpen = false else route = AppRoute.HOME
+        if (settingsOpen) settingsOpen = false else {
+            if (route == AppRoute.PLAYER) playback.pauseForBackground()
+            route = AppRoute.HOME
+        }
     }
 
     when (route) {
@@ -132,7 +135,10 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
             onBack = { route = AppRoute.HOME },
         )
 
-        AppRoute.PLAYER -> PlayerScreen(playback = playback, onHome = {
+        AppRoute.PLAYER -> PlayerScreen(playback = playback, onAddUrl = {
+            playback.pauseForBackground()
+            route = AppRoute.ADD_URL
+        }, onHome = {
             playback.pauseForBackground()
             route = AppRoute.HOME
         })
@@ -304,7 +310,7 @@ private fun ResumePrompt(entry: HistoryEntry, onResume: () -> Unit, onStartOver:
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
+private fun PlayerScreen(playback: PlaybackController, onAddUrl: () -> Unit, onHome: () -> Unit) {
     val state by playback.state.collectAsState()
     var menuOpen by remember { mutableStateOf(false) }
     var menuWasOpen by remember { mutableStateOf(false) }
@@ -362,6 +368,19 @@ private fun PlayerScreen(playback: PlaybackController, onHome: () -> Unit) {
                 color = Muted,
                 fontSize = 16.sp,
             )
+            Text(
+                if (state.isBuffering) "Buffering · buffered to ${formatTime(state.bufferedPositionMs)}"
+                else "Buffered to ${formatTime(state.bufferedPositionMs)}",
+                color = Muted,
+                fontSize = 14.sp,
+            )
+            if (state.error != null) {
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = playback::retryPlayback, enabled = state.canRetry) { Text("Retry") }
+                    Button(onClick = onAddUrl) { Text("Enter another link") }
+                }
+            }
             state.subtitleError?.let { Text("Subtitle: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

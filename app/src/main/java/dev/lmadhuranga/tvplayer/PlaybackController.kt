@@ -8,9 +8,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.common.MediaItem.SubtitleConfiguration
+import androidx.media3.exoplayer.DefaultLoadControl
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.media3.ui.AspectRatioFrameLayout
 import kotlin.math.abs
 
@@ -30,8 +32,10 @@ data class PlaybackUiState(
     val isBuffering: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
+    val bufferedPositionMs: Long = 0L,
     val speed: Float = 1f,
     val error: String? = null,
+    val canRetry: Boolean = false,
     val subtitlesAvailable: Boolean = false,
     val subtitlesEnabled: Boolean = true,
     val subtitleOffsetMs: Long = 0L,
@@ -52,7 +56,12 @@ enum class VideoDisplayMode(val label: String, val resizeMode: Int) {
 @OptIn(UnstableApi::class)
 class PlaybackController(context: Context, private val historyRepository: HistoryRepository) : Player.Listener {
     private val appContext = context.applicationContext
-    val player: ExoPlayer = ExoPlayer.Builder(appContext).build()
+    private val loadControl = DefaultLoadControl.Builder()
+        .setBufferDurationsMs(15_000, 50_000, 2_500, 5_000)
+        .setTargetBufferBytes(64 * 1024 * 1024)
+        .setPrioritizeTimeOverSizeThresholds(false)
+        .build()
+    val player: ExoPlayer = ExoPlayer.Builder(appContext).setLoadControl(loadControl).build()
     private val subtitleRepository = SubtitleRepository(appContext.cacheDir)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handler = Handler(Looper.getMainLooper())
@@ -73,6 +82,9 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     private var sourceGeneration = 0L
     private var historyEntry: HistoryEntry? = null
     private var lastHistorySaveMs = 0L
+    private var bufferingTimeoutJob: Job? = null
+    private var playbackIntent = false
+    private var timedOutGeneration: Long? = null
 
     init {
         player.addListener(this)
@@ -83,6 +95,9 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         if (released) return
         saveHistoryNow()
         val generation = ++sourceGeneration
+        timedOutGeneration = null
+        bufferingTimeoutJob?.cancel()
+        bufferingTimeoutJob = null
         subtitleJob?.cancel()
         subtitleJob = null
         player.stop()
@@ -104,6 +119,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         player.setMediaItem(MediaItem.fromUri(Uri.parse(url)), startPositionMs.coerceAtLeast(0L))
         player.prepare()
         player.playWhenReady = true
+        playbackIntent = true
         if (subtitleUrl != null) {
             subtitleJob = scope.launch {
                 try {
@@ -128,13 +144,15 @@ class PlaybackController(context: Context, private val historyRepository: Histor
 
     fun togglePlayPause() {
         if (released) return
-        if (player.isPlaying || player.playWhenReady) player.pause() else player.play()
+        playbackIntent = !(player.isPlaying || player.playWhenReady)
+        if (playbackIntent) player.play() else player.pause()
         publishState()
     }
 
     fun pauseForBackground() {
         if (released) return
         player.pause()
+        playbackIntent = false
         publishState()
         saveHistoryNow()
     }
@@ -144,6 +162,24 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
         player.seekTo((player.currentPosition + deltaMs).coerceIn(0L, duration))
         publishState()
+    }
+
+    fun retryPlayback() {
+        if (released) return
+        val url = currentVideoUrl ?: return
+        timedOutGeneration = null
+        bufferingTimeoutJob?.cancel()
+        bufferingTimeoutJob = null
+        val position = player.currentPosition.coerceAtLeast(0L)
+        val speed = player.playbackParameters.speed
+        val item = mediaItem(url, downloadedSubtitle)
+        player.setMediaItem(item, position)
+        player.prepare()
+        player.setPlaybackSpeed(speed)
+        player.playWhenReady = playbackIntent
+        mutableState.value = mutableState.value.copy(error = null, canRetry = false, isBuffering = true)
+        val generation = sourceGeneration
+        startBufferingTimeout(generation)
     }
 
     fun cycleSpeed() {
@@ -220,6 +256,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         sourceGeneration++
         subtitleJob?.cancel()
         handler.removeCallbacks(ticker)
+        bufferingTimeoutJob?.cancel()
         player.removeListener(this)
         player.release()
         subtitleRepository.discard(downloadedSubtitle)
@@ -235,14 +272,24 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     }
 
     override fun onIsPlayingChanged(isPlaying: Boolean) = publishState()
-    override fun onPlaybackStateChanged(playbackState: Int) = publishState()
+    override fun onPlaybackStateChanged(playbackState: Int) {
+        publishState()
+        if (playbackState == Player.STATE_BUFFERING) startBufferingTimeout(sourceGeneration)
+        else {
+            timedOutGeneration = null
+            bufferingTimeoutJob?.cancel()
+            bufferingTimeoutJob = null
+        }
+    }
 
     override fun onPlayerError(error: PlaybackException) {
-        // Media errors can include a signed URL. Keep their user-facing form generic.
+        bufferingTimeoutJob?.cancel()
+        bufferingTimeoutJob = null
         mutableState.value = mutableState.value.copy(
             isPlaying = false,
             isBuffering = false,
-            error = "This video could not be played. Check the link or try another video.",
+            error = playbackErrorMessage(error),
+            canRetry = currentVideoUrl != null,
         )
     }
 
@@ -250,12 +297,57 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         if (released) return
         mutableState.value = mutableState.value.copy(
             isPlaying = player.isPlaying,
-            isBuffering = player.playbackState == Player.STATE_BUFFERING,
+            isBuffering = player.playbackState == Player.STATE_BUFFERING && timedOutGeneration != sourceGeneration,
             positionMs = player.currentPosition.coerceAtLeast(0L),
             durationMs = player.duration.takeIf { it > 0L } ?: 0L,
+            bufferedPositionMs = player.bufferedPosition.coerceAtLeast(player.currentPosition.coerceAtLeast(0L)),
             speed = player.playbackParameters.speed,
         )
     }
+
+    private fun startBufferingTimeout(generation: Long) {
+        if (released || bufferingTimeoutJob?.isActive == true) return
+        bufferingTimeoutJob = scope.launch {
+            delay(BUFFERING_TIMEOUT_MS)
+            if (!released && generation == sourceGeneration && player.playbackState == Player.STATE_BUFFERING) {
+                timedOutGeneration = generation
+                mutableState.value = mutableState.value.copy(
+                    isBuffering = false,
+                    error = "Playback has been waiting for data for too long. Check the TV connection, then retry or enter a fresh link.",
+                    canRetry = currentVideoUrl != null,
+                )
+            }
+        }
+    }
+
+    private fun playbackErrorMessage(error: PlaybackException): String {
+        val status = generateSequence(error.cause) { it.cause }
+            .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
+            .firstOrNull()?.responseCode
+        return when {
+            status == 401 || status == 403 -> "The link was refused or may have expired. Enter a fresh direct link, then retry."
+            status == 404 -> "The video was not found at that link. Check it or enter another link."
+            status != null -> "The video server returned an error (HTTP $status). Check the link or try another source."
+            error.errorCodeName.contains("NETWORK", ignoreCase = true) || error.errorCodeName.contains("TIMEOUT", ignoreCase = true) ->
+                "The TV could not reach the video server. Check the network, then retry or enter a fresh link."
+            error.errorCodeName.contains("UNSUPPORTED", ignoreCase = true) || error.errorCodeName.contains("DECODING", ignoreCase = true) ->
+                "This TV cannot decode the video format. Try a compatible source or another stream."
+            else -> "This video could not be played. Check the link or try another video."
+        }
+    }
+
+    private fun mediaItem(url: String, subtitle: CachedSubtitle?): MediaItem {
+        if (subtitle == null) return MediaItem.fromUri(Uri.parse(url))
+        val configuration = SubtitleConfiguration.Builder(Uri.fromFile(subtitle.adjustedFile))
+            .setMimeType(subtitle.mimeType)
+            .setLanguage("und")
+            .setLabel("External subtitles")
+            .setSelectionFlags(if (mutableState.value.subtitlesEnabled) C.SELECTION_FLAG_DEFAULT else 0)
+            .build()
+        return MediaItem.Builder().setUri(Uri.parse(url)).setSubtitleConfigurations(listOf(configuration)).build()
+    }
+
+    companion object { private const val BUFFERING_TIMEOUT_MS = 45_000L }
 
     private fun maybeSaveHistory() {
         if (released || !player.isPlaying || abs(player.currentPosition - lastHistorySaveMs) < 15_000L) return
@@ -283,17 +375,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         val wasPlaying = player.playWhenReady
         val position = player.currentPosition.coerceAtLeast(0L)
         val speed = player.playbackParameters.speed
-        val configuration = SubtitleConfiguration.Builder(Uri.fromFile(subtitle.adjustedFile))
-            .setMimeType(subtitle.mimeType)
-            .setLanguage("und")
-            .setLabel("External subtitles")
-            .setSelectionFlags(if (mutableState.value.subtitlesEnabled) C.SELECTION_FLAG_DEFAULT else 0)
-            .build()
-        val item = MediaItem.Builder()
-            .setUri(Uri.parse(url))
-            .setSubtitleConfigurations(listOf(configuration))
-            .build()
-        player.setMediaItem(item, position)
+        player.setMediaItem(mediaItem(url, subtitle), position)
         player.prepare()
         player.setPlaybackSpeed(speed)
         player.playWhenReady = wasPlaying
