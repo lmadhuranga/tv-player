@@ -83,7 +83,7 @@ private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 @Composable
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 private fun TVPlayerApp(playback: PlaybackController, historyRepository: HistoryRepository, window: Window) {
-    var route by remember { mutableStateOf(AppRoute.HOME) }
+    var route by remember { mutableStateOf(AppRoute.HANDOFF) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
@@ -116,9 +116,6 @@ private fun TVPlayerApp(playback: PlaybackController, historyRepository: History
     when (route) {
         AppRoute.HOME -> HomeScreen(
             settingsRequester = settingsOpenerRequester,
-            onOpenPlayer = { route = AppRoute.PLAYER },
-            onAddVideo = { route = AppRoute.ADD_URL },
-            onOpenHandoff = { route = AppRoute.HANDOFF },
             onOpenSettings = { settingsOpen = true },
         )
 
@@ -187,9 +184,6 @@ private data class PendingPlayback(val url: String, val subtitleUrl: String?, va
 @Composable
 private fun HomeScreen(
     settingsRequester: FocusRequester,
-    onOpenPlayer: () -> Unit,
-    onAddVideo: () -> Unit,
-    onOpenHandoff: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     TVBackground {
@@ -217,12 +211,6 @@ private fun HomeScreen(
                     fontSize = 21.sp,
                 )
                 Spacer(Modifier.height(34.dp))
-                AppButton(onClick = onAddVideo) { Text("Add video URL", fontSize = 18.sp) }
-                Spacer(Modifier.height(10.dp))
-                AppButton(onClick = onOpenHandoff) { Text("Send link from phone", fontSize = 18.sp) }
-                Spacer(Modifier.height(10.dp))
-                AppButton(onClick = onOpenPlayer) { Text("Open player", fontSize = 18.sp) }
-                Spacer(Modifier.height(10.dp))
                 AppButton(
                     onClick = onOpenSettings,
                     modifier = Modifier.focusRequester(settingsRequester),

@@ -46,6 +46,7 @@ Record each result, device model/software, network conditions, test source/conta
 
 - [x] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions. Lint emitted 22 warnings.
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
+- [ ] Launch and confirm the phone-send QR/PIN screen is the default; Back to Home and confirm “Add Video URL” and “Open player” are absent.
 - [ ] Confirm focus visibility and D-pad reachability on Home, URL entry, options/settings dialogs, history and handoff screens; Back restores focus or returns safely.
 - [ ] Verify every button is dark at rest, white only while focused/pressed, has readable disabled contrast, and returns to dark when focus moves. Check Home, player controls/settings, history/resume, URL entry, and handoff. Confirm selected audio/quality remains indicated by its check/label rather than a sticky white fill.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.

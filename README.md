@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation through milestone 16 is committed on sequential local branches. Buttons use dark fills at rest and white fills while focused or pressed. Milestone 17 adds local subtitles, URL-derived filenames, and hidden-control skip keys; its build/install and runtime behavior are pending. The milestone 16 debug APK is installed on a Sony BRAVIA VU3 without launch. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and deferred checks.
+Source implementation through milestone 17 is committed on sequential local branches. The app opens to the phone-send QR/PIN screen; handoff links begin playback immediately. Milestone 17 also adds local subtitle picking, URL-derived single-line player titles, hidden-control 30-second skips, and an always-visible muted timeline. The latest build/lint passed; final install/launch on the Sony BRAVIA is in progress. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and remaining checks.
 
 ## Development workflow
 
@@ -16,7 +16,7 @@ Source implementation through milestone 16 is committed on sequential local bran
 - Keep each branch focused; commit every completed feature before starting the next milestone.
 - Keep implementation and verification status distinct. Record exactly which checks ran and which remain pending; a source review does not prove that a build or device behavior works.
 - Do not push branches, create a GitHub repository, or merge to `main` without an explicit request.
-- Source implementation, local build/lint, and installation without launch were authorized. TV launch, input, navigation, and runtime QA remain pending separate authorization.
+- Local build/lint, TV installation, and app launch are authorized. D-pad interaction, playback, visual, and functional QA still require manual checks and are not claimed complete.
 
 ## Tentative product identity
 
