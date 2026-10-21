@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation for core milestones 2–12 is complete and committed sequentially on local numbered branches. This pass did not compile, lint, test, install, or launch the app, so the source remains unverified. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for scope, exact evidence, and deferred checks.
+Source implementation for core milestones 2–12 is complete and committed sequentially on local numbered branches. Milestone 13 build and lint passed, and the debug APK was installed on a Sony BRAVIA VU3 without launching it. Runtime behavior and QA remain unverified. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for exact evidence and deferred checks.
 
 ## Development workflow
 
@@ -16,7 +16,7 @@ Source implementation for core milestones 2–12 is complete and committed seque
 - Keep each branch focused; commit every completed feature before starting the next milestone.
 - Keep implementation and verification status distinct. Record exactly which checks ran and which remain pending; a source review does not prove that a build or device behavior works.
 - Do not push branches, create a GitHub repository, or merge to `main` without an explicit request.
-- Source implementation was authorized through milestone 12. Builds, tests, installation, and TV connection remain pending; TV access requires explicit approval before device interaction.
+- Source implementation, local build/lint, and installation without launch were authorized. TV launch, input, navigation, and runtime QA remain pending separate authorization.
 
 ## Tentative product identity
 

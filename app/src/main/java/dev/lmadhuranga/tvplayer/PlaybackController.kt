@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import androidx.media3.ui.AspectRatioFrameLayout
 import kotlin.math.abs
 
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 data class PlaybackUiState(
     val title: String? = null,
     val isPlaying: Boolean = false,
@@ -65,14 +66,14 @@ data class MediaTrackChoice(
     val selected: Boolean,
 )
 
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 enum class VideoDisplayMode(val label: String, val resizeMode: Int) {
     FIT("Fit", AspectRatioFrameLayout.RESIZE_MODE_FIT),
     FILL("Fill", AspectRatioFrameLayout.RESIZE_MODE_FILL),
     ZOOM("Zoom", AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
 }
 
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 class PlaybackController(context: Context, private val historyRepository: HistoryRepository) : Player.Listener {
     private val appContext = context.applicationContext
     private val loadControl = DefaultLoadControl.Builder()

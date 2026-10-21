@@ -3,22 +3,22 @@
 ## Current state
 
 - Date: 2026-10-21
-- Implemented through milestone: `12-device-qa-release` (source complete; all verification pending)
-- Current branch: `12-device-qa-release`
-- Planning baseline: `be2f7cc`; milestones 2–12 are committed sequentially on separate local branches (full commit mapping below).
-- No TV connection, installation, or live testing has occurred. User authorized continuing core source implementation through milestone 12 without running builds or tests; validation remains pending.
+- Implemented through milestone: `13-build-install` (debug build/lint and package installation verified; app behavior remains unverified)
+- Current branch: `13-build-install`
+- Planning baseline: `be2f7cc`; core milestones 2–12 and build/install milestone 13 are committed sequentially on local branches (full mapping below).
+- The debug APK was installed on the authorized Sony BRAVIA VU3 (Android API 34). It was not launched; no app input, navigation, playback, screenshot, or runtime behavior was tested.
 
 ## Decisions recorded
 
 - Native Kotlin Android TV app; Compose for TV, Media3 ExoPlayer, and DataStore are the initial technology direction.
-- App configuration uses minimum API 26 and compile/target API 36. Build compatibility and target-device behavior remain unverified.
+- App configuration uses minimum API 26 and compile/target API 36. The debug build and lint pass with the JDK17/SDK36 toolchain; runtime behavior remains unverified.
 - A TV-hosted page accepts links from a same-Wi-Fi browser. It submits only the URLs; video and subtitle data are fetched by the TV.
 - Direct HTTP(S) playback is the baseline. Seedr integration is deferred behind a verified authentication/support gate.
 - Remote navigation and reliable focus behavior are core requirements.
 - Recent history is local and privacy-conscious, with clear-history and deliberate handling of signed URL replacement/resume.
 - Feature work proceeds in numbered branches stacked from the last accepted commit; commit each feature before proceeding. No pushes, repository creation, or merge without an explicit request.
 - The app UI, settings, errors, documentation, and examples are English-only; subtitle content may use any language/Unicode supported by playback.
-- The user authorized continuous source implementation through milestone 12 without intermediate approvals. Build and test commands were deferred during this source-only pass. Do not describe implementation as compiled, tested, or device-validated until those checks are explicitly run and recorded.
+- The user later authorized local build/lint and installing the matching debug package to the TV, while explicitly disallowing launch. Installation is recorded below; tests, launch, and runtime behavior remain unverified.
 
 ## Numbered branches and commits
 
@@ -36,6 +36,7 @@
 | 10 | `10-playback-errors` | `3caeaf9` |
 | 11 | `11-media-tracks` | `7aa31b2` |
 | 12 | `12-device-qa-release` | branch HEAD (`git rev-parse 12-device-qa-release`) |
+| 13 | `13-build-install` | branch HEAD (`git rev-parse 13-build-install`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -125,10 +126,22 @@ Status: source implemented; dependency resolution, actual track discovery/select
 
 ## Milestone 12: `12-device-qa-release`
 
-Added release-variant minification/resource shrinking configuration without signing credentials. TV and phone/laptop link forms now accept an optional 100-character user label. Resume selection presents the saved positions and requires the user to choose one or start from the beginning; it warns that the new link may be different and does not silently resume based on a title match. Added [the local build and TV QA guide](SETUP_AND_QA.md) with toolchain setup, exact debug/lint and release commands, expected APK location, optional installation commands, a manual TV checklist, and known limitations. Updated this checkpoint to show that core source work through milestone 12 is committed, while all requested builds, tests, and device verification remain pending.
+Added release-variant minification/resource shrinking configuration without signing credentials. TV and phone/laptop link forms now accept an optional 100-character user label. Resume selection presents the saved positions and requires the user to choose one or start from the beginning; it warns that the new link may be different and does not silently resume based on a title match. Added [the local build and TV QA guide](SETUP_AND_QA.md) with toolchain setup, exact debug/lint and release commands, expected APK location, optional installation commands, a manual TV checklist, and known limitations. At this point source implementation through milestone 12 was committed, with verification deferred until milestone 13.
 
-Status: source implemented and reviewed; no APK was produced. The scaffold build timed out during dependency metadata resolution, and the retry was stopped before Kotlin compilation. No build, lint, test, emulator, or device command was run after the user directed source-only continuation. Release signing is intentionally unconfigured; debug/release packaging, manifest behavior, playback, focus, subtitles, handoff, history, and device compatibility remain unverified.
+Status: source implemented and reviewed. The separate milestone 13 later built/linted the debug variant and installed it without launch. Release signing is intentionally unconfigured; release packaging, manifest behavior, playback, focus, subtitles, handoff, history, and device runtime compatibility remain unverified.
+
+## Milestone 13: `13-build-install`
+
+Fixed the compile blockers found by the first complete build: removed an invalid `weight` import, made the shared TV background composable visible to the URL screen, removed a duplicate `URI` import, and applied AndroidX `OptIn` annotations for Media3's `UnstableApi`. Pinned Lifecycle to `2.9.4`; `2.11.0` required compileSdk 37 and AGP 9.1, conflicting with this project's SDK36/AGP8.13.2 setup.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed with JDK `17.0.17`, Gradle `8.13`, AGP `8.13.2`, compile/target SDK `36`; Gradle reported `BUILD SUCCESSFUL`.
+- Lint completed with 22 warnings and no errors. Warnings include newer-version advisories, fixed-orientation and backup-rule notices, vector size, KTX suggestions, and local SDK/NDK metadata warnings. The local NDK folder lacked `source.properties`; the build still packaged its native libraries.
+- APK: `app/build/outputs/apk/debug/app-debug.apk` (16 MiB). APK inspection confirmed ID `dev.lmadhuranga.tvplayer`, minSdk `26`, targetSdk `36`, `MainActivity` `MAIN`/`LEANBACK_LAUNCHER`, and Android debug signing certificate.
+- ADB read-only identification confirmed Sony BRAVIA VU3, Android API `34`; no package was installed beforehand. `adb install -r` returned `Success`. Post-install `pm path` and `dumpsys package` confirmed the package path and version `1` / `0.1.0`, minSdk `26`, targetSdk `36`.
+- The app was not launched. No app input, navigation, playback, screenshots, or runtime behavior were tested. Existing build/lint warnings and device runtime behavior remain open for QA.
 
 ## Current execution boundary
 
-Milestones 2–12 are source-complete on separate numbered branches, each stacked from its predecessor. This implementation pass is source-only: builds, lint, tests, emulator actions, and device commands were deferred. The initial scaffold build encountered Google Maven timeouts, and its retry was canceled before compilation. No APK was produced. Do not push or merge. Milestone 13 remains optional and out of scope. Real-TV installation and live testing remain pending explicit approval.
+Milestones 2–13 are committed on separate local branches, stacked sequentially. The debug build, lint, and package installation have been verified; tests, app launch and all runtime behavior remain unverified. Do not launch the TV app unless separately authorized. Do not push or merge. Optional Seedr discovery remains deferred. No additional device interaction is authorized by this checkpoint.

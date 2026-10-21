@@ -2,7 +2,6 @@ package dev.lmadhuranga.tvplayer
 
 import java.net.URI
 import java.util.Locale
-import java.net.URI
 
 sealed interface VideoUrlValidation {
     data class Valid(val normalizedUrl: String, val sourceLabel: String) : VideoUrlValidation

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +54,7 @@ internal val Ink = Color(0xFF07111F)
 internal val Teal = Color(0xFF5BD5C6)
 internal val Muted = Color(0xFFB9C8D9)
 
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 class MainActivity : ComponentActivity() {
     private lateinit var playback: PlaybackController
 
@@ -83,6 +83,7 @@ class MainActivity : ComponentActivity() {
 private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
 
 @Composable
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 private fun TVPlayerApp(playback: PlaybackController, historyRepository: HistoryRepository) {
     var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
@@ -313,7 +314,7 @@ private fun ResumePrompt(entries: List<HistoryEntry>, onResume: (HistoryEntry) -
     }
 }
 
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
 private fun PlayerScreen(playback: PlaybackController, onAddUrl: () -> Unit, onHome: () -> Unit) {
     val state by playback.state.collectAsState()
@@ -495,7 +496,7 @@ private fun Brand() {
 }
 
 @Composable
-private fun TVBackground(content: @Composable () -> Unit) {
+internal fun TVBackground(content: @Composable () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         colors = SurfaceDefaults.colors(containerColor = Ink),

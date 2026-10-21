@@ -1,10 +1,10 @@
 # Local build and TV QA guide
 
-This guide records the commands and checks for the project owner to run later. The current implementation pass did not build, lint, test, install, or launch the app. No debug or release APK has been produced by this pass.
+This guide records the completed local build/lint and authorized installation, plus checks still pending. The debug APK was installed on a Sony BRAVIA VU3 (Android API 34) but was not launched. No tests, playback, D-pad interaction, screenshots, or runtime checks were performed.
 
 ## Local toolchain
 
-The source pass found Amazon Corretto JDK 17 and Android SDK API 36 at `/Users/lmadhuranga/Library/Android/sdk`. On that Mac, open Terminal and run:
+The verified toolchain is Amazon Corretto JDK 17.0.17 and Android SDK API 36 at `/Users/lmadhuranga/Library/Android/sdk`. From the repository root, the successful command was:
 
 ```sh
 cd /Users/lmadhuranga/Desktop/Coding/tv-player
@@ -12,23 +12,23 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 export ANDROID_HOME=/Users/lmadhuranga/Library/Android/sdk
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 ./gradlew --version
-./gradlew :app:assembleDebug :app:lintDebug
+./gradlew :app:assembleDebug :app:lintDebug --console=plain
 ```
 
-Install Android SDK Platform 36 and Android SDK Build Tools 36 through Android Studio's SDK Manager if they are missing. The Gradle wrapper pins Gradle 8.13; AGP 8.13.2 and Kotlin 2.2.21 are pinned in the version catalog. The debug APK, if the build succeeds, should be at `app/build/outputs/apk/debug/app-debug.apk`.
+Install Android SDK Platform 36 and Android SDK Build Tools 36 through Android Studio's SDK Manager if they are missing. The Gradle wrapper pins Gradle 8.13; AGP 8.13.2 and Kotlin 2.2.21 are pinned in the version catalog. Lifecycle is pinned to 2.9.4 because 2.11.0 requires SDK37 and AGP9.1. The command above passed; APK: `app/build/outputs/apk/debug/app-debug.apk` (16 MiB). Lint reported 22 warnings and zero errors.
 
-During milestone 2, a scaffold-only build attempt reached Gradle dependency metadata resolution but timed out while accessing Google Maven; its retry was stopped before Kotlin compilation at the user's direction. No build, lint, or test was run for the completed milestone 2–12 source. Allow Gradle network access and retry the commands above when the user requests verification.
+During milestone 2, an earlier scaffold-only build attempt timed out accessing Google Maven; its retry was stopped before Kotlin compilation. The later build on milestone 13 resolved dependencies, exposed and fixed compile/lint blockers, then passed. Gradle also warned about a local NDK folder missing `source.properties`; native libraries were packaged. The lint report includes version advisories, manifest, vector, and KTX warnings; review them during maintenance.
 
 ## Optional local installation
 
-Only after the user confirms a TV or emulator is available for installation, connect it using the user's approved method and run:
+For an authorized installation, select the already-connected target explicitly and install without launching:
 
 ```sh
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell monkey -p dev.lmadhuranga.tvplayer 1
+TV_SERIAL="<authorized-device-id>"
+adb -s "$TV_SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-These commands are instructions only; this implementation pass did not connect to, query, install on, or launch an emulator or TV. The app should appear in the Android TV launcher as **TV Player**. Its application ID is `dev.lmadhuranga.tvplayer`.
+This `adb install -r` command succeeded on the authorized Sony BRAVIA VU3. A read-only package check confirmed path `/data/app/.../dev.lmadhuranga.tvplayer.../base.apk`, versionCode 1 / versionName 0.1.0, minSdk 26, and targetSdk 36. No launch command was run. The APK manifest declares application ID `dev.lmadhuranga.tvplayer` and a Leanback launcher entry; launcher visibility has not been visually checked.
 
 ## Release build and signing
 
@@ -44,7 +44,7 @@ The project deliberately does not configure or commit a signing key. Gradle's de
 
 Record each result, device model/software, network conditions, test source/container, and any limitations. Leave checks incomplete until personally run.
 
-- [ ] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions.
+- [x] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions. Lint emitted 22 warnings.
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
 - [ ] Confirm focus visibility and D-pad reachability on Home, URL entry, options/settings dialogs, history and handoff screens; Back restores focus or returns safely.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
@@ -56,7 +56,8 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Test network loss/recovery, 401/403/404 server responses, unsupported codecs, prolonged buffering, explicit retry, fresh-link entry, and return navigation. Confirm no automatic retry loop.
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
-- [ ] Complete a separate approved Sony BRAVIA pass; an emulator or successful build alone does not demonstrate TV playback, focus, network, or subtitle behavior.
+- [x] Install the debug APK on Sony BRAVIA VU3 and verify package metadata read-only. The app was not launched.
+- [ ] Complete a separate authorized Sony BRAVIA runtime pass; the installation does not demonstrate launcher visibility, playback, focus, network, or subtitle behavior.
 
 ## Known boundaries
 
