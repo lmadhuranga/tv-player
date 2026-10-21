@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `23-phone-input-mode` (source implementation; local build/lint recorded below, TV not contacted)
-- Current branch: `23-phone-input-mode`
+- Implemented through milestone: `24-phone-url-history` (source implementation; local build/lint recorded below, TV not contacted)
+- Current branch: `24-phone-url-history`
 - Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
 - The milestone 19 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, Settings reopen, or other functional runtime QA was performed.
 
@@ -47,6 +47,7 @@
 | 21 | `21-limits-origin-fix` | branch HEAD (`git rev-parse 21-limits-origin-fix`) |
 | 22 | `22-buffering-choice` | `54acfe2` |
 | 23 | `23-phone-input-mode` | branch HEAD (`git rev-parse 23-phone-input-mode`) |
+| 24 | `24-phone-url-history` | branch HEAD (`git rev-parse 24-phone-url-history`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -225,7 +226,7 @@ Verification record:
 
 ## Current execution boundary
 
-Milestones 2–22 are committed on separate local branches, stacked sequentially. Milestone 21 was built, linted, installed, and launched on the approved BRAVIA; read-only Origin regression requests passed. Phone-browser upload and other behavioral/runtime QA remain pending. Milestones 22–23 have not been installed or launched; the TV was not contacted for these milestones. Optional Seedr discovery remains deferred.
+Milestones 2–23 are committed on separate local branches, stacked sequentially. Milestone 21 was built, linted, installed, and launched on the approved BRAVIA; read-only Origin regression requests passed. Phone-browser upload and other behavioral/runtime QA remain pending. Milestones 22–24 have not been installed or launched; the TV was not contacted for these milestones. Optional Seedr discovery remains deferred.
 
 ## Milestone 21: `21-limits-origin-fix`
 
@@ -257,3 +258,14 @@ Verification record:
 - With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks); lint passed with 0 errors and 25 warnings.
 - Debug APK: `app/build/outputs/apk/debug/app-debug.apk` (16 MiB).
 - No TV connection, install, or launch was performed. Real browser interaction and URL/file combinations remain unverified.
+
+## Milestone 24: `24-phone-url-history`
+
+Added browser-local history for successfully submitted video and subtitle URLs. The phone page stores full URL values only in that browser's localStorage, deduplicated by kind and URL, capped at 20 total entries, and expires entries after 24 hours. Signed links may expire earlier on their source service. Each section renders a separate list whose button labels show only the hostname and final path segment, with no query string; DOM content is assigned as text rather than HTML. Selecting an entry switches that media type to URL mode and fills its input without submitting or starting playback; expired/cleared entries are rechecked at click time. A clear control deletes local history. Upload files are never stored in this history. Send-time locks cover mode radios, media inputs, history buttons, and clear control, while Cancel remains available. If localStorage access or writes are blocked, history is unavailable but the form's send path remains usable.
+
+Verification record:
+
+- `git diff --check` passed. The embedded phone-page JavaScript passed `node --check` after extraction from the Kotlin raw HTML string.
+- With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks); lint passed with 0 errors and 25 warnings.
+- Debug APK: `app/build/outputs/apk/debug/app-debug.apk` (16 MiB).
+- No TV connection, install, or launch was performed. Browser runtime, expiry, storage-denial, and no-auto-submit behavior remain unverified.
