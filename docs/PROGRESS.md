@@ -2,11 +2,11 @@
 
 ## Current state
 
-- Date: 2026-10-21
-- Implemented through milestone: `17-subtitle-file-upload-filename-and-hidden-skip` (build/lint passed; install pending)
+- Date: 2026-10-22
+- Implemented through milestone: `17-subtitle-file-upload-filename-and-hidden-skip` (build/lint/install/launch command complete; runtime UI QA pending)
 - Current branch: `17-subtitle-file-upload-filename-and-hidden-skip`
-- Planning baseline: `be2f7cc`; milestones 2–16 are committed sequentially on local branches; milestone 17 implementation and local build/lint are complete on its feature branch (full mapping below).
-- The milestone 16 debug APK was installed on the authorized Sony BRAVIA VU3 (Android API 34) without launch. Milestone 17 debug build/lint passed locally; after the always-visible timeline update, install/launch of this exact revision is pending fresh device identity confirmation. Player runtime behavior has not been tested.
+- Planning baseline: `be2f7cc`; milestones 2–16 are committed sequentially on local branches; milestone 17 source, build/lint, install, and launch command are complete on its feature branch (full mapping below).
+- The milestone 17 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, or other functional runtime QA was performed.
 
 ## Decisions recorded
 
@@ -182,8 +182,9 @@ Verification record:
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
 - The first sandboxed Gradle invocation stopped before configuration because Gradle could not create its local lock service socket (`Operation not permitted`); the same command passed with the required local build permission.
 - After adding the timeline, filename ellipsis, direct browser-handoff playback, and default QR/PIN startup, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
-- `git diff --check` passed. An install attempt for an earlier binary was canceled when the user added UI changes; no launch occurred. The latest milestone 17 APK is awaiting fresh BRAVIA identity confirmation and install/launch. Picker, subtitle, filename, seek, handoff, visual, and playback runtime behavior remain unverified.
+- `git diff --check` passed. Before install, ADB identified `192.168.8.100:5555` as manufacturer Sony, model BRAVIA VU3, API 34. `adb install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`; `pm path` and `dumpsys package` confirmed `dev.lmadhuranga.tvplayer`, version `0.1.0`, minSdk 26, targetSdk 36.
+- `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. No D-pad input, screenshot, visible UI inspection, playback, or feature QA was performed. Picker, subtitle rendering/cleanup, title display, seek, handoff, visual, and playback runtime behavior remain unverified.
 
 ## Current execution boundary
 
-Milestones 2–16 are committed on separate local branches, stacked sequentially; milestone 17 is implemented on its own branch with follow-up routing changes awaiting build/lint and commit. Launch has been explicitly authorized after build/lint and a current device identity check. Optional Seedr discovery remains deferred.
+Milestones 2–16 are committed on separate local branches, stacked sequentially; milestone 17 is committed on its own branch and built/linted, installed, and launched. Manual functional/runtime QA remains pending. Optional Seedr discovery remains deferred.

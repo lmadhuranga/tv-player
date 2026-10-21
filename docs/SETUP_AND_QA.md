@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint and authorized TV checks, plus checks still pending. Milestone 17's latest debug APK has built and linted; that exact revision is awaiting TV install and authorized launch. Player playback, local subtitle import, hidden-key, and visual runtime checks remain pending.
+This guide records completed local build/lint, install, and launch commands, plus checks still pending. The final milestone 17 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). No visual inspection, D-pad interaction, playback, local subtitle import, or other runtime QA was performed.
 
 ## Local toolchain
 
@@ -21,14 +21,14 @@ During milestone 2, an earlier scaffold-only build attempt timed out accessing G
 
 ## Optional local installation
 
-For an authorized installation, select the already-connected target explicitly and install without launching:
+For an authorized installation, select the already-connected target explicitly:
 
 ```sh
 TV_SERIAL="<authorized-device-id>"
 adb -s "$TV_SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-This `adb install -r` command succeeded on the authorized Sony BRAVIA VU3. A read-only package check confirmed path `/data/app/.../dev.lmadhuranga.tvplayer.../base.apk`, versionCode 1 / versionName 0.1.0, minSdk 26, and targetSdk 36. No launch command was run. The APK manifest declares application ID `dev.lmadhuranga.tvplayer` and a Leanback launcher entry; launcher visibility has not been visually checked.
+`adb install -r` returned `Success` on `192.168.8.100:5555`, verified immediately beforehand as manufacturer Sony, model BRAVIA VU3, API 34. A read-only package check confirmed path `/data/app/.../dev.lmadhuranga.tvplayer.../base.apk`, versionCode 1 / versionName 0.1.0, minSdk 26, and targetSdk 36. `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. No D-pad input or visual inspection was performed. The APK manifest declares application ID `dev.lmadhuranga.tvplayer` and a Leanback launcher entry.
 
 ## Release build and signing
 
@@ -46,7 +46,7 @@ Record each result, device model/software, network conditions, test source/conta
 
 - [x] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions. Lint emitted 22 warnings.
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
-- [ ] Launch and confirm the phone-send QR/PIN screen is the default; Back to Home and confirm “Add Video URL” and “Open player” are absent.
+- [ ] Visually confirm the phone-send QR/PIN screen is the default; Back to Home and confirm “Add Video URL” and “Open player” are absent.
 - [ ] Confirm focus visibility and D-pad reachability on Home, URL entry, options/settings dialogs, history and handoff screens; Back restores focus or returns safely.
 - [ ] Verify every button is dark at rest, white only while focused/pressed, has readable disabled contrast, and returns to dark when focus moves. Check Home, player controls/settings, history/resume, URL entry, and handoff. Confirm selected audio/quality remains indicated by its check/label rather than a sticky white fill.
 - [ ] Enter a supported direct HTTP and HTTPS video link from the TV; test empty, malformed, very long, and unsupported-scheme values.
@@ -63,7 +63,7 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
-- [ ] Install and launch the latest milestone 17 APK on the Sony BRAVIA; verify playback UI and local subtitle behaviors.
+- [x] Install and launch the latest milestone 17 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.

@@ -8,7 +8,7 @@ The player interface, settings, and errors are English-only. Subtitle tracks may
 
 ## Project status
 
-Source implementation through milestone 17 is committed on sequential local branches. The app opens to the phone-send QR/PIN screen; handoff links begin playback immediately. Milestone 17 also adds local subtitle picking, URL-derived single-line player titles, hidden-control 30-second skips, and an always-visible muted timeline. The latest build/lint passed; final install/launch on the Sony BRAVIA is in progress. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and remaining checks.
+Source implementation through milestone 17 is committed on sequential local branches. The app opens to the phone-send QR/PIN screen; handoff links begin playback immediately. Milestone 17 also adds local subtitle picking, URL-derived single-line player titles, hidden-control 30-second skips, and an always-visible muted timeline. Build/lint passed, and the debug APK was installed and launched on the Sony BRAVIA; manual UI and playback QA remain pending. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and remaining checks.
 
 ## Development workflow
 
