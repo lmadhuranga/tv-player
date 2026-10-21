@@ -57,7 +57,6 @@ fun HandoffScreen(
 ) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
     val server = remember { LocalLinkServer(cacheDirectory) { latestCallback(it) } }
-    val goToPlayerRequester = remember { FocusRequester() }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
@@ -67,10 +66,6 @@ fun HandoffScreen(
             now = SystemClock.elapsedRealtime()
             delay(1_000)
         }
-    }
-
-    LaunchedEffect(hasActiveMedia) {
-        if (hasActiveMedia) goToPlayerRequester.requestFocus() else settingsRequester.requestFocus()
     }
 
     DisposableEffect(server, lifecycleOwner) {
@@ -136,7 +131,7 @@ fun HandoffScreen(
                 Spacer(Modifier.height(26.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (hasActiveMedia) {
-                        AppButton(onClick = onGoToPlayer, modifier = Modifier.focusRequester(goToPlayerRequester)) {
+                        AppButton(onClick = onGoToPlayer) {
                             Text("Go to Player")
                         }
                     }
