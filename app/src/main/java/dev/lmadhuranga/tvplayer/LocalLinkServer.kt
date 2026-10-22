@@ -110,19 +110,28 @@ class LocalLinkServer(
         }
         var socket: ServerSocket? = null
         try {
-            val listener = ServerSocket().apply {
-                // Permit a quick same-process restart after accepted connections close.
-                // This does not allow two live listeners to own the port.
-                reuseAddress = true
-                soTimeout = 0
-                bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
+            var listener: ServerSocket? = null
+            for (attempt in 0..1) {
+                try {
+                    listener = ServerSocket().apply {
+                        // Permit a quick same-process restart after accepted connections close.
+                        reuseAddress = true
+                        soTimeout = 0
+                        bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
+                    }
+                    break
+                } catch (error: BindException) {
+                    if (attempt != 0 || !closeStaleAppOwnedListener()) throw error
+                }
             }
-            socket = listener
-            server = listener
+            val boundListener = listener ?: throw BindException("Could not bind port $HANDOFF_PORT")
+            socket = boundListener
+            server = boundListener
+            synchronized(listenerOwnershipLock) { appOwnedListener = boundListener }
             publishPairingState(address = lanAddress)
-            Thread({ acceptLoop(listener, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
+            Thread({ acceptLoop(boundListener, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
         } catch (_: BindException) {
-            failStart(socket, "Port $HANDOFF_PORT is already in use by another app. Close that app and retry link handoff.")
+            failStart(socket, "Port $HANDOFF_PORT is unavailable. Close the app using it, then choose Retry.")
         } catch (error: Exception) {
             val reason = error.localizedMessage
                 ?.filterNot(Char::isISOControl)
@@ -133,8 +142,31 @@ class LocalLinkServer(
         }
     }
 
+    /** Reclaims a listener only when this process previously registered the exact socket. */
+    private fun closeStaleAppOwnedListener(): Boolean = synchronized(listenerOwnershipLock) {
+        val owned = appOwnedListener ?: return@synchronized false
+        if (owned === server) return@synchronized false
+        appOwnedListener = null
+        try { owned.close() } catch (_: Exception) { }
+        true
+    }
+
+    private fun clearListenerOwnership(listener: ServerSocket?) {
+        if (listener == null) return
+        synchronized(listenerOwnershipLock) {
+            if (appOwnedListener === listener) appOwnedListener = null
+        }
+    }
+
+    @Synchronized
+    fun retry() {
+        stop()
+        start()
+    }
+
     private fun failStart(socket: ServerSocket?, message: String) {
         try { socket?.close() } catch (_: Exception) { }
+        clearListenerOwnership(socket)
         server = null
         stopped.set(true)
         generation.incrementAndGet()
@@ -156,6 +188,7 @@ class LocalLinkServer(
         val current = server
         server = null
         try { current?.close() } catch (_: Exception) { }
+        clearListenerOwnership(current)
         clearUploads()
         mutableState.value = HandoffState()
     }
@@ -203,6 +236,7 @@ class LocalLinkServer(
         sessionToken = ""
         releasePendingApproval()
         try { listener.close() } catch (_: Exception) { }
+        clearListenerOwnership(listener)
         mainHandler.post {
             if (stopped.get() && generation.get() == failedGeneration) {
                 mutableState.value = HandoffState(message = "The link handoff stopped. Reopen this screen to start a new session.")
@@ -647,6 +681,10 @@ class LocalLinkServer(
     }
 
     private companion object {
+        /** Tracks only listeners created by this process, so recovery never kills an unknown owner. */
+        val listenerOwnershipLock = Any()
+        @Volatile var appOwnedListener: ServerSocket? = null
+
         val LINK_ENTRY_PAGE = """
             <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>TV Player</title>
             <style>

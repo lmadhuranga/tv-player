@@ -447,3 +447,13 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`; `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed. The visual result remains unverified on-device.
+
+## Milestone 43: `43-handoff-port-retry`
+
+Handoff startup now records the exact `ServerSocket` created by this process. If binding port 8765 fails, it closes and retries once only when that process-local ownership record identifies an earlier app listener; an unknown listener is left alone. The failure text describes the port as unavailable and the handoff screen shows a remote-focusable Retry action. The QR continues to render from the local page URL immediately after a successful bind publishes the LAN address.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date). `git diff --check` passed.
+- Source inspection established that Compose retains one remembered server for the Handoff screen and starts/stops it on Activity lifecycle events. The prior `BindException` message did not identify the owning process, so the original incident's actual port owner cannot be proven from repository evidence alone.
+- No TV contact, install, launch, or live port-owner check was performed. Retry behavior against a real stale listener and QR visibility remain unverified on-device.

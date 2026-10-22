@@ -110,6 +110,9 @@ fun HandoffScreen(
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(26.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!state.isRunning && state.message != null) {
+                        AppButton(onClick = { server.retry() }) { Text("Retry") }
+                    }
                     if (hasActiveMedia) {
                         AppButton(onClick = onGoToPlayer) {
                             Text("Go to Player")
