@@ -50,12 +50,13 @@ data class SubmittedVideo(
 data class HandoffState(
     val address: String? = null,
     val isRunning: Boolean = false,
+    val isHttps: Boolean = false,
     val message: String? = null,
     val pendingApprovalId: String? = null,
     val requesterDevice: String? = null,
     val requesterAddress: String? = null,
 ) {
-    val pageUrl: String? get() = address?.let { "http://$it:$HANDOFF_PORT/" }
+    val pageUrl: String? get() = address?.let { "${if (isHttps) "https" else "http"}://$it:$HANDOFF_PORT/" }
 }
 
 private const val HANDOFF_PORT = 8765
@@ -80,6 +81,7 @@ class LocalLinkServer(
     private val stopped = AtomicBoolean(true)
     private val generation = AtomicLong(0L)
     @Volatile private var server: ServerSocket? = null
+    @Volatile private var secureConnection = false
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
     private val clientWorkers = ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS,
         ArrayBlockingQueue<Runnable>(8), { task -> Thread(task, "tv-player-http-client").apply { isDaemon = true } })
@@ -130,11 +132,15 @@ class LocalLinkServer(
             var listener: ServerSocket? = null
             for (attempt in 0..1) {
                 try {
-                    listener = ServerSocket().apply {
-                        // Permit a quick same-process restart after accepted connections close.
-                        reuseAddress = true
-                        soTimeout = 0
-                        bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
+                    val candidate = LanHttps.unboundListener(appContext, lanAddress)
+                    try {
+                        candidate.reuseAddress = true
+                        candidate.soTimeout = 0
+                        candidate.bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
+                        listener = candidate
+                    } catch (error: Exception) {
+                        runCatching { candidate.close() }
+                        throw error
                     }
                     break
                 } catch (error: BindException) {
@@ -144,6 +150,7 @@ class LocalLinkServer(
             val boundListener = listener ?: throw BindException("Could not bind port $HANDOFF_PORT")
             socket = boundListener
             server = boundListener
+            secureConnection = LanHttps.isConfigured(appContext)
             synchronized(listenerOwnershipLock) { appOwnedListener = boundListener }
             publishPairingState(address = lanAddress)
             Thread({ acceptLoop(boundListener, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
@@ -185,6 +192,7 @@ class LocalLinkServer(
         try { socket?.close() } catch (_: Exception) { }
         clearListenerOwnership(socket)
         server = null
+        secureConnection = false
         stopped.set(true)
         generation.incrementAndGet()
         approvalSocket = null
@@ -206,6 +214,7 @@ class LocalLinkServer(
         previewGrants.clear()
         val current = server
         server = null
+        secureConnection = false
         try { current?.close() } catch (_: Exception) { }
         clearListenerOwnership(current)
         clearUploads()
@@ -863,6 +872,7 @@ class LocalLinkServer(
         mutableState.value = HandoffState(
             address = address,
             isRunning = !stopped.get(),
+            isHttps = secureConnection,
             message = message,
             pendingApprovalId = pending?.id,
             requesterDevice = pending?.requesterDevice,
@@ -873,7 +883,7 @@ class LocalLinkServer(
     private fun isSameOrigin(origin: String?, localAddress: InetAddress): Boolean {
         if (origin == null) return false
         val uri = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
-        return uri.scheme == "http" && uri.host == localAddress.hostAddress && uri.port == HANDOFF_PORT
+        return uri.scheme == (if (secureConnection) "https" else "http") && uri.host == localAddress.hostAddress && uri.port == HANDOFF_PORT
     }
 
     private fun isAllowedPeer(peer: InetAddress): Boolean = peer is Inet4Address && peer.isSiteLocalAddress && sharesSubnet(peer)
