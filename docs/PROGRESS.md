@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `56-fullscreen-progress-time-labels` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `56-fullscreen-progress-time-labels`
+- Implemented through milestone: `57-repeat-two-minute-hold-seek` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `57-repeat-two-minute-hold-seek`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -58,6 +58,7 @@
 | 32 | `32-fullscreen-dark-timeline` | `bd145b5` |
 | 35 | `35-icon-player-controls` | branch HEAD (`git rev-parse 35-icon-player-controls`) |
 | 56 | `56-fullscreen-progress-time-labels` | pending local commit |
+| 57 | `57-repeat-two-minute-hold-seek` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -580,5 +581,15 @@ Reduced the visible-controls progress tracks from 2dp to 1dp and the hidden-cont
 Verification record:
 
 - Focused source assertions confirmed persistent labels are gated only by visible controls/options, hidden-control presentation retains no persistent labels, visible seek target remains 12dp, and track heights and opacity match the request. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or preview was performed.
+
+## Milestone 57: `57-repeat-two-minute-hold-seek`
+
+Hidden-control fullscreen Left/Right taps continue to seek 30 seconds on KeyUp. While held, every distinct increase in Android's repeatCount seeks an additional two minutes; duplicate repeat events are ignored, and a skipped count applies all missed two-minute increments. Left and right track their repeat counts independently, and their matching KeyUp is consumed and resets the next press to tap behavior. Visible-control arrow navigation remains unchanged.
+
+Verification record:
+
+- Focused source assertions confirmed tap seeking occurs only on KeyUp when no repeats were received, repeat deltas apply each two-minute increment once, repeat state resets on release, and the hidden-controls gate continues to preserve visible navigation. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or preview was performed.
