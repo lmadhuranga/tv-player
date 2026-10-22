@@ -507,7 +507,7 @@ private fun UsbVideoBrowserScreen(
                 when {
                     loading -> "Finding your media…"
                     root == null -> "${roots.size} storage location${if (roots.size == 1) "" else "s"} · Press OK to open"
-                    else -> "${entries.size} item${if (entries.size == 1) "" else "s"} · OK to open · Left to go up",
+                    else -> "${entries.size} item${if (entries.size == 1) "" else "s"} · OK to open · Left to go up"
                 },
                 color = Muted,
                 fontSize = 15.sp,
