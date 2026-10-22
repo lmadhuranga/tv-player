@@ -108,6 +108,16 @@ internal class NetworkFileManager(
         return PreviewFile(file, type)
     }
 
+    /** Validates any ordinary visible file for download; never follows links or escapes a drive. */
+    fun downloadFile(rootId: String, relativePath: String, name: String): File {
+        val parent = resolveDirectory(rootId, relativePath)
+        validateName(name)
+        val root = resolveRoot(rootId)
+        val file = safeChild(root, parent, name) ?: throw IOException("That file is not available.")
+        if (!file.isFile || !file.canRead()) throw IOException("The selected file cannot be downloaded.")
+        return file
+    }
+
     fun createFolder(rootId: String, relativePath: String, name: String) {
         val parent = resolveDirectory(rootId, relativePath)
         requireWritable(resolveRoot(rootId), parent)
