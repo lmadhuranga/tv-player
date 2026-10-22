@@ -21,3 +21,4 @@ local.env
 !.env.example
 
 .playwright-mcp/
+.tv.env
