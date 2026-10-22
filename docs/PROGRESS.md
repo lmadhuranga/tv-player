@@ -420,3 +420,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date). `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 40: `40-right-side-playback-speed`
+
+Added a compact playback-speed button to the right side of the fullscreen controller row, adjacent to Player Options. The button shows the current speed, exposes a playback-speed accessibility description, and cycles the existing speed choices. The transport controls remain centered independently of the left and right control groups, and Options retains its existing focus requester.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`; `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.

@@ -440,11 +440,22 @@ fun FullscreenPlayerScreen(
                         onTogglePlayback = { interacted(playback::togglePlayPause) },
                         onSeekForward = { interacted { playback.seekBy(10_000L) } },
                     )
-                    PlayerCircleButton(
-                        onClick = { interacted { openOptions() } },
-                        modifier = Modifier.align(Alignment.CenterEnd).semantics { contentDescription = "Player options" },
-                        diameter = 50.dp,
-                    ) { Text("•••", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        PlayerCircleButton(
+                            onClick = { interacted(playback::cycleSpeed) },
+                            enabled = state.title != null,
+                            modifier = Modifier.semantics { contentDescription = "Playback speed: ${state.speed}×" },
+                        ) { Text("${state.speed}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                        PlayerCircleButton(
+                            onClick = { interacted { openOptions() } },
+                            modifier = Modifier.focusRequester(optionsFocus).semantics { contentDescription = "Player options" },
+                            diameter = 50.dp,
+                        ) { Text("•••", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
+                    }
                 }
             }
         }
