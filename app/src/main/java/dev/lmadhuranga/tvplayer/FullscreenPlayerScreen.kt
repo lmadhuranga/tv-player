@@ -420,8 +420,6 @@ fun FullscreenPlayerScreen(
                 }
                 state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(formatPlayerTime(state.positionMs), color = Color.White, fontSize = 14.sp)
-                    Spacer(Modifier.width(12.dp))
                     PlayerProgress(
                         positionMs = state.positionMs,
                         bufferedPositionMs = state.bufferedPositionMs,
@@ -429,8 +427,6 @@ fun FullscreenPlayerScreen(
                         onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
                         modifier = Modifier.weight(1f),
                     )
-                    Spacer(Modifier.width(12.dp))
-                    Text(formatPlayerTime(state.durationMs), color = Color.White, fontSize = 14.sp)
                 }
                 Box(modifier = Modifier.fillMaxWidth().height(64.dp)) {
                     SubtitleAudioControls(

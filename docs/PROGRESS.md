@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `37-auto-send-history` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `37-auto-send-history`
+- Implemented through milestone: `44-hide-fullscreen-time-labels` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `44-hide-fullscreen-time-labels`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -457,3 +457,12 @@ Verification record:
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date). `git diff --check` passed.
 - Source inspection established that Compose retains one remembered server for the Handoff screen and starts/stops it on Activity lifecycle events. The prior `BindException` message did not identify the owning process, so the original incident's actual port owner cannot be proven from repository evidence alone.
 - No TV contact, install, launch, or live port-owner check was performed. Retry behavior against a real stale listener and QR visibility remain unverified on-device.
+
+## Milestone 44: `44-hide-fullscreen-time-labels`
+
+Removed the elapsed and total time labels and their side gaps from the visible fullscreen progress row. The seekable 12dp progress area, remote focus and seeking behavior, transport row, and elapsed/total labels on the progress bar shown while controls are hidden remain unchanged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed successfully; `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.
