@@ -43,6 +43,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -404,16 +406,26 @@ fun FullscreenPlayerScreen(
                         ) { Text("Audio", fontSize = 16.sp) }
                     }
                     Spacer(Modifier.weight(1f))
-                    AppButton(onClick = { interacted { playback.seekBy(-30_000L) } }, enabled = state.title != null) {
-                        Text("−30 sec", fontSize = 17.sp)
+                    AppButton(
+                        onClick = { interacted { playback.seekBy(-30_000L) } },
+                        enabled = state.title != null,
+                        modifier = Modifier.semantics { contentDescription = "Seek backward 30 seconds" },
+                    ) {
+                        Text("⏪︎", fontSize = 22.sp)
                     }
                     AppButton(
                         onClick = { interacted(playback::togglePlayPause) },
                         enabled = state.title != null,
-                        modifier = Modifier.focusRequester(playFocus),
-                    ) { Text(if (state.isPlaying) "Ⅱ  Pause" else "▶  Play", fontSize = 20.sp) }
-                    AppButton(onClick = { interacted { playback.seekBy(30_000L) } }, enabled = state.title != null) {
-                        Text("+30 sec", fontSize = 17.sp)
+                        modifier = Modifier.focusRequester(playFocus).semantics {
+                            contentDescription = if (state.isPlaying) "Pause video" else "Play video"
+                        },
+                    ) { Text(if (state.isPlaying) "⏸︎" else "▶︎", fontSize = 22.sp) }
+                    AppButton(
+                        onClick = { interacted { playback.seekBy(30_000L) } },
+                        enabled = state.title != null,
+                        modifier = Modifier.semantics { contentDescription = "Seek forward 30 seconds" },
+                    ) {
+                        Text("⏩︎", fontSize = 22.sp)
                     }
                     AppButton(onClick = { interacted(playback::cycleSpeed) }, enabled = state.title != null) {
                         Text("${state.speed}×", fontSize = 16.sp)

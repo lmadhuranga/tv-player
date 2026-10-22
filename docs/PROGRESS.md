@@ -56,6 +56,7 @@
 | 30 | `30-browser-dark-theme` | branch HEAD (`git rev-parse 30-browser-dark-theme`) |
 | 31 | `31-video-send-history` | `0a0d95c` |
 | 32 | `32-fullscreen-dark-timeline` | `bd145b5` |
+| 35 | `35-icon-player-controls` | branch HEAD (`git rev-parse 35-icon-player-controls`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -371,3 +372,13 @@ Verification record:
 - Focused source assertions confirmed all three choices, selected-state labeling, next-video guidance, and both playback and persistence callbacks. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date). `git diff --check` passed.
 - No TV contact, install, launch, or visual preview was performed. Remote focus, selection, and persistence behavior remain unverified on-device.
+
+## Milestone 35: `35-icon-player-controls`
+
+Replaced the fullscreen transport row's visible “−30 sec”, “+30 sec”, “Pause”, and “Play” labels with text-style rewind, forward, pause, and play symbols. The buttons retain their existing ±30-second seek and toggle actions, and each now exposes an accessible description. CC, Audio, Options, playback speed, timeline, and focus treatment remain as before.
+
+Verification record:
+
+- Focused source assertions confirmed icon-only transport labels, exact ±30,000 ms seek callbacks, play/pause toggle wiring and state, and accessible descriptions. `git diff --check` passed.
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or visual preview was performed. Android TV font rendering and on-device assistive-technology announcements remain unverified.
