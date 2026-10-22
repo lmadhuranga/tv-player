@@ -308,7 +308,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
 
     fun cycleSpeed() {
         if (released) return
-        val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
+        val speeds = listOf(1f, 1.25f, 1.5f, 1.75f, 2f)
         val current = player.playbackParameters.speed
         val index = speeds.indexOfFirst { it == current }
         val next = speeds[(index + 1).mod(speeds.size)]

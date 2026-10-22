@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `52-progressive-arrow-seek` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `52-progressive-arrow-seek`
+- Implemented through milestone: `53-remove-slow-speed-options` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `53-remove-slow-speed-options`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -542,3 +542,13 @@ Verification record:
 - Focused source assertions confirmed initial KeyDown does not seek, repeatCount stages map to ±60,000/180,000/300,000 ms at most once, no-repeat KeyUp seeks ±30,000 ms, later repeats are capped, and hidden arrow KeyUp is consumed. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or preview was performed. Remote repeat timing and visible-controller focus behavior remain unverified on a device.
+
+## Milestone 53: `53-remove-slow-speed-options`
+
+Removed 0.5× and 0.75× from playback speed cycling. The remaining choices stay in order: 1×, 1.25×, 1.5×, 1.75×, and 2×. If the player's current speed is outside that list, the next cycle selects 1×. The player does not persist speed as a saved setting, so no saved-speed migration is needed.
+
+Verification record:
+
+- Focused source assertions confirmed the supported speed list and wraparound/fallback behavior; `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or preview was performed.
