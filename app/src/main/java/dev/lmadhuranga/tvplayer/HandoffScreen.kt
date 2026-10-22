@@ -37,6 +37,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
@@ -124,7 +125,11 @@ fun HandoffScreen(
                         val title = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }
                         val label = "$title · ${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}"
                         if (entry.mediaUrl != null) {
-                            AppButton(onClick = { onReplay(entry) }, modifier = Modifier.widthIn(max = 620.dp)) {
+                            AppButton(
+                                onClick = { onReplay(entry) },
+                                modifier = Modifier.widthIn(max = 620.dp),
+                                scale = ButtonDefaults.scale(focusedScale = 1f),
+                            ) {
                                 Text(label, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         } else {

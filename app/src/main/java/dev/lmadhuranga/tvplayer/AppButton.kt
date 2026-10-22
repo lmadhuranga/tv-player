@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.Button as TvButton
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 
 /** Shared TV remote button colors: dark at rest, white while focused or pressed. */
 @Composable
@@ -13,12 +14,14 @@ fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    scale: ButtonScale = ButtonDefaults.scale(),
     content: @Composable RowScope.() -> Unit,
 ) {
     TvButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        scale = scale,
         colors = ButtonDefaults.colors(
             containerColor = Color(0xFF202020),
             contentColor = Color.White,

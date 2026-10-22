@@ -406,6 +406,16 @@ Verification record:
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed with `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, or preview was performed.
 
+## Milestone 66: `66-recent-history-highlight-no-motion`
+
+QR/handoff recent replay buttons keep the existing white focused highlight, accessible row label, and replay action, with their focused scale fixed at 1 so focus does not enlarge or animate the row. `AppButton` now accepts an optional scale override and retains its normal TV Material scale by default, leaving all unrelated buttons unchanged.
+
+Verification record:
+
+- Focused source checks confirmed only recent replay buttons set a fixed focused scale; the standard `AppButton` default, row text, and `onReplay` callback remain in place.
+- `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, or preview was performed.
+
 ## Milestone 38: `38-seedr-player-controls`
 
 Reshaped the fullscreen controller around the supplied Seedr Android TV reference: circular dark controls turn white when focused, with a circular back/settings header, a thin timeline and elapsed/total labels directly above the controls, subtitle/audio buttons at left, centered transport buttons, and an options button at right. Visible skip buttons seek by 10 seconds and expose matching accessible labels. D-pad Left/Right while controls are hidden still seeks by 30 seconds; timeline focus still seeks by 10 seconds. Playback speed remains available in Player Options, and the existing auto-hide, title, subtitle/audio, buffering, and error behavior remain wired.
