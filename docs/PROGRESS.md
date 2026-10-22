@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `78-usb-all-folder-files` (local checks recorded below; no TV validation)
-- Current branch: `78-usb-all-folder-files`
+- Implemented through milestone: `81-usb-explorer-list-design` (debug build and lint passed; no TV validation)
+- Current branch: `81-usb-explorer-list-design`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -64,6 +64,9 @@
 | 72 | `72-home-recent-title-ellipsis` | pending local commit |
 | 77 | `77-playback-keep-awake` | branch HEAD (`git rev-parse 77-playback-keep-awake`) |
 | 78 | `78-usb-all-folder-files` | pending local commit |
+| 79 | `79-usb-folder-counts` | `54eee8c` |
+| 80 | `80-hide-unavailable-file-size` | `d1c6b46` |
+| 81 | `81-usb-explorer-list-design` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -811,3 +814,13 @@ Verification record:
 - [x] `git diff --check` and `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 50 actionable tasks, 12 executed, 38 up-to-date).
 - [ ] TV runtime verification not performed.
 - No TV contact, installation, or runtime validation is implied.
+
+## Milestone 81: `81-usb-explorer-list-design`
+
+USB drives, parent navigation, folders, indexed videos, and direct file entries now use compact explorer rows rather than pill-shaped AppButtons. Rows use simple drawn folder, drive, video, file, and up icons, a single metadata line, and a trailing chevron for folders. Focus adds a restrained background and outline without changing row geometry or text size. Unsupported and subtitle files remain visible as subdued non-actionable rows. The browser uses a keyed `LazyColumn` so large folders are composed as needed; existing Back handling and the separate subtitle-choice screen are unchanged.
+
+Verification record:
+
+- [x] `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed (50 actionable tasks; 13 executed, 37 up-to-date).
+- [ ] D-pad focus, row activation, long-folder scrolling, and parent navigation remain pending TV runtime verification.
+- No TV contact, installation, or runtime validation was performed.

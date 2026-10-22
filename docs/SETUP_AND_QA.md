@@ -136,3 +136,10 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] Confirm singular/plural labels and that folder rows show counts while file rows retain type and size.
 - [ ] Confirm unreadable child directories show “Contents unavailable” rather than zero; counts do not recurse into descendants.
 - [ ] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` results are recorded in `docs/PROGRESS.md`; TV validation remains pending.
+
+### Milestone 81 USB explorer rows
+
+- [ ] Browse USB roots and nested directories; confirm rows show drawn drive/folder/video/file icons, concise metadata, and a chevron on folders.
+- [ ] Use the remote to focus, activate, scroll through a long directory, open a folder, and use the parent row to navigate back. Confirm focus changes only the row background/outline and does not scale or resize text.
+- [ ] Confirm subtitle and unsupported files remain visible in a subdued style and cannot be activated; confirm video rows still open subtitle selection.
+- [x] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` passed as recorded in `docs/PROGRESS.md`; no TV contact, install, or runtime validation was performed.

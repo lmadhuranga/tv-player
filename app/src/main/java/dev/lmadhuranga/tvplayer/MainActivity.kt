@@ -16,6 +16,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +31,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
@@ -41,8 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -452,78 +461,137 @@ private fun UsbVideoBrowserScreen(
                 shape = RoundedCornerShape(24.dp),
                 colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     when {
-                        loading -> Text("Scanning mounted USB drives…", color = Muted, fontSize = 20.sp)
+                        loading -> item { Text("Scanning mounted USB drives…", color = Muted, fontSize = 20.sp) }
                         error != null -> {
-                            Text(error, color = Muted, fontSize = 20.sp)
+                            item { Text(error, color = Muted, fontSize = 20.sp) }
                             if (root != null && directory != null) {
-                                AppButton(onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester)) {
-                                    Text(if (directory.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder")
+                                item {
+                                    UsbExplorerRow("..", if (directory.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester))
                                 }
                             }
-                            if (needsStorageAccess) AppButton(onClick = onRequestAccess, modifier = Modifier.focusRequester(firstEntryRequester)) {
-                                Text("Allow USB folder access")
+                            if (needsStorageAccess) item {
+                                AppButton(onClick = onRequestAccess, modifier = Modifier.focusRequester(firstEntryRequester)) { Text("Allow USB folder access") }
                             }
-                            if (needsStorageAccess || indexedVideos.isEmpty()) AppButton(onClick = onShowIndexedVideos, modifier = if (!needsStorageAccess) Modifier.focusRequester(firstEntryRequester) else Modifier) {
-                                Text("Show indexed videos")
+                            if (needsStorageAccess || indexedVideos.isEmpty()) item {
+                                AppButton(onClick = onShowIndexedVideos, modifier = if (!needsStorageAccess) Modifier.focusRequester(firstEntryRequester) else Modifier) { Text("Show indexed videos") }
                             }
-                            AppButton(onClick = onRetry, modifier = Modifier) {
-                                Text("Scan USB drives")
+                            item {
+                                AppButton(onClick = onRetry, modifier = if (root == null && !needsStorageAccess && indexedVideos.isNotEmpty()) Modifier.focusRequester(firstEntryRequester) else Modifier) { Text("Scan USB drives") }
                             }
-                            indexedVideos.forEach { video ->
-                                AppButton(onClick = { onIndexedVideo(video) }) {
-                                    Column {
-                                        Text(video.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(video.sizeBytes?.let { "${video.folder} · ${formatFileSize(it)}" } ?: video.folder, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                }
+                            items(indexedVideos, key = { it.uri.toString() }) { video ->
+                                UsbExplorerRow(video.name, video.sizeBytes?.let { "${video.folder} · ${formatFileSize(it)}" } ?: video.folder, ExplorerIcon.VIDEO, onClick = { onIndexedVideo(video) })
                             }
                         }
-                        root == null -> roots.forEachIndexed { index, usbRoot ->
-                            AppButton(onClick = { onChooseRoot(usbRoot) }, modifier = if (index == 0) Modifier.focusRequester(firstEntryRequester) else Modifier) {
-                                Column {
-                                    Text(usbRoot.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(usbRoot.directory.path, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(folderCountsLabel(usbRoot.folderCount, usbRoot.fileCount), color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
+                        root == null -> {
+                            items(roots, key = { it.directory.path }) { usbRoot ->
+                                UsbExplorerRow(usbRoot.name, "${usbRoot.directory.path} · ${folderCountsLabel(usbRoot.folderCount, usbRoot.fileCount)}", ExplorerIcon.DRIVE, onClick = { onChooseRoot(usbRoot) }, modifier = if (usbRoot == roots.firstOrNull()) Modifier.focusRequester(firstEntryRequester) else Modifier)
                             }
                         }
                         else -> {
-                            AppButton(onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester)) {
-                                Text(if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder")
+                            item {
+                                UsbExplorerRow("..", if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester))
                             }
-                            if (entries.isEmpty()) Text("This folder is empty.", color = Muted, fontSize = 20.sp)
-                            entries.forEach { entry ->
-                                AppButton(
-                                    onClick = { if (entry.isDirectory) onOpenFolder(entry) else if (entry.canPlay) onChooseVideo(entry) },
+                            if (entries.isEmpty()) item { Text("This folder is empty.", color = Muted, fontSize = 18.sp, modifier = Modifier.padding(12.dp)) }
+                            items(entries, key = { it.file.path }) { entry ->
+                                val description = if (entry.isDirectory) folderCountsLabel(entry.folderCount, entry.fileCount)
+                                    else entry.sizeBytes?.let { "${entry.typeLabel} · ${formatFileSize(it)}" } ?: entry.typeLabel
+                                UsbExplorerRow(
+                                    name = entry.name,
+                                    metadata = description,
+                                    icon = when { entry.isDirectory -> ExplorerIcon.FOLDER; entry.canPlay -> ExplorerIcon.VIDEO; else -> ExplorerIcon.FILE },
                                     enabled = entry.isDirectory || entry.canPlay,
-                                ) {
-                                    Column {
-                                        Text((if (entry.isDirectory) "📁  " else if (entry.canPlay) "▶  " else "📄  ") + entry.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(
-                                            if (entry.isDirectory) folderCountsLabel(entry.folderCount, entry.fileCount)
-                                            else entry.sizeBytes?.let { "${entry.typeLabel} · ${formatFileSize(it)}" } ?: entry.typeLabel,
-                                            color = Muted,
-                                            fontSize = 14.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
+                                    trailingChevron = entry.isDirectory,
+                                    onClick = { if (entry.isDirectory) onOpenFolder(entry) else if (entry.canPlay) onChooseVideo(entry) },
+                                )
                             }
                         }
                     }
-                    AppButton(onClick = onBack) { Text("Back to Home") }
+                    item {
+                        Spacer(Modifier.height(12.dp))
+                        AppButton(onClick = onBack) { Text("Back to Home") }
+                    }
                 }
             }
         }
     }
     LaunchedEffect(loading, error, roots.size, entries.size, root) {
-        if (!loading) firstEntryRequester.requestFocus()
+        if (!loading && (root != null || roots.isNotEmpty() || error != null)) firstEntryRequester.requestFocus()
+    }
+}
+
+private enum class ExplorerIcon { DRIVE, PARENT, FOLDER, VIDEO, FILE }
+
+@Composable
+private fun UsbExplorerRow(
+    name: String,
+    metadata: String,
+    icon: ExplorerIcon,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    trailingChevron: Boolean = false,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val rowShape = RoundedCornerShape(7.dp)
+    Box(
+        modifier = modifier.fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
+            .then(if (enabled) Modifier.clickable(onClick = onClick).focusable() else Modifier)
+            .background(if (focused) Color(0xFF26445E) else Color.Transparent, rowShape)
+            .border(1.5.dp, if (focused) Color(0xFF6FAED0) else Color.Transparent, rowShape),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(66.dp).padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ExplorerGlyph(icon, enabled)
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(name, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(metadata, color = if (enabled) Muted else Color(0xFF738091), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (trailingChevron) Text("›", color = Muted, fontSize = 26.sp)
+        }
+    }
+}
+
+@Composable
+private fun ExplorerGlyph(icon: ExplorerIcon, enabled: Boolean) {
+    val tint = if (enabled) Color(0xFF8EB7D8) else Color(0xFF687789)
+    Canvas(Modifier.size(26.dp)) {
+        val sx = size.width / 26f
+        val sy = size.height / 26f
+        when (icon) {
+            ExplorerIcon.FOLDER, ExplorerIcon.DRIVE -> {
+                val folder = Path().apply {
+                    moveTo(2f * sx, 6f * sy); lineTo(10f * sx, 6f * sy); lineTo(12f * sx, 9f * sy)
+                    lineTo(24f * sx, 9f * sy); lineTo(24f * sx, 21f * sy); lineTo(2f * sx, 21f * sy); close()
+                }
+                drawPath(folder, tint)
+                if (icon == ExplorerIcon.DRIVE) drawRect(Color(0xFF102239), androidx.compose.ui.geometry.Offset(4f * sx, 17f * sy), androidx.compose.ui.geometry.Size(18f * sx, 2f * sy))
+            }
+            ExplorerIcon.VIDEO -> {
+                drawRoundRect(tint, androidx.compose.ui.geometry.Offset(2f * sx, 5f * sy), androidx.compose.ui.geometry.Size(22f * sx, 16f * sy), androidx.compose.ui.geometry.CornerRadius(3f * sx))
+                val play = Path().apply { moveTo(10f * sx, 9f * sy); lineTo(17f * sx, 13f * sy); lineTo(10f * sx, 17f * sy); close() }
+                drawPath(play, Color(0xFF102239))
+            }
+            ExplorerIcon.FILE -> {
+                val page = Path().apply { moveTo(6f * sx, 2f * sy); lineTo(16f * sx, 2f * sy); lineTo(21f * sx, 7f * sy); lineTo(21f * sx, 24f * sy); lineTo(6f * sx, 24f * sy); close() }
+                drawPath(page, tint)
+                drawLine(Color(0xFF102239), androidx.compose.ui.geometry.Offset(9f * sx, 13f * sy), androidx.compose.ui.geometry.Offset(18f * sx, 13f * sy), 1.5f * sx)
+                drawLine(Color(0xFF102239), androidx.compose.ui.geometry.Offset(9f * sx, 17f * sy), androidx.compose.ui.geometry.Offset(18f * sx, 17f * sy), 1.5f * sx)
+            }
+            ExplorerIcon.PARENT -> {
+                drawLine(tint, androidx.compose.ui.geometry.Offset(13f * sx, 22f * sy), androidx.compose.ui.geometry.Offset(13f * sx, 5f * sy), 2f * sx)
+                drawLine(tint, androidx.compose.ui.geometry.Offset(13f * sx, 5f * sy), androidx.compose.ui.geometry.Offset(6f * sx, 12f * sy), 2f * sx)
+                drawLine(tint, androidx.compose.ui.geometry.Offset(13f * sx, 5f * sy), androidx.compose.ui.geometry.Offset(20f * sx, 12f * sy), 2f * sx)
+            }
+        }
     }
 }
 
