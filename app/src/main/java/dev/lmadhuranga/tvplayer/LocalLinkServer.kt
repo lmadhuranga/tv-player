@@ -397,6 +397,10 @@ class LocalLinkServer(
     ) {
         val output = socket.getOutputStream()
         val token = headers["x-pairing-token"].orEmpty()
+        if (path == "/api/files/media" && method in setOf("GET", "HEAD")) {
+            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "This media preview must open from the TV file manager")
+            return streamPreview(socket, method, target, headers["range"], listener, runId)
+        }
         if (method == "GET") {
             if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "Open the file manager from this TV's local network")
             if (!isAuthorized(token)) return respond(output, 401, "Unauthorized", "Request approval on the TV before managing files")
@@ -405,6 +409,14 @@ class LocalLinkServer(
                 when (path) {
                     "/api/files/roots" -> fileManager.rootsJson()
                     "/api/files/list" -> fileManager.listJson(query["root"].orEmpty(), query["path"].orEmpty())
+                    "/api/files/preview-ticket" -> {
+                        val root = query["root"].orEmpty()
+                        val relative = query["path"].orEmpty()
+                        val name = query["name"].orEmpty()
+                        fileManager.previewFile(root, relative, name)
+                        val ticket = issuePreviewTicket(root, relative, name, socket.inetAddress.hostAddress.orEmpty())
+                        JSONObject(mapOf("url" to "/api/files/media?ticket=$ticket")).toString()
+                    }
                     else -> return respond(output, 404, "Not Found", "Not found")
                 }
             } catch (error: Exception) {
@@ -456,6 +468,74 @@ class LocalLinkServer(
         } catch (error: Exception) {
             val status = if (error is NetworkFileManager.FileExistsException) 409 to "Conflict" else 400 to "Bad Request"
             respond(output, status.first, status.second, error.message ?: "Could not update this location")
+        }
+    }
+
+    /** A scoped, short-lived URL allows native browser video/image tags without sharing the pairing token. */
+    private fun issuePreviewTicket(root: String, path: String, name: String, peer: String): String {
+        val now = System.currentTimeMillis()
+        previewGrants.entries.removeIf { it.value.expiresAt < now }
+        if (previewGrants.size >= 32) previewGrants.clear()
+        val ticket = Base64.encodeToString(ByteArray(32).also(SecureRandom()::nextBytes),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        previewGrants[ticket] = PreviewGrant(root, path, name, peer, now + 4L * 60L * 60L * 1000L)
+        return ticket
+    }
+
+    private fun streamPreview(
+        socket: Socket,
+        method: String,
+        target: String,
+        rangeHeader: String?,
+        listener: ServerSocket,
+        runId: Long,
+    ) {
+        val output = socket.getOutputStream()
+        val ticket = try { parseQuery(target.substringAfter('?', ""))["ticket"].orEmpty() }
+            catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid preview link") }
+        val grant = previewGrants[ticket]
+        val now = System.currentTimeMillis()
+        if (grant == null || grant.expiresAt < now || grant.peer != socket.inetAddress.hostAddress) {
+            return respond(output, 401, "Unauthorized", "Preview expired. Reopen this file in the file manager.")
+        }
+        val media = try { fileManager.previewFile(grant.root, grant.path, grant.name) }
+            catch (_: Exception) { return respond(output, 404, "Not Found", "The preview file is no longer available.") }
+        try {
+            RandomAccessFile(media.file, "r").use { file ->
+                val fileSize = file.length()
+                val window = PreviewByteRanges.parse(rangeHeader, fileSize)
+                if (window == null) {
+                    val response = "HTTP/1.1 416 Range Not Satisfiable\r\n" +
+                        "Content-Range: bytes */$fileSize\r\nContent-Length: 0\r\n" +
+                        "Accept-Ranges: bytes\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n"
+                    output.write(response.toByteArray(StandardCharsets.US_ASCII))
+                    output.flush()
+                    return
+                }
+                val partial = rangeHeader != null
+                val response = "HTTP/1.1 ${if (partial) "206 Partial Content" else "200 OK"}\r\n" +
+                    "Content-Type: ${media.mimeType}\r\n" +
+                    "Content-Length: ${window.length}\r\n" +
+                    "Accept-Ranges: bytes\r\n" +
+                    (if (partial) "Content-Range: bytes ${window.first}-${window.last}/$fileSize\r\n" else "") +
+                    "Connection: close\r\nCache-Control: no-store\r\n" +
+                    "Referrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\r\n"
+                output.write(response.toByteArray(StandardCharsets.US_ASCII))
+                if (method != "HEAD") {
+                    file.seek(window.first)
+                    val buffer = ByteArray(64 * 1024)
+                    var remaining = window.length
+                    while (remaining > 0L && isCurrent(listener, runId)) {
+                        val count = file.read(buffer, 0, minOf(remaining, buffer.size.toLong()).toInt())
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        remaining -= count
+                    }
+                }
+                output.flush()
+            }
+        } catch (_: IOException) {
+            // Browsers frequently cancel or replace range requests while seeking.
         }
     }
 
@@ -778,7 +858,7 @@ class LocalLinkServer(
             "Connection: close\r\n" +
             "Cache-Control: no-store\r\n" +
             "X-Content-Type-Options: nosniff\r\n" +
-            "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'\r\n\r\n"
+            "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; media-src 'self'; form-action 'self'; base-uri 'none'\r\n\r\n"
         output.write(headers.toByteArray(StandardCharsets.US_ASCII))
         output.write(bytes)
         output.flush()
