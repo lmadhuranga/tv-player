@@ -16,6 +16,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,6 +54,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -60,6 +62,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -756,18 +759,22 @@ private fun HomeScreen(
                 )
                 Spacer(Modifier.height(34.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AppButton(onClick = onBrowseUsb) {
-                        Text("Browse USB videos", fontSize = 18.sp)
-                    }
-                    AppButton(onClick = onSendToTv) {
-                        Text("Send to TV", fontSize = 18.sp)
-                    }
-                    AppButton(
+                    HomeMenuButton(
+                        label = "Browse USB videos",
+                        icon = R.drawable.ic_home_usb,
+                        onClick = onBrowseUsb,
+                    )
+                    HomeMenuButton(
+                        label = "Send to TV",
+                        icon = R.drawable.ic_home_send,
+                        onClick = onSendToTv,
+                    )
+                    HomeMenuButton(
+                        label = "Settings",
+                        icon = R.drawable.ic_home_settings,
                         onClick = onOpenSettings,
                         modifier = Modifier.focusRequester(settingsRequester),
-                    ) {
-                        Text("Settings", fontSize = 18.sp)
-                    }
+                    )
                 }
             }
             Spacer(Modifier.width(56.dp))
@@ -897,15 +904,37 @@ private fun formatTime(milliseconds: Long): String {
 }
 
 @Composable
+private fun HomeMenuButton(
+    label: String,
+    icon: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    AppButton(
+        onClick = onClick,
+        modifier = modifier.onFocusChanged { focused = it.isFocused },
+    ) {
+        Image(
+            painter = painterResource(id = icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(if (focused) Color(0xFF075D99) else Color(0xFF62CEFF)),
+            modifier = Modifier.size(24.dp),
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(label, fontSize = 18.sp)
+    }
+}
+
+@Composable
 private fun Brand() {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier.size(52.dp).background(Teal, RoundedCornerShape(16.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("▶", color = Ink, fontSize = 22.sp)
-        }
-        Spacer(Modifier.width(16.dp))
+        Image(
+            painter = painterResource(id = R.mipmap.ic_launcher),
+            contentDescription = null,
+            modifier = Modifier.size(56.dp),
+        )
+        Spacer(Modifier.width(14.dp))
         Text("TV PLAYER", color = Muted, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
     }
 }
