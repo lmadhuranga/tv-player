@@ -420,6 +420,8 @@ class LocalLinkServer(
         authorizedSessions.clear()
         sessionToken = ""
         previewGrants.clear()
+        releasePendingApproval()
+        publishPairingState(message = "Saved browser access was revoked. New connections require approval.")
     }
 
     fun trustedBrowserCount(): Int = trustedBrowsers.count()
