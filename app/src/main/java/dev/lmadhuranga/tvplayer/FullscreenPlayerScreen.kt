@@ -559,6 +559,12 @@ fun FullscreenPlayerScreen(
                         modifier = Modifier.focusRequester(backFocus).semantics { contentDescription = "Back" },
                     ) { Text("‹", fontSize = 34.sp) }
                     Column(modifier = Modifier.weight(1f)) {
+                        val playbackMetadata = when {
+                            state.isBuffering -> "Buffering · ${formatPlayerTime(state.bufferedPositionMs)} buffered"
+                            state.videoWidth > 0 && state.videoHeight > 0 -> "${state.videoWidth} × ${state.videoHeight}"
+                            state.subtitleError != null -> "Subtitle: ${state.subtitleError}"
+                            else -> "TV PLAYER"
+                        }
                         Text(
                             state.title ?: "TV PLAYER",
                             color = Color.White,
@@ -567,24 +573,24 @@ fun FullscreenPlayerScreen(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            when {
-                                state.isBuffering -> "Buffering · ${formatPlayerTime(state.bufferedPositionMs)} buffered"
-                                state.videoWidth > 0 && state.videoHeight > 0 -> "${state.videoWidth} × ${state.videoHeight}"
-                                state.subtitleError != null -> "Subtitle: ${state.subtitleError}"
-                                else -> "TV PLAYER"
-                            },
-                            color = Muted,
-                            fontSize = 15.sp,
-                        )
-                    }
-                    receiveRate?.let { rate ->
-                        Text(
-                            "↓ ${formatReceiveRate(rate)}",
-                            color = Color.White.copy(alpha = 0.86f),
-                            fontSize = 15.sp,
-                            modifier = Modifier.semantics { contentDescription = "Download speed ${formatReceiveRate(rate)}" },
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                playbackMetadata,
+                                color = Muted,
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            receiveRate?.let { rate ->
+                                Text(
+                                    "· ${formatReceiveRate(rate)}",
+                                    color = Color.White.copy(alpha = 0.86f),
+                                    fontSize = 15.sp,
+                                    modifier = Modifier.semantics { contentDescription = "Download speed ${formatReceiveRate(rate)}" },
+                                )
+                            }
+                        }
                     }
                 }
             }

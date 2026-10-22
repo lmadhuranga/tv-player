@@ -837,7 +837,7 @@ Verification record:
 
 ## Milestone 83: `83-buffering-dots-only`
 
-The centered buffering indicator now displays only its existing animated dots. Buffering detection and the network-speed UI are unchanged.
+The centered buffering indicator now displays only its existing animated dots. In the visible player controls, receive speed appears beside the resolution or other playback metadata instead of at the far right of the header. Buffering detection and the speed sampling/visibility rules are unchanged.
 
 Verification record:
 
