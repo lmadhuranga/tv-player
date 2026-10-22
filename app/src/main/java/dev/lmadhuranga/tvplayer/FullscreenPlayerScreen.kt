@@ -384,7 +384,7 @@ fun FullscreenPlayerScreen(
                     .padding(start = 58.dp, end = 58.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.88f), fontSize = 13.sp)
+                Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.68f), fontSize = 13.sp)
                 Spacer(Modifier.width(12.dp))
                 HiddenPlaybackProgress(
                     positionMs = state.positionMs,
@@ -393,7 +393,7 @@ fun FullscreenPlayerScreen(
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.88f), fontSize = 13.sp)
+                Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.68f), fontSize = 13.sp)
             }
         }
 
@@ -469,7 +469,7 @@ fun FullscreenPlayerScreen(
                     if (seekTimeLabelsVisible && controlsVisible && !optionsOpen) {
                         Text(
                             formatPlayerTime(state.positionMs),
-                            color = Color.White.copy(alpha = 0.88f),
+                            color = Color.White.copy(alpha = 0.68f),
                             fontSize = 13.sp,
                             modifier = Modifier.semantics {
                                 contentDescription = "Elapsed time ${formatPlayerTime(state.positionMs)}"
@@ -488,7 +488,7 @@ fun FullscreenPlayerScreen(
                         Spacer(Modifier.width(12.dp))
                         Text(
                             formatPlayerTime(state.durationMs),
-                            color = Color.White.copy(alpha = 0.88f),
+                            color = Color.White.copy(alpha = 0.68f),
                             fontSize = 13.sp,
                             modifier = Modifier.semantics {
                                 contentDescription = "Total duration ${formatPlayerTime(state.durationMs)}"
@@ -719,9 +719,9 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
             }
             .focusable(),
     ) {
-        Box(Modifier.fillMaxWidth().height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(2.dp)))
-        Box(Modifier.fillMaxWidth(buffered).height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.27f), RoundedCornerShape(2.dp)))
-        Box(Modifier.fillMaxWidth(progress).height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.84f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth().height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth(buffered).height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.20f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.62f), RoundedCornerShape(2.dp)))
         Box(Modifier.fillMaxWidth(progress).height(12.dp), contentAlignment = Alignment.CenterEnd) {
             Box(Modifier.size(if (focused) 12.dp else 8.dp).background(if (focused) Color(0xFF52A6FF) else Color.White, CircleShape))
         }
@@ -737,9 +737,9 @@ private fun HiddenPlaybackProgress(
 ) {
     val progress = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     val buffered = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs).coerceIn(progress, 1f) else 0f
-    Box(modifier.height(5.dp).background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(4.dp))) {
-        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color.White.copy(alpha = 0.24f), RoundedCornerShape(4.dp)))
-        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color.White.copy(alpha = 0.42f), RoundedCornerShape(4.dp)))
+    Box(modifier.height(5.dp).background(Color.White.copy(alpha = 0.07f), RoundedCornerShape(4.dp))) {
+        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color.White.copy(alpha = 0.30f), RoundedCornerShape(4.dp)))
     }
 }
 

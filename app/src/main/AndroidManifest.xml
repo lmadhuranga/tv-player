@@ -4,8 +4,10 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:banner="@drawable/tv_banner"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="TV Player"
         android:usesCleartextTraffic="true"

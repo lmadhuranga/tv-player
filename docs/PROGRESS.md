@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `46-transient-seek-times` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `46-transient-seek-times`
+- Implemented through milestone: `48-resume-history-backup` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `48-resume-history-backup`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -493,3 +493,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date); `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 48: `48-resume-history-backup`
+
+Enabled Android backup for the app and scoped cloud backup, device transfer, and legacy full backup to the app's `file/datastore/` directory, which stores playback history/resume positions and player settings. Resume history and settings can restore after reinstall only when Android system backup is enabled and a backup has completed for the same Google account or device-transfer dataset. Android Auto Backup may run roughly nightly, so uninstalling soon after a change can happen before that data is backed up. The fullscreen seek rails, buffered/played tracks, and elapsed/total labels now use lower opacity for a translucent appearance; playhead visibility, dimensions, and behavior are unchanged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed successfully; `git diff --check` passed.
+- No physical restore test, TV contact, install, launch, or preview was performed.
