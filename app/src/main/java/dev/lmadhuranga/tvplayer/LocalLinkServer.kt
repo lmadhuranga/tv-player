@@ -85,6 +85,8 @@ class LocalLinkServer(
         ArrayBlockingQueue<Runnable>(8), { task -> Thread(task, "tv-player-http-client").apply { isDaemon = true } })
     @Volatile private var approvalSocket: Socket? = null
     @Volatile private var sessionToken: String = ""
+    private val authorizedSessions = ConcurrentHashMap.newKeySet<String>()
+    private val trustedBrowsers = TrustedBrowserRegistry(appContext)
     private var pendingApproval: PendingApproval? = null
     private var lastApprovalRequestAtMs = 0L
     private val uploadDirectory = File(cacheDirectory, "handoff-uploads").apply { mkdirs() }
@@ -103,6 +105,8 @@ class LocalLinkServer(
         val id: String,
         val requesterDevice: String,
         val requesterAddress: String,
+        val userAgent: String,
+        @Volatile var trustBrowser: Boolean = false,
         @Volatile var decision: ApprovalDecision = ApprovalDecision.PENDING,
     ) {
         val completed = CountDownLatch(1)
@@ -185,6 +189,7 @@ class LocalLinkServer(
         generation.incrementAndGet()
         approvalSocket = null
         sessionToken = ""
+        authorizedSessions.clear()
         releasePendingApproval()
         mutableState.value = HandoffState(message = message)
     }
@@ -194,6 +199,7 @@ class LocalLinkServer(
         if (stopped.getAndSet(true)) return
         generation.incrementAndGet()
         sessionToken = ""
+        authorizedSessions.clear()
         val awaitingSocket = approvalSocket
         releasePendingApproval()
         clientSockets.forEach { client -> if (client !== awaitingSocket) runCatching { client.close() } }
@@ -256,6 +262,7 @@ class LocalLinkServer(
         previewGrants.clear()
         approvalSocket = null
         sessionToken = ""
+        authorizedSessions.clear()
         releasePendingApproval()
         try { listener.close() } catch (_: Exception) { }
         clearListenerOwnership(listener)
@@ -296,8 +303,16 @@ class LocalLinkServer(
         if (method == "POST" && path == "/api/pair") {
             if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
             val requesterAddress = socket.inetAddress.hostAddress ?: "Unknown address"
-            val requesterDevice = describeRequester(headers["user-agent"])
-            return requestPairApproval(socket, listener, runId, requesterDevice, requesterAddress)
+            val userAgent = headers["user-agent"].orEmpty()
+            val requesterDevice = describeRequester(userAgent)
+            val trustedToken = headers["x-trusted-browser"].orEmpty()
+            if (trustedBrowsers.valid(trustedToken, userAgent)) {
+                val token = createSession()
+                return respond(socket.getOutputStream(), 200, "OK",
+                    JSONObject(mapOf("token" to token, "trusted" to true)).toString(),
+                    "application/json; charset=utf-8")
+            }
+            return requestPairApproval(socket, listener, runId, requesterDevice, requesterAddress, userAgent)
         }
         if (method == "GET" && path == "/api/limits") {
             // Same-origin GET fetches commonly omit Origin. The paired token still
@@ -381,9 +396,33 @@ class LocalLinkServer(
     }
 
     private fun isAuthorized(token: String): Boolean {
-        val expected = sessionToken.toByteArray(StandardCharsets.UTF_8)
-        return expected.isNotEmpty() && MessageDigest.isEqual(expected, token.toByteArray(StandardCharsets.UTF_8))
+        if (token.isEmpty()) return false
+        val candidate = token.toByteArray(StandardCharsets.UTF_8)
+        return authorizedSessions.any { saved ->
+            MessageDigest.isEqual(saved.toByteArray(StandardCharsets.UTF_8), candidate)
+        }
     }
+
+    @Synchronized
+    private fun createSession(): String {
+        val newToken = Base64.encodeToString(ByteArray(32).also(SecureRandom()::nextBytes),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        if (authorizedSessions.size >= 16) authorizedSessions.clear()
+        authorizedSessions.add(newToken)
+        sessionToken = newToken
+        return newToken
+    }
+
+    /** Used only by the TV owner's remote, never exposed as a browser endpoint. */
+    @Synchronized
+    fun forgetTrustedBrowsers() {
+        trustedBrowsers.forgetAll()
+        authorizedSessions.clear()
+        sessionToken = ""
+        previewGrants.clear()
+    }
+
+    fun trustedBrowserCount(): Int = trustedBrowsers.count()
 
     private fun handleFileManagerRequest(
         socket: Socket,
@@ -681,6 +720,7 @@ class LocalLinkServer(
         runId: Long,
         requesterDevice: String,
         requesterAddress: String,
+        userAgent: String,
     ) {
         val output = socket.getOutputStream()
         val pending = synchronized(this) {
@@ -698,7 +738,7 @@ class LocalLinkServer(
                 return
             }
             lastApprovalRequestAtMs = now
-            PendingApproval(UUID.randomUUID().toString(), requesterDevice, requesterAddress).also {
+            PendingApproval(UUID.randomUUID().toString(), requesterDevice, requesterAddress, userAgent).also {
                 pendingApproval = it
                 approvalSocket = socket
                 publishPairingState(message = null)
@@ -718,11 +758,14 @@ class LocalLinkServer(
             when {
                 pending.decision == ApprovalDecision.ALLOWED && isCurrent(listener, runId) -> {
                     if (pendingApproval === pending) pendingApproval = null
-                    val bytes = ByteArray(32).also(SecureRandom()::nextBytes)
-                    previewGrants.clear() // Revoke preview links when pairing changes.
-                    sessionToken = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+                    val token = createSession()
+                    val data = JSONObject().put("token", token)
+                    if (pending.trustBrowser && pending.userAgent.isNotBlank()) {
+                        data.put("trustedToken", trustedBrowsers.create(pending.userAgent))
+                        data.put("trusted", true)
+                    }
                     publishPairingState(message = null)
-                    Triple(200, "OK", JSONObject(mapOf("token" to sessionToken)).toString())
+                    Triple(200, "OK", data.toString())
                 }
                 pending.decision == ApprovalDecision.DENIED -> {
                     Triple(403, "Forbidden", "Pairing was denied on the TV")
@@ -751,8 +794,9 @@ class LocalLinkServer(
     }
 
     @Synchronized
-    fun approvePairingRequest(id: String) {
+    fun approvePairingRequest(id: String, trustBrowser: Boolean = false) {
         val pending = pendingApproval?.takeIf { it.id == id && it.decision == ApprovalDecision.PENDING } ?: return
+        pending.trustBrowser = trustBrowser
         pending.decision = ApprovalDecision.ALLOWED
         pendingApproval = null
         publishPairingState(message = null)
