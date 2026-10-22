@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `27-remote-pair-approval` (source implementation and local build/lint recorded below; no install or TV interaction for this milestone)
-- Current branch: `27-remote-pair-approval`
+- Implemented through milestone: `28-collapsible-subtitle` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `28-collapsible-subtitle`
 - Planning baseline: `be2f7cc`; milestones 2–27 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -50,7 +50,8 @@
 | 24 | `24-phone-url-history` | branch HEAD (`git rev-parse 24-phone-url-history`) |
 | 25 | `25-phone-mode-buttons` | `81b5509` |
 | 26 | `26-darker-qr-page` | `3ad257b` |
-| 27 | `27-remote-pair-approval` | `b9a21b5` |
+| 27 | `27-remote-pair-approval` | `08fb00a` |
+| 28 | `28-collapsible-subtitle` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -296,3 +297,13 @@ Verification record:
 
 - Local debug build/lint, embedded JavaScript syntax check, and `git diff --check` results are recorded after execution below.
 - A narrow Python source assertion checked that the old QR fragment/header/state are absent, `/api/pair` has no code header, and the TV Allow action is wired to the approval method. No TV install, launch, or navigation was performed for this milestone. Remote focus, prompt visuals, phone browser behavior, and runtime allow/deny/timeout flows remain unverified on-device.
+
+## Milestone 28: `28-collapsible-subtitle`
+
+The phone handoff now shows an “Add subtitle” button by default; the subtitle URL/File modes, URL history, and size guidance are contained in a collapsed, disabled section. The toggle exposes `aria-expanded` and `aria-controls`, and is locked during submission. Opening reveals the previous subtitle controls. Closing clears both subtitle URL and file selection, resets the mode to URL, and clears any staged handoff upload so a later video-only send cannot reuse a subtitle. Choosing a subtitle-history item reveals the section before filling the URL field; it does not submit the form.
+
+Verification record:
+
+- With JDK `17.0.17`, Gradle `8.13`, and SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 25 lint warnings, zero errors).
+- Extracted the embedded handoff script to `/tmp/tv-player-handoff.js`; `node --check /tmp/tv-player-handoff.js` passed. Source assertions covered initial collapsed/disabled state, accessibility attributes, clear/reset on close, busy lock, history reveal/fill order, optional subtitle send, and hidden-state guards. `git diff --check` passed.
+- No TV contact, install, or launch was performed. Visual phone-browser behavior remains unverified in a browser.
