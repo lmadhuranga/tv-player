@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `58-half-progress-opacity` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `58-half-progress-opacity`
+- Implemented through milestone: `71-outline-paused-indicator` (local checks and live TV evidence/limits recorded below)
+- Current branch: `71-outline-paused-indicator`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -60,6 +60,7 @@
 | 56 | `56-fullscreen-progress-time-labels` | pending local commit |
 | 57 | `57-repeat-two-minute-hold-seek` | pending local commit |
 | 58 | `58-half-progress-opacity` | pending local commit |
+| 71 | `71-outline-paused-indicator` | branch HEAD (`git rev-parse 71-outline-paused-indicator`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -724,3 +725,13 @@ Verification record:
 - Focused source assertions confirmed explicit white Surface content color, unchanged center alignment and state condition, no focus/click modifier, and unchanged hidden progress and label order. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, input, or screenshot was performed; device visibility remains unverified.
+
+## Milestone 71: `71-outline-paused-indicator`
+
+Replaced the paused overlay Surface and its theme-dependent Canvas glyph with an explicitly drawn transparent circle, white outline, and white pause bars outlined in black. It appears centered only when loaded media is paused, not buffering or in an error state, and playback controls are hidden. The Canvas draws the complete symbol with explicit colors, so visibility does not depend on a Material content-color local. When controls are hidden, both timeline time labels are now hidden too; they appear for 1.2 seconds after Left/Right seek feedback, then disappear while the progress bar remains visible.
+
+Verification record:
+
+- Source review confirmed explicit circle outline and glyph drawing, hidden-controls and paused-state gating, centering, and the “Video paused” accessibility description. `git diff --check` passed.
+- `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 12 executed, 38 up-to-date).
+- The final debug APK installed and launched on the authorized Sony BRAVIA VU3 (Android 14, `192.168.8.100:5555`). Using a hidden Left seek, the live screen showed both time labels briefly, then removed them while retaining the bottom progress bar. The saved media links subsequently buffered only 0–4 seconds, so seek movement and the final white outline in a paused frame could not be confirmed on the final installation. An earlier revision showed the centered pause bars on the TV while paused; the circle color was corrected to white afterward. The app was returned to the handoff page and its QR/send URL were visible.

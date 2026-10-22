@@ -98,6 +98,8 @@ fun FullscreenPlayerScreen(
     var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
     var hiddenLeftLastRepeatCount by remember { mutableIntStateOf(0) }
     var hiddenRightLastRepeatCount by remember { mutableIntStateOf(0) }
+    var seekFeedbackVisible by remember { mutableStateOf(false) }
+    var hiddenSeekFeedbackSerial by remember { mutableIntStateOf(0) }
     var consumedSkipBackwardKeyUp by remember { mutableStateOf(false) }
     var consumedSkipForwardKeyUp by remember { mutableStateOf(false) }
     var interactionSerial by remember { mutableIntStateOf(0) }
@@ -127,6 +129,16 @@ fun FullscreenPlayerScreen(
         if (optionsOpen || !controlsVisible || !state.isPlaying || state.isBuffering || state.error != null || state.subtitleError != null) return@LaunchedEffect
         delay(CONTROLS_AUTO_HIDE_MS)
         controlsVisible = false
+    }
+
+    LaunchedEffect(controlsVisible, hiddenSeekFeedbackSerial) {
+        if (controlsVisible) {
+            seekFeedbackVisible = false
+            return@LaunchedEffect
+        }
+        if (!seekFeedbackVisible) return@LaunchedEffect
+        delay(1_200L)
+        seekFeedbackVisible = false
     }
 
     LaunchedEffect(state.error, state.canRetry, state.subtitleError, optionsOpen) {
@@ -225,6 +237,12 @@ fun FullscreenPlayerScreen(
         interacted { playback.seekBy(deltaMs) }
     }
 
+    fun seekWhileHidden(deltaMs: Long) {
+        playback.seekBy(deltaMs)
+        seekFeedbackVisible = true
+        hiddenSeekFeedbackSerial++
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -305,13 +323,13 @@ fun FullscreenPlayerScreen(
                         consumedHiddenLeftKeyUp = true
                         val repeatCount = event.nativeKeyEvent.repeatCount
                         if (repeatCount > hiddenLeftLastRepeatCount) {
-                            if (state.title != null) playback.seekBy(-120_000L * (repeatCount - hiddenLeftLastRepeatCount))
+                            if (state.title != null) seekWhileHidden(-120_000L * (repeatCount - hiddenLeftLastRepeatCount))
                             hiddenLeftLastRepeatCount = repeatCount
                         }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenLeftKeyUp) {
                         consumedHiddenLeftKeyUp = false
-                        if (hiddenLeftLastRepeatCount == 0 && state.title != null) playback.seekBy(-30_000L)
+                        if (hiddenLeftLastRepeatCount == 0 && state.title != null) seekWhileHidden(-30_000L)
                         hiddenLeftLastRepeatCount = 0
                         true
                     } else false
@@ -322,13 +340,13 @@ fun FullscreenPlayerScreen(
                         consumedHiddenRightKeyUp = true
                         val repeatCount = event.nativeKeyEvent.repeatCount
                         if (repeatCount > hiddenRightLastRepeatCount) {
-                            if (state.title != null) playback.seekBy(120_000L * (repeatCount - hiddenRightLastRepeatCount))
+                            if (state.title != null) seekWhileHidden(120_000L * (repeatCount - hiddenRightLastRepeatCount))
                             hiddenRightLastRepeatCount = repeatCount
                         }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenRightKeyUp) {
                         consumedHiddenRightKeyUp = false
-                        if (hiddenRightLastRepeatCount == 0 && state.title != null) playback.seekBy(30_000L)
+                        if (hiddenRightLastRepeatCount == 0 && state.title != null) seekWhileHidden(30_000L)
                         hiddenRightLastRepeatCount = 0
                         true
                     } else false
@@ -367,18 +385,29 @@ fun FullscreenPlayerScreen(
             onRelease = { view -> view.player = null },
         )
 
-        if (state.title != null && !state.isPlaying && !state.isBuffering && state.error == null) {
-            Surface(
+        if (!controlsVisible && state.title != null && !state.isPlaying && !state.isBuffering && state.error == null) {
+            Canvas(
                 modifier = Modifier.align(Alignment.Center).size(88.dp)
                     .semantics { contentDescription = "Video paused" },
-                shape = CircleShape,
-                colors = SurfaceDefaults.colors(
-                    containerColor = Color(0x99000000),
-                    contentColor = Color.White,
-                ),
             ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    PlayerTransportIcon(PlayerTransportGlyph.PAUSE)
+                val center = Offset(size.width / 2f, size.height / 2f)
+                val circleRadius = size.minDimension * 0.46f
+                drawCircle(
+                    color = Color.White,
+                    radius = circleRadius,
+                    center = center,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx()),
+                )
+
+                val glyphWidth = size.width * 0.10f
+                val glyphHeight = size.height * 0.38f
+                val gap = size.width * 0.08f
+                val barTop = center.y - glyphHeight / 2f
+                val leftBar = center.x - gap / 2f - glyphWidth
+                val rightBar = center.x + gap / 2f
+                listOf(leftBar, rightBar).forEach { left ->
+                    drawRect(Color.Black, Offset(left - 2.dp.toPx(), barTop - 2.dp.toPx()), Size(glyphWidth + 4.dp.toPx(), glyphHeight + 4.dp.toPx()))
+                    drawRect(Color.White, Offset(left, barTop), Size(glyphWidth, glyphHeight))
                 }
             }
         }
@@ -421,16 +450,20 @@ fun FullscreenPlayerScreen(
                     .padding(start = 58.dp, end = 58.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.68f), fontSize = 13.sp)
-                Spacer(Modifier.width(12.dp))
+                if (seekFeedbackVisible) {
+                    Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.68f), fontSize = 13.sp)
+                    Spacer(Modifier.width(12.dp))
+                }
                 HiddenPlaybackProgress(
                     positionMs = state.positionMs,
                     bufferedPositionMs = state.bufferedPositionMs,
                     durationMs = state.durationMs,
                     modifier = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(12.dp))
-                Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.68f), fontSize = 13.sp)
+                if (seekFeedbackVisible) {
+                    Spacer(Modifier.width(12.dp))
+                    Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.68f), fontSize = 13.sp)
+                }
             }
         }
 
