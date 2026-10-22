@@ -272,3 +272,9 @@ A screenshot of the old preview showed a dark media element and endless-looking 
 4. Click Play: verify loading state, playback controls, seeking, fullscreen, sound, Download, and Close.
 5. Verify unsupported MKV/codecs, slow storage, connection interruption, Retry, and re-opening another file.
 6. Check image preview and small mobile viewport, with keyboard Escape to dismiss.
+### Milestone 88 USB explorer space
+
+- [ ] On a 960 × 540 logical TV display, confirm the USB list shows about seven rows, with one compact folder heading and the breadcrumb in a small fixed footer.
+- [ ] Confirm no `../` row appears in normal, empty, or error views. Use Left to move to the parent folder and Back to return to the parent or drive list.
+- [ ] In an empty folder and a folder containing only unsupported files, confirm focus remains usable and Left/Back still work. In an error view, confirm focus lands on the first available action.
+- [x] Source checks and local debug build/lint are recorded in `docs/PROGRESS.md`; TV visual and remote behavior remain unverified.

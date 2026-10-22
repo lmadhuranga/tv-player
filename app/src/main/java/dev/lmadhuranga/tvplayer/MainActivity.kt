@@ -465,6 +465,7 @@ private fun UsbVideoBrowserScreen(
     onRetry: () -> Unit,
 ) {
     val firstEntryRequester = remember { FocusRequester() }
+    val emptyStateRequester = remember { FocusRequester() }
     val firstActionableEntry = entries.firstOrNull { it.isDirectory || it.canPlay }
     val listState = rememberLazyListState()
     var consumedParentKeyUp by remember { mutableStateOf(false) }
@@ -474,9 +475,12 @@ private fun UsbVideoBrowserScreen(
         directory.canonicalFile == root.directory.canonicalFile -> "USB drive"
         else -> directory.name
     }
-    TVBackground {
+    TVBackground(horizontalPadding = 36.dp, verticalPadding = 16.dp) {
         Column(
-            modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+            modifier = Modifier.fillMaxSize()
+                .focusRequester(emptyStateRequester)
+                .focusable()
+                .onPreviewKeyEvent { event ->
                 if (root == null || directory == null || event.key != Key.DirectionLeft) return@onPreviewKeyEvent false
                 when (event.type) {
                     KeyEventType.KeyDown -> {
@@ -494,17 +498,16 @@ private fun UsbVideoBrowserScreen(
                 }
             },
         ) {
-            Text("USB BROWSE", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
             Text(
                 folderTitle,
                 color = Color.White,
-                fontSize = 34.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(8.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 shape = RoundedCornerShape(24.dp),
@@ -512,7 +515,7 @@ private fun UsbVideoBrowserScreen(
             ) {
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     when {
@@ -530,9 +533,6 @@ private fun UsbVideoBrowserScreen(
                             }
                             items(indexedVideos, key = { it.uri.toString() }) { video ->
                                 UsbExplorerRow(video.name, video.sizeBytes?.let { "${video.folder} · ${formatFileSize(it)}" } ?: video.folder, ExplorerIcon.VIDEO, onClick = { onIndexedVideo(video) })
-                            }
-                            if (root != null && directory != null) item {
-                                UsbExplorerRow("../", if (directory.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent)
                             }
                         }
                         root == null -> {
@@ -555,9 +555,6 @@ private fun UsbVideoBrowserScreen(
                                     modifier = if (entry == firstActionableEntry) Modifier.focusRequester(firstEntryRequester) else Modifier,
                                 )
                             }
-                            item {
-                                UsbExplorerRow("../", if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent, modifier = if (entries.none { it.isDirectory || it.canPlay }) Modifier.focusRequester(firstEntryRequester) else Modifier)
-                            }
                         }
                     }
                 }
@@ -565,11 +562,11 @@ private fun UsbVideoBrowserScreen(
             Text(
                 breadcrumb,
                 color = Muted,
-                fontSize = 18.sp,
+                fontSize = 13.sp,
                 maxLines = 1,
                 overflow = TextOverflow.StartEllipsis,
                 modifier = Modifier.fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp)
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
                     .semantics { contentDescription = breadcrumb },
             )
         }
@@ -580,11 +577,13 @@ private fun UsbVideoBrowserScreen(
                 error != null -> 1
                 root == null -> 0
                 firstActionableEntry != null -> entries.indexOf(firstActionableEntry)
-                else -> entries.size + if (entries.isEmpty()) 1 else 0
+                else -> 0
             }
             listState.scrollToItem(focusIndex)
             withFrameNanos { }
-            firstEntryRequester.requestFocus()
+            val hasBrowserAction = error != null || root == null && roots.isNotEmpty() || firstActionableEntry != null
+            if (hasBrowserAction) firstEntryRequester.requestFocus()
+            else emptyStateRequester.requestFocus()
         }
     }
 }
@@ -598,7 +597,7 @@ private fun usbBreadcrumb(root: UsbRoot, directory: java.io.File): String {
     return (listOf("USB drive") + folders).joinToString(" > ")
 }
 
-private enum class ExplorerIcon { DRIVE, PARENT, FOLDER, VIDEO, FILE }
+private enum class ExplorerIcon { DRIVE, FOLDER, VIDEO, FILE }
 
 @Composable
 private fun UsbExplorerRow(
@@ -620,14 +619,14 @@ private fun UsbExplorerRow(
             .border(1.5.dp, if (focused) Color(0xFF6FAED0) else Color.Transparent, rowShape),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(66.dp).padding(horizontal = 14.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ExplorerGlyph(icon, enabled)
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(name, color = if (enabled) Color.White else Color(0xFFAAB8C6), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(metadata, color = if (enabled) Muted else Color(0xFF929EAC), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(name, color = if (enabled) Color.White else Color(0xFFAAB8C6), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(metadata, color = if (enabled) Muted else Color(0xFF929EAC), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (trailingChevron) Text("›", color = Muted, fontSize = 26.sp)
         }
@@ -659,11 +658,6 @@ private fun ExplorerGlyph(icon: ExplorerIcon, enabled: Boolean) {
                 drawPath(page, tint)
                 drawLine(Color(0xFF102239), androidx.compose.ui.geometry.Offset(9f * sx, 13f * sy), androidx.compose.ui.geometry.Offset(18f * sx, 13f * sy), 1.5f * sx)
                 drawLine(Color(0xFF102239), androidx.compose.ui.geometry.Offset(9f * sx, 17f * sy), androidx.compose.ui.geometry.Offset(18f * sx, 17f * sy), 1.5f * sx)
-            }
-            ExplorerIcon.PARENT -> {
-                drawLine(tint, androidx.compose.ui.geometry.Offset(13f * sx, 22f * sy), androidx.compose.ui.geometry.Offset(13f * sx, 5f * sy), 2f * sx)
-                drawLine(tint, androidx.compose.ui.geometry.Offset(13f * sx, 5f * sy), androidx.compose.ui.geometry.Offset(6f * sx, 12f * sy), 2f * sx)
-                drawLine(tint, androidx.compose.ui.geometry.Offset(13f * sx, 5f * sy), androidx.compose.ui.geometry.Offset(20f * sx, 12f * sy), 2f * sx)
             }
         }
     }
@@ -940,7 +934,11 @@ private fun Brand() {
 }
 
 @Composable
-internal fun TVBackground(content: @Composable () -> Unit) {
+internal fun TVBackground(
+    horizontalPadding: androidx.compose.ui.unit.Dp = 72.dp,
+    verticalPadding: androidx.compose.ui.unit.Dp = 48.dp,
+    content: @Composable () -> Unit,
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         colors = SurfaceDefaults.colors(containerColor = Ink),
@@ -949,7 +947,7 @@ internal fun TVBackground(content: @Composable () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.linearGradient(listOf(Color(0xFF142A46), Ink, Color(0xFF0A1220))))
-                .padding(horizontal = 72.dp, vertical = 48.dp),
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         ) {
             content()
         }

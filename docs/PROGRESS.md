@@ -887,3 +887,12 @@ Verification record:
 - [x] `./gradlew :app:testDebugUnitTest` passed after adding symlink and cancelled-upload regression cases.
 - [ ] Final `:app:assembleDebug`, `:app:lintDebug`, embedded JavaScript `node --check`, and `git diff --check` are pending after feature 88 integration.
 - [ ] Browser screenshot/interaction verification remains pending because the sandbox refused the local mock server bind and the shared Playwright browser profile was locked; no TV contact, install, or runtime verification was performed.
+
+## Milestone 88: `88-tv-explorer-space`
+
+The USB browser now uses compact page padding, a single 24 sp folder heading, 52 dp rows, narrower list insets, and a smaller fixed breadcrumb footer. This yields roughly seven visible rows on a 960 × 540 logical display, up from about four. The synthetic `../` row is removed from normal, empty, and error listings; Left still opens the parent folder and remote Back retains its existing navigation. Empty or unsupported-only folder views request focus on the browser container so Left and Back remain available without targeting a removed row, while error views and populated lists target their first available action.
+
+Verification record:
+
+- [x] `git diff --check` passed; `./gradlew :app:assembleDebug --console=plain` passed (39 actionable tasks); `./gradlew :app:lintDebug --console=plain` passed (30 actionable tasks).
+- [ ] TV visual and remote runtime behavior remain pending; no TV contact or installation was performed.
