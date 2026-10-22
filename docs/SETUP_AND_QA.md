@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34); a read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. The milestone 25 APK was also built, installed, and launched on that TV; the handoff screen and QR became available after initial startup. Milestones 22–24 were not installed as separate APKs. No D-pad interaction, playback, phone-browser submission, local subtitle import, Settings reopen, Back routing, or other feature QA is claimed here.
+This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34); a read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. The milestone 25 APK was also built, installed, and launched on that TV; the handoff screen and QR became available after initial startup. Limited remote input was used to inspect the player and verify a buffer setting across Settings close/reopen; full navigation, video image/audio output, and subtitle rendering are not established. Milestone 26 was built/linted locally, but not installed or launched; no phone-camera scan of the gray QR surface has been performed.
 
 ## Local toolchain
 
@@ -78,6 +78,8 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Milestone 24 browser-local URL history was built/linted locally; no install, launch, or TV contact was performed for this version. LocalStorage TTL, clear, safe labels, selection, and no-auto-submit behavior remain pending.
 - [x] Milestone 25 button-selector APK built/linted, installed, and launched; MainActivity remained top-resumed and the handoff QR appeared. The lead reported successful URL/URL form submission with no JavaScript errors; the TV fetched both synthetic WAV and SRT fixtures and the player showed the audio filename and 0:10 duration with CC On. Audible output and rendered subtitle cues were not confirmed.
 - [ ] Explicitly switch the new phone-page buttons between URL and File for both media types; confirm visible selected state, `aria-pressed`, inactive clearing, send-time lock, and that selecting history fills URL mode without submitting.
+- [ ] On milestone 26, verify the QR tile/quiet-zone gray (`#D6D6D6`) is visibly dimmer than white and scan its QR with a phone camera from normal viewing distance; QR contents and black modules should remain unchanged.
+- [x] Milestone 26 assemble and lint passed locally; no install, launch, screen capture, or QR scan was performed for the gray-surface change.
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.

@@ -3,10 +3,10 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `25-phone-mode-buttons` (source implementation; local build/lint and install/launch recorded below; browser behavior under test)
-- Current branch: `25-phone-mode-buttons`
+- Implemented through milestone: `26-darker-qr-page` (source implementation; local build/lint recorded below; no install or TV interaction for this milestone)
+- Current branch: `26-darker-qr-page`
 - Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
-- The milestone 19 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, Settings reopen, or other functional runtime QA was performed.
+- The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
 ## Decisions recorded
 
@@ -48,7 +48,8 @@
 | 22 | `22-buffering-choice` | `54acfe2` |
 | 23 | `23-phone-input-mode` | branch HEAD (`git rev-parse 23-phone-input-mode`) |
 | 24 | `24-phone-url-history` | branch HEAD (`git rev-parse 24-phone-url-history`) |
-| 25 | `25-phone-mode-buttons` | pending commit |
+| 25 | `25-phone-mode-buttons` | `81b5509` |
+| 26 | `26-darker-qr-page` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -281,3 +282,12 @@ Verification record:
 - With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks).
 - The debug APK was installed with `adb install -r` on the verified Sony BRAVIA VU3 (Android API 34); `am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting`, the process remained alive, and `dumpsys activity activities` showed `MainActivity` top-resumed. The handoff page and QR became available after initial startup. A fresh PIN was generated for the lead's separate browser check.
 - The lead's separate browser check reported successful URL/URL submission, loaded limits and video/subtitle history buttons, unlocked controls, and no JavaScript errors. The TV fetched the synthetic 10-second silent WAV and SRT fixtures (both HTTP 200). The player showed the WAV filename, 0:10 duration, CC On, and no visible error; the captured image was at the end of the silent audio sample, so audible playback and subtitle cue rendering were not confirmed. Back returned to Handoff with QR/URL. Settings showed 1 minute initially; after selecting 2 minutes, closing/reopening Settings retained 2 minutes, and 1 minute was restored. The position-history toggle remained Off after an accidental toggle was immediately reverted. The new mode buttons still need explicit URL/File switching checks; no video image/codec playback was tested.
+
+## Milestone 26: `26-darker-qr-page`
+
+Reduced the handoff QR tile and the QR bitmap background/quiet zone from white to light neutral gray `#D6D6D6`. QR modules remain black, the existing generated URL/content and QR matrix dimensions are unchanged, and the standard four-module quiet zone from ZXing remains intact. For sRGB `#D6D6D6`, black-to-background contrast is approximately 14.4:1; this lowers the pure-white tile's brightness while retaining strong foreground separation for QR scanners. Other handoff text, controls, focus colors, and navigation are unchanged.
+
+Verification record:
+
+- `git diff --check` passed. With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks).
+- No TV install, launch, screenshot, or live phone-camera scan was performed for the darker QR change. Visual appearance and scanner compatibility should be checked on-device.

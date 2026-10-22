@@ -45,6 +45,9 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.delay
 
+private val QrLightBackground = Color(0xFFD6D6D6)
+private val QrLightBackgroundArgb = android.graphics.Color.rgb(214, 214, 214)
+
 @Composable
 fun HandoffScreen(
     cacheDirectory: java.io.File,
@@ -144,7 +147,7 @@ fun HandoffScreen(
             Surface(
                 modifier = Modifier.size(260.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = SurfaceDefaults.colors(containerColor = Color.White),
+                colors = SurfaceDefaults.colors(containerColor = QrLightBackground),
             ) {
                 if (qr != null) {
                     Image(
@@ -154,7 +157,7 @@ fun HandoffScreen(
                     )
                 } else {
                     Column(
-                        modifier = Modifier.fillMaxSize().background(Color.White),
+                        modifier = Modifier.fillMaxSize().background(QrLightBackground),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
@@ -170,7 +173,7 @@ private fun createQrBitmap(contents: String): Bitmap? = runCatching {
     val matrix = QRCodeWriter().encode(contents, BarcodeFormat.QR_CODE, 320, 320)
     Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888).apply {
         for (y in 0 until matrix.height) for (x in 0 until matrix.width) {
-            setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+            setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else QrLightBackgroundArgb)
         }
     }
 }.getOrNull()
