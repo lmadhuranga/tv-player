@@ -164,15 +164,26 @@ private fun TVPlayerApp(
             onApprovalPending = { pending -> if (pending) settingsOpen = false },
         )
 
-        AppRoute.PLAYER -> FullscreenPlayerScreen(playback = playback, window = window, onChooseSubtitleFile = {
-            subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
-        }, onAddUrl = {
-            playback.pauseForBackground()
-            route = AppRoute.ADD_URL
-        }, onHome = {
-            playback.pauseForBackground()
-            route = AppRoute.HANDOFF
-        })
+        AppRoute.PLAYER -> FullscreenPlayerScreen(
+            playback = playback,
+            window = window,
+            maximumBufferMinutes = maximumBufferMinutes,
+            onMaximumBufferMinutesChange = { minutes ->
+                playback.setMaximumBufferMinutes(minutes)
+                appScope.launch { playerSettingsRepository.setMaximumBufferMinutes(minutes) }
+            },
+            onChooseSubtitleFile = {
+                subtitlePicker.launch(arrayOf("text/*", "application/x-subrip", "application/octet-stream"))
+            },
+            onAddUrl = {
+                playback.pauseForBackground()
+                route = AppRoute.ADD_URL
+            },
+            onHome = {
+                playback.pauseForBackground()
+                route = AppRoute.HANDOFF
+            },
+        )
     }
 
     if (settingsOpen) {

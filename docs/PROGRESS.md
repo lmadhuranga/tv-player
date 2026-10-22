@@ -361,3 +361,13 @@ Verification record:
 - Extracted the embedded handoff page and script to `/tmp/tv-player-handoff.html` and `/tmp/tv-player-handoff.js`; `node --check` and 13 focused assertions passed for URL clearing, clipboard fallback guidance, picker and keyboard activation, DataTransfer drop, extension filtering, source validity, upload-size enforcement, and Send-only transfer.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date). `git diff --check` passed.
 - No TV contact, install, launch, or browser visual preview was performed.
+
+## Milestone 34: `34-fullscreen-buffer-option`
+
+Added the existing maximum playback buffer setting to the fullscreen Player Options screen. The remote-focusable 1, 2, and 5 minute choices show the selected value and explain that the choice applies to the next video. Selecting a value updates the playback policy immediately and persists it through the existing settings repository; the Privacy & History Settings screen remains available with its existing choice.
+
+Verification record:
+
+- Focused source assertions confirmed all three choices, selected-state labeling, next-video guidance, and both playback and persistence callbacks. `git diff --check` passed.
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date). `git diff --check` passed.
+- No TV contact, install, launch, or visual preview was performed. Remote focus, selection, and persistence behavior remain unverified on-device.

@@ -68,6 +68,8 @@ private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 fun FullscreenPlayerScreen(
     playback: PlaybackController,
     window: Window,
+    maximumBufferMinutes: Int,
+    onMaximumBufferMinutesChange: (Int) -> Unit,
     onChooseSubtitleFile: () -> Unit,
     onAddUrl: () -> Unit,
     onHome: () -> Unit,
@@ -173,6 +175,8 @@ fun FullscreenPlayerScreen(
         PlayerOptionsScreen(
             playback = playback,
             state = state,
+            maximumBufferMinutes = maximumBufferMinutes,
+            onMaximumBufferMinutesChange = onMaximumBufferMinutesChange,
             firstFocus = optionsFirstFocus,
             onChooseSubtitleFile = onChooseSubtitleFile,
             onAddUrl = onAddUrl,
@@ -492,6 +496,8 @@ private fun StatusPill(text: String, modifier: Modifier = Modifier) {
 private fun PlayerOptionsScreen(
     playback: PlaybackController,
     state: PlaybackUiState,
+    maximumBufferMinutes: Int,
+    onMaximumBufferMinutesChange: (Int) -> Unit,
     firstFocus: FocusRequester,
     onChooseSubtitleFile: () -> Unit,
     onAddUrl: () -> Unit,
@@ -507,6 +513,19 @@ private fun PlayerOptionsScreen(
             Text("Settings stay on this page; the video controls do not open floating panels.", color = Muted, fontSize = 17.sp)
             AppButton(onClick = onChooseSubtitleFile, enabled = state.title != null && !state.subtitleLoading) {
                 Text(if (state.subtitleLoading) "Loading subtitle file…" else "Choose subtitle file (.srt or .vtt)")
+            }
+            Text("MAXIMUM BUFFER", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
+            Text(
+                "Buffers up to the selected time. Playback starts as soon as enough video is ready. Memory and stream limits may reduce the buffer. Applies to the next video.",
+                color = Muted,
+                fontSize = 16.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1, 2, 5).forEach { minutes ->
+                    AppButton(onClick = { onMaximumBufferMinutesChange(minutes) }) {
+                        Text("$minutes minute${if (minutes == 1) "" else "s"}${if (maximumBufferMinutes == minutes) " · Selected" else ""}")
+                    }
+                }
             }
             state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 15.sp) }
             state.error?.let { error ->
