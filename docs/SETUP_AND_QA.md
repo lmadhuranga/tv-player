@@ -207,3 +207,47 @@ The phone/computer web File Manager now offers contextual actions when a file, f
 Delete is disabled on read-only storage. Nonempty folders cannot be deleted; this restriction is enforced by the server, not just the UI. Folder downloads as ZIP archives are **not included** in this branch; ordinary individual file downloads are supported.
 
 **Manual QA required on the Sony BRAVIA and computer/phone browser:** verify menu placement near screen edges; mouse right-click; long-press; ⋮ buttons; selection toolbar in grid/list views; Escape/menu dismissal; playback/preview; download; upload into a chosen nested folder; deleting an empty folder and a file after confirmation; no delete for populated folders; read-only drive behavior; keyboard Shift+F10. Build/run using `bash scripts/tv.sh deploy` from branch `89-file-context-actions`. No hardware run is claimed here.
+
+
+## Branch 90 — LAN HTTPS (opt-in debug provisioning)
+
+### Why HTTPS isn't just a URL change
+
+The TV previously listened on plain HTTP at `http://TV_IP:8765/`. Browser access to a private LAN IP cannot be made securely HTTPS just by changing the scheme. TLS requires a unique certificate with an **IP address Subject Alternative Name** and the client browser must trust the certificate issuer.
+
+A trusted public certificate for `192.168.x.x` is not available through Let's Encrypt IP validation: Let's Encrypt's new IP certificates require public proof via HTTP-01 or TLS-ALPN-01 and expire after about six days. For this local-TV developer workflow we use **mkcert** and a local CA instead.
+
+### Mac and Sony BRAVIA setup
+
+1. Check out the separate feature branch `90-lan-https`. Keep Android SDK 36, JDK 17, and ADB available.
+2. Build and install the debug app first: `bash scripts/tv.sh deploy`.
+3. On the Mac: `brew install mkcert`. Run **`mkcert -install`**, which installs a development CA in this Mac's trust store. Only do this on your own trusted computer.
+4. With ADB connected to the BRAVIA, run `bash scripts/https-tv.sh install`. This generates a certificate for the TV's current IP, packages it as PKCS12, verifies the transfer, and stores it in the *debug app's private files directory*. The certificate, key, password and PKCS12 files remain under `.local-https/` on the Mac, which is Git-ignored.
+5. Open **`https://TV_IP:8765/files`**, not the old HTTP URL. The Send to TV screen's QR and text automatically switch to HTTPS once provisioning succeeds.
+6. For other phones/computers, export **only** `$(mkcert -CAROOT)/rootCA.pem` from your Mac and install it as a trusted CA on the receiving device. On iOS, installing a profile is not sufficient: full trust must be enabled in Settings → General → About → Certificate Trust Settings. Never distribute `rootCA-key.pem`, `.p12`, `.pass`, or the private leaf key.
+7. Re-approve browser trust once after switching schemes: HTTP and HTTPS have **different browser storage origins**. After that, the existing 30-day trusted-browser mechanism works under HTTPS.
+
+The same port **8765** is used for either protocol, not both. Once HTTPS is enabled, HTTP requests to port 8765 will fail; no insecure HTTP listener or silent downgrade is added.
+
+### Operational rules
+
+- `bash scripts/https-tv.sh status`: check whether HTTPS provisioning is enabled.
+- If the TV's LAN IP changes, rerun `bash scripts/https-tv.sh install` using the new address and update any saved browser bookmark. A certificate made for one IP does not validate a different IP.
+- A missing, expired, invalid, or IP-mismatched certificate causes the TV handoff listener to **fail closed** and display an error; it will **not** drop to HTTP.
+- To explicitly roll back the development configuration, run `bash scripts/https-tv.sh disable`. This removes the app-private TLS files and **restores HTTP**. Do not use on shared/untrusted networks.
+- ADB `run-as` provisioning is for **debug builds only**. Release deployment needs a secure TV-side certificate import and renewal UI before HTTPS can be enabled for retail distribution.
+- There is no need for an always-on Mac *after* provisioning. The Android TV serves TLS itself whenever the Send to TV screen is running.
+- HTTPS encrypts the browser connection; it does not automatically fix 401 pairing-token errors, media codecs, transfer timeouts, or disconnects when the app is backgrounded.
+- Protect the mkcert root CA and its *private key* on your Mac, and use the trusted-browser approval/revocation controls on your TV.
+
+### Validation still required on the physical TV
+
+- Build `./gradlew testDebugUnitTest assembleDebug --console=plain` and install.
+- Provision certificate and confirm the displayed TV QR code and URL are HTTPS.
+- Verify `curl --cacert "$(mkcert -CAROOT)/rootCA.pem" "https://TV_IP:8765/files"` returns the file manager with successful certificate/IP validation.
+- Confirm plain HTTP on port 8765 does *not* return the file manager after provisioning.
+- Confirm approval/trusted-browser reconnect, download, preview seeking, uploads, browser CSP, and Same-Origin POSTs succeed over HTTPS.
+- Confirm an IP change, expired certificate, or deleted PKCS12 blocks listener startup instead of downgrading.
+- Verify macOS, iPhone Safari, and Android Chrome trust instructions on devices you personally control.
+
+**Status:** Source changes and setup script are committed; no Mac/BRAVIA build, certificate provisioning, browser tests, or successful TLS handshake is claimed yet.
