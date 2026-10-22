@@ -109,9 +109,17 @@ fun HandoffScreen(
                 Spacer(Modifier.height(14.dp))
                 Text("Scan to open the send page.", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(16.dp))
-                state.address?.let { address ->
-                    Text("Or open:", color = Muted, fontSize = 16.sp)
-                    Text("http://$address:8765", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
+                state.pageUrl?.let { url ->
+                    Text(if (state.isHttps) "Secure LAN connection:" else "Local connection (HTTP):", color = Muted, fontSize = 16.sp)
+                    Text(url, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
+                    if (!state.isHttps) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Not encrypted. Use scripts/https-tv.sh to enable HTTPS for this TV.",
+                            color = Color(0xFFFFC589),
+                            fontSize = 15.sp,
+                        )
+                    }
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(18.dp))
