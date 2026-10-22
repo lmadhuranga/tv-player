@@ -645,9 +645,9 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
             }
             .focusable(),
     ) {
-        Box(Modifier.fillMaxWidth().height(4.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(4.dp)))
-        Box(Modifier.fillMaxWidth(buffered).height(4.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.27f), RoundedCornerShape(4.dp)))
-        Box(Modifier.fillMaxWidth(progress).height(4.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.84f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth().height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth(buffered).height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.27f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(2.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.84f), RoundedCornerShape(2.dp)))
         Box(Modifier.fillMaxWidth(progress).height(12.dp), contentAlignment = Alignment.CenterEnd) {
             Box(Modifier.size(if (focused) 12.dp else 8.dp).background(if (focused) Color(0xFF52A6FF) else Color.White, CircleShape))
         }

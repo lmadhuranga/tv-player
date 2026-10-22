@@ -438,3 +438,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`; `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 42: `42-half-height-fullscreen-progress`
+
+Reduced the visible fullscreen controller timeline's background, buffered, and played tracks from 4dp to 2dp, with matching 2dp rounded corners. The 12dp focus and seek interaction area, playhead, controller row, and time labels remain unchanged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`; `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed. The visual result remains unverified on-device.
