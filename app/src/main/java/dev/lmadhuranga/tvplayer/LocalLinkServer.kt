@@ -11,6 +11,7 @@ import java.io.OutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -26,6 +27,10 @@ import java.security.SecureRandom
 import java.util.Collections
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.CountDownLatch
@@ -75,7 +80,9 @@ class LocalLinkServer(
     private val stopped = AtomicBoolean(true)
     private val generation = AtomicLong(0L)
     @Volatile private var server: ServerSocket? = null
-    @Volatile private var activeSocket: Socket? = null
+    private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
+    private val clientWorkers = ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue<Runnable>(8), { task -> Thread(task, "tv-player-http-client").apply { isDaemon = true } })
     @Volatile private var approvalSocket: Socket? = null
     @Volatile private var sessionToken: String = ""
     private var pendingApproval: PendingApproval? = null
@@ -86,6 +93,8 @@ class LocalLinkServer(
     private val stagedUploads = mutableMapOf<UploadKind, StagedUpload>()
     private val inFlightUploads = mutableSetOf<File>()
     private val fileManager = NetworkFileManager(appContext)
+    private data class PreviewGrant(val root: String, val path: String, val name: String, val peer: String, val expiresAt: Long)
+    private val previewGrants = ConcurrentHashMap<String, PreviewGrant>()
 
     private enum class UploadKind { VIDEO, SUBTITLE }
     private data class StagedUpload(val file: File, val name: String, val token: String)
@@ -103,6 +112,7 @@ class LocalLinkServer(
     fun start() {
         if (!stopped.compareAndSet(true, false)) return
         clearUploads()
+        previewGrants.clear()
         uploadDirectory.listFiles()?.forEach { it.delete() }
         val runId = generation.incrementAndGet()
         val lanAddress = findLanAddress()
@@ -184,10 +194,10 @@ class LocalLinkServer(
         if (stopped.getAndSet(true)) return
         generation.incrementAndGet()
         sessionToken = ""
-        val awaitingSocket = activeSocket?.takeIf { approvalSocket === it }
+        val awaitingSocket = approvalSocket
         releasePendingApproval()
-        if (awaitingSocket == null) try { activeSocket?.close() } catch (_: Exception) { }
-        activeSocket = null
+        clientSockets.forEach { client -> if (client !== awaitingSocket) runCatching { client.close() } }
+        previewGrants.clear()
         val current = server
         server = null
         try { current?.close() } catch (_: Exception) { }
@@ -207,20 +217,28 @@ class LocalLinkServer(
                 stopAfterListenerFailure(listener, runId)
                 return
             }
-            activeSocket = client
+            clientSockets.add(client)
             try {
-                client.use { socket ->
-                    socket.soTimeout = 4_000
-                    if (!isCurrent(listener, runId)) return
-                    if (isAllowedPeer(socket.inetAddress)) handleRequest(socket, listener, runId)
-                    else respond(socket.getOutputStream(), 403, "Forbidden", "Local network only")
+                clientWorkers.execute {
+                    try {
+                        client.use { socket ->
+                            socket.soTimeout = 4_000
+                            if (isCurrent(listener, runId)) {
+                                if (isAllowedPeer(socket.inetAddress)) handleRequest(socket, listener, runId)
+                                else respond(socket.getOutputStream(), 403, "Forbidden", "Local network only")
+                            }
+                        }
+                    } catch (_: SocketTimeoutException) {
+                        // Close stalled HTTP requests without blocking another preview or upload.
+                    } catch (_: Exception) {
+                        // A peer may disconnect during a long upload or range response.
+                    } finally {
+                        clientSockets.remove(client)
+                    }
                 }
-            } catch (_: SocketTimeoutException) {
-                // Drop partial requests without affecting the next local client.
-            } catch (_: Exception) {
-                // The peer may close early. Continue accepting only while this server generation is current.
-            } finally {
-                if (activeSocket === client) activeSocket = null
+            } catch (_: RejectedExecutionException) {
+                clientSockets.remove(client)
+                runCatching { client.close() }
             }
         }
     }
@@ -234,7 +252,8 @@ class LocalLinkServer(
         stopped.set(true)
         val failedGeneration = generation.incrementAndGet()
         server = null
-        activeSocket = null
+        clientSockets.forEach { client -> runCatching { client.close() } }
+        previewGrants.clear()
         approvalSocket = null
         sessionToken = ""
         releasePendingApproval()
