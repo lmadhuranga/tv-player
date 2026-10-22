@@ -278,3 +278,12 @@ A screenshot of the old preview showed a dark media element and endless-looking 
 - [ ] Confirm no `../` row appears in normal, empty, or error views. Use Left to move to the parent folder and Back to return to the parent or drive list.
 - [ ] In an empty folder and a folder containing only unsupported files, confirm focus remains usable and Left/Back still work. In an error view, confirm focus lands on the first available action.
 - [x] Source checks and local debug build/lint are recorded in `docs/PROGRESS.md`; TV visual and remote behavior remain unverified.
+
+### Milestone 97 USB playback return and subtitle focus
+
+- [ ] Play a USB folder video with a matching subtitle, then use the player Home action; confirm the same folder returns, focus and scroll land on the played video, and the subtitle remains auto-selected when selected again.
+- [ ] On the subtitle choice screen, confirm **Play video** initially has focus even when a subtitle is auto-selected; choose another subtitle and confirm playback uses that choice.
+- [ ] Repeat with an indexed USB video; confirm the USB browser is the return destination.
+- [ ] Play a handoff URL, browser-uploaded video, and recently played URL; confirm player Home returns to Send to TV.
+- [ ] Unplug the USB drive during playback and return; confirm a reconnect message appears and the app stays in USB browsing.
+- [x] Local debug build, lint, and diff checks are recorded in `docs/PROGRESS.md`; physical TV behavior remains unverified.

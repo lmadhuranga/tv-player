@@ -122,6 +122,7 @@ private fun TVPlayerApp(
     window: Window,
 ) {
     var route by remember { mutableStateOf(AppRoute.HANDOFF) }
+    var playerReturnRoute by remember { mutableStateOf(AppRoute.HANDOFF) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
@@ -140,6 +141,7 @@ private fun TVPlayerApp(
     var usbEntries by remember { mutableStateOf<List<UsbEntry>>(emptyList()) }
     var usbIndexedVideos by remember { mutableStateOf<List<UsbIndexedVideo>>(emptyList()) }
     var usbSelection by remember { mutableStateOf<UsbVideoSelection?>(null) }
+    var usbReturnFocusPath by remember { mutableStateOf<String?>(null) }
     var usbLoading by remember { mutableStateOf(false) }
     var usbError by remember { mutableStateOf<String?>(null) }
     fun loadUsbRoots() {
@@ -216,6 +218,7 @@ private fun TVPlayerApp(
         }
     }
     fun browseUsb() {
+        usbReturnFocusPath = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (Environment.isExternalStorageManager()) loadUsbRoots() else {
                 route = AppRoute.USB_BROWSER
@@ -253,6 +256,7 @@ private fun TVPlayerApp(
     }
 
     fun startVideo(url: String, subtitleUrl: String?) {
+        playerReturnRoute = AppRoute.HANDOFF
         val identity = HistoryRepository.mediaIdentity(url)
         val sameVideo = identity?.let { mediaIdentity ->
             recentEntries.firstOrNull { it.mediaUrl?.let(HistoryRepository::mediaIdentity) == mediaIdentity }
@@ -295,6 +299,7 @@ private fun TVPlayerApp(
             onOpenSettings = { settingsOpen = true },
             onReplay = { entry ->
                 val url = entry.mediaUrl ?: return@HomeScreen
+                playerReturnRoute = AppRoute.HANDOFF
                 playback.playUrl(url, entry.subtitleUrl, entry.positionMs.takeIf { it > 5_000L } ?: 0L)
                 route = AppRoute.PLAYER
             },
@@ -316,9 +321,16 @@ private fun TVPlayerApp(
             indexedVideos = usbIndexedVideos,
             loading = usbLoading,
             error = usbError,
-            onChooseRoot = { root -> openUsbDirectory(root, root.directory) },
-            onOpenFolder = { entry -> usbRoot?.let { root -> openUsbDirectory(root, entry.file) } },
+            onChooseRoot = { root ->
+                usbReturnFocusPath = null
+                openUsbDirectory(root, root.directory)
+            },
+            onOpenFolder = { entry ->
+                usbReturnFocusPath = null
+                usbRoot?.let { root -> openUsbDirectory(root, entry.file) }
+            },
             onChooseVideo = { entry ->
+                usbReturnFocusPath = entry.file.path
                 usbLoading = true
                 appScope.launch {
                     runCatching { usbVideoRepository.selection(entry) }
@@ -327,19 +339,25 @@ private fun TVPlayerApp(
                 }
             },
             onParent = {
+                usbReturnFocusPath = null
                 val currentRoot = usbRoot
                 val current = usbDirectory
                 if (currentRoot == null || current == null || current.canonicalFile == currentRoot.directory.canonicalFile) loadUsbRoots()
                 else openUsbDirectory(currentRoot, current.parentFile ?: currentRoot.directory)
             },
             onRequestAccess = ::requestUsbStorageAccess,
-            onIndexedVideo = { video -> playback.playDocument(video.uri); route = AppRoute.PLAYER },
+            onIndexedVideo = { video ->
+                playerReturnRoute = AppRoute.USB_BROWSER
+                playback.playDocument(video.uri)
+                route = AppRoute.PLAYER
+            },
             onShowIndexedVideos = {
                 if (context.checkSelfPermission(usbPermission) != PackageManager.PERMISSION_GRANTED) {
                     usbPermissionLauncher.launch(usbPermission)
                 } else loadIndexedUsbVideos()
             },
             onRetry = ::browseUsb,
+            returnFocusPath = usbReturnFocusPath,
         )
 
         AppRoute.USB_SUBTITLES -> UsbSubtitleChoiceScreen(
@@ -347,6 +365,7 @@ private fun TVPlayerApp(
             loading = usbLoading,
             onPlay = { subtitle ->
                 val selection = usbSelection ?: return@UsbSubtitleChoiceScreen
+                playerReturnRoute = AppRoute.USB_BROWSER
                 playback.playLocalFile(selection.video.file, subtitle?.file)
                 route = AppRoute.PLAYER
             },
@@ -359,6 +378,7 @@ private fun TVPlayerApp(
             settingsRequester = settingsOpenerRequester,
             onVideoSubmitted = { submission ->
                 pendingStart = null
+                playerReturnRoute = AppRoute.HANDOFF
                 if (submission.uploadedVideo != null) {
                     playback.playUploadedFile(
                         submission.uploadedVideo,
@@ -377,6 +397,7 @@ private fun TVPlayerApp(
             onApprovalPending = { pending -> if (pending) settingsOpen = false },
             onReplay = { entry ->
                 val url = entry.mediaUrl ?: return@HandoffScreen
+                playerReturnRoute = AppRoute.HANDOFF
                 playback.playUrl(url, entry.subtitleUrl, entry.positionMs.takeIf { it > 5_000L } ?: 0L)
                 route = AppRoute.PLAYER
             },
@@ -399,7 +420,48 @@ private fun TVPlayerApp(
             },
             onHome = {
                 playback.pauseForBackground()
-                route = AppRoute.HANDOFF
+                route = playerReturnRoute
+                if (playerReturnRoute == AppRoute.USB_BROWSER) {
+                    val currentRoot = usbRoot
+                    val currentDirectory = usbDirectory
+                    if (currentRoot != null && currentDirectory != null) {
+                        usbLoading = true
+                        usbError = null
+                        appScope.launch {
+                            runCatching { usbVideoRepository.listRoots() }
+                                .onSuccess { roots ->
+                                    usbRoots = roots
+                                    val mountedRoot = roots.firstOrNull { it.directory.canonicalFile == currentRoot.directory.canonicalFile }
+                                    if (mountedRoot == null) {
+                                        usbRoot = null
+                                        usbDirectory = null
+                                        usbEntries = emptyList()
+                                        usbError = "The USB drive is no longer available. Reconnect it and scan again."
+                                    } else {
+                                        openUsbDirectory(mountedRoot, currentDirectory)
+                                    }
+                                }
+                                .onFailure { error ->
+                                    usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not reconnect to the USB folder."
+                                }
+                            usbLoading = false
+                        }
+                    } else {
+                        appScope.launch {
+                            runCatching { usbVideoRepository.listRoots() }
+                                .onSuccess { roots ->
+                                    usbRoots = roots
+                                    if (roots.isEmpty() && usbIndexedVideos.isNotEmpty()) {
+                                        usbIndexedVideos = emptyList()
+                                        usbError = "The USB drive is no longer available. Reconnect it and scan again."
+                                    }
+                                }
+                                .onFailure { error ->
+                                    usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not reconnect to USB storage."
+                                }
+                        }
+                    }
+                }
             },
         )
     }
@@ -429,11 +491,13 @@ private fun TVPlayerApp(
             entries = pending.entries,
             onResume = { entry ->
                 playback.playUrl(pending.url, pending.subtitleUrl, entry.positionMs)
+                playerReturnRoute = AppRoute.HANDOFF
                 pendingStart = null
                 route = AppRoute.PLAYER
             },
             onStartOver = {
                 playback.playUrl(pending.url, pending.subtitleUrl)
+                playerReturnRoute = AppRoute.HANDOFF
                 pendingStart = null
                 route = AppRoute.PLAYER
             },
@@ -462,10 +526,12 @@ private fun UsbVideoBrowserScreen(
     onShowIndexedVideos: () -> Unit,
     onIndexedVideo: (UsbIndexedVideo) -> Unit,
     onRetry: () -> Unit,
+    returnFocusPath: String?,
 ) {
     val firstEntryRequester = remember { FocusRequester() }
     val emptyStateRequester = remember { FocusRequester() }
     val firstActionableEntry = entries.firstOrNull { it.isDirectory || it.canPlay }
+    val focusTargetPath = returnFocusPath?.takeIf { path -> entries.any { it.file.path == path } }
     val listState = rememberLazyListState()
     var consumedParentKeyUp by remember { mutableStateOf(false) }
     val breadcrumb = if (root != null && directory != null) usbBreadcrumb(root, directory) else "USB drives"
@@ -551,7 +617,7 @@ private fun UsbVideoBrowserScreen(
                                     enabled = entry.isDirectory || entry.canPlay,
                                     trailingChevron = entry.isDirectory,
                                     onClick = { if (entry.isDirectory) onOpenFolder(entry) else if (entry.canPlay) onChooseVideo(entry) },
-                                    modifier = if (entry == firstActionableEntry) Modifier.focusRequester(firstEntryRequester) else Modifier,
+                                    modifier = if (entry.file.path == focusTargetPath || focusTargetPath == null && entry == firstActionableEntry) Modifier.focusRequester(firstEntryRequester) else Modifier,
                                 )
                             }
                         }
@@ -570,11 +636,13 @@ private fun UsbVideoBrowserScreen(
             )
         }
     }
-    LaunchedEffect(loading, error, roots.size, entries.size, root, directory) {
+    LaunchedEffect(loading, error, roots.size, entries.size, root, directory, focusTargetPath) {
         if (!loading && (root != null || roots.isNotEmpty() || error != null)) {
+            val returnedEntryIndex = focusTargetPath?.let { path -> entries.indexOfFirst { it.file.path == path } } ?: -1
             val focusIndex = when {
                 error != null -> 1
                 root == null -> 0
+                returnedEntryIndex >= 0 -> returnedEntryIndex
                 firstActionableEntry != null -> entries.indexOf(firstActionableEntry)
                 else -> 0
             }
@@ -676,9 +744,7 @@ private fun UsbSubtitleChoiceScreen(
     onPlay: (UsbEntry?) -> Unit,
 ) {
     var selected by remember(selection) { mutableStateOf(selection?.automaticSubtitle) }
-    val firstChoice = remember { FocusRequester() }
-    val firstSubtitle = selection?.subtitles.orEmpty().firstOrNull { it.file == selected?.file }
-        ?: selection?.subtitles.orEmpty().firstOrNull()
+    val playRequester = remember { FocusRequester() }
     TVBackground {
         Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center) {
             Text("READY TO PLAY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
@@ -696,20 +762,19 @@ private fun UsbSubtitleChoiceScreen(
                     selection?.subtitles.orEmpty().forEach { subtitle ->
                         AppButton(
                             onClick = { selected = subtitle },
-                            modifier = if (subtitle.file == firstSubtitle?.file) Modifier.focusRequester(firstChoice) else Modifier,
                         ) {
                             Text((if (selected?.file == subtitle.file) "✓  " else "") + subtitle.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     AppButton(
                         onClick = { onPlay(selected) },
-                        modifier = if (firstSubtitle == null) Modifier.focusRequester(firstChoice) else Modifier,
+                        modifier = Modifier.focusRequester(playRequester),
                     ) { Text("Play video", fontSize = 18.sp) }
                 }
             }
         }
     }
-    LaunchedEffect(selection, loading) { if (!loading) firstChoice.requestFocus() }
+    LaunchedEffect(selection, loading) { if (!loading) playRequester.requestFocus() }
 }
 
 private fun formatFileSize(bytes: Long): String {

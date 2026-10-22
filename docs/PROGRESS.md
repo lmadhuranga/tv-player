@@ -907,3 +907,13 @@ Verification record:
 
 - [x] `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (39 actionable tasks; 4 executed, 35 up-to-date).
 - [ ] TV remote focus behavior pending runtime verification; no TV contact or installation performed.
+
+## Milestone 97: `97-usb-playback-return-focus`
+
+USB file playback now returns to the retained USB browser folder, rechecks that the drive is still mounted, reloads the folder, and restores scroll and focus to the played video. If the drive was removed, the browser stays open with a reconnect message. Indexed USB playback also retains the USB browser as its return route. URL playback, recent URL replay, browser uploads, and resume prompts continue returning to Send to TV. The subtitle choice screen now initially focuses **Play video** while keeping the automatically selected subtitle and allowing the user to change it.
+
+Verification record:
+
+- [x] `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 15 executed, 40 up-to-date).
+- [x] `git diff --check` passed.
+- [ ] Remote-control route and focus behavior, including unplugging the drive during playback, remain pending physical TV verification; no TV contact or installation was performed.
