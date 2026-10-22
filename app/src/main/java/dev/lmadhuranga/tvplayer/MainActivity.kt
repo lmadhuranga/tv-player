@@ -54,6 +54,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -450,9 +455,26 @@ private fun UsbVideoBrowserScreen(
     val firstEntryRequester = remember { FocusRequester() }
     val firstActionableEntry = entries.firstOrNull { it.isDirectory || it.canPlay }
     val listState = rememberLazyListState()
+    var consumedParentKeyUp by remember { mutableStateOf(false) }
     TVBackground {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
+                if (root == null || directory == null || event.key != Key.DirectionLeft) return@onPreviewKeyEvent false
+                when (event.type) {
+                    KeyEventType.KeyDown -> {
+                        if (event.nativeKeyEvent.repeatCount == 0) onParent()
+                        consumedParentKeyUp = true
+                        true
+                    }
+                    KeyEventType.KeyUp -> {
+                        if (consumedParentKeyUp) {
+                            consumedParentKeyUp = false
+                            true
+                        } else false
+                    }
+                    else -> false
+                }
+            },
             verticalArrangement = Arrangement.Center,
         ) {
             Text("USB BROWSE", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
