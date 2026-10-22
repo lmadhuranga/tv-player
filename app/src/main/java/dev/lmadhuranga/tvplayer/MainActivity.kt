@@ -118,7 +118,7 @@ private fun TVPlayerApp(
     usbVideoRepository: UsbVideoRepository,
     window: Window,
 ) {
-    var route by remember { mutableStateOf(AppRoute.HANDOFF) }
+    var route by remember { mutableStateOf(AppRoute.HOME) }
     var settingsOpen by remember { mutableStateOf(false) }
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
@@ -289,6 +289,7 @@ private fun TVPlayerApp(
             settingsRequester = settingsOpenerRequester,
             onBrowseUsb = ::browseUsb,
             onSendToTv = { route = AppRoute.HANDOFF },
+            onAddUrl = { route = AppRoute.ADD_URL },
             onOpenSettings = { settingsOpen = true },
             onReplay = { entry ->
                 val url = entry.mediaUrl ?: return@HomeScreen
@@ -370,6 +371,7 @@ private fun TVPlayerApp(
                 route = AppRoute.PLAYER
             },
             onBack = { route = AppRoute.HOME },
+            onAddUrl = { route = AppRoute.ADD_URL },
             onGoToPlayer = { route = AppRoute.PLAYER },
             onOpenSettings = { settingsOpen = true },
             onApprovalPending = { pending -> if (pending) settingsOpen = false },
@@ -501,7 +503,16 @@ private fun UsbVideoBrowserScreen(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(20.dp))
+            Text(
+                when {
+                    loading -> "Finding your media…"
+                    root == null -> "${roots.size} storage location${if (roots.size == 1) "" else "s"} · Press OK to open"
+                    else -> "${entries.size} item${if (entries.size == 1) "" else "s"} · OK to open · Left to go up",
+                },
+                color = Muted,
+                fontSize = 15.sp,
+            )
+            Spacer(Modifier.height(14.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 shape = RoundedCornerShape(24.dp),
@@ -727,9 +738,18 @@ private fun HomeScreen(
     settingsRequester: FocusRequester,
     onBrowseUsb: () -> Unit,
     onSendToTv: () -> Unit,
+    onAddUrl: () -> Unit,
     onOpenSettings: () -> Unit,
     onReplay: (HistoryEntry) -> Unit,
 ) {
+    val primaryActionRequester = remember { FocusRequester() }
+    val replayable = remember(entries) {
+        entries.filter { it.mediaUrl != null }
+            .distinctBy { it.mediaUrl?.let(HistoryRepository::mediaIdentity) ?: it.title }
+            .take(4)
+    }
+    LaunchedEffect(Unit) { primaryActionRequester.requestFocus() }
+
     TVBackground {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -740,66 +760,86 @@ private fun HomeScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Brand()
-                Spacer(Modifier.height(30.dp))
+                Spacer(Modifier.height(24.dp))
                 Text(
-                    "Your screen.\nYour video.",
+                    "Your movies.\nOne easy screen.",
                     color = Color.White,
-                    fontSize = 56.sp,
-                    lineHeight = 64.sp,
+                    fontSize = 48.sp,
+                    lineHeight = 54.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    "A simple place to play videos on your TV.",
+                    "Watch videos from your phone, your USB drive, or a direct link.",
                     color = Muted,
-                    fontSize = 21.sp,
+                    fontSize = 19.sp,
+                    lineHeight = 27.sp,
                 )
-                Spacer(Modifier.height(34.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Spacer(Modifier.height(26.dp))
+                Text("START WATCHING", color = Teal, fontSize = 13.sp, letterSpacing = 2.sp)
+                Spacer(Modifier.height(10.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    AppButton(onClick = onSendToTv, modifier = Modifier.focusRequester(primaryActionRequester)) {
+                        Text("↗  Send from phone or computer", fontSize = 18.sp)
+                    }
                     AppButton(onClick = onBrowseUsb) {
-                        Text("Browse USB videos", fontSize = 18.sp)
+                        Text("▣  Browse USB movies", fontSize = 18.sp)
                     }
-                    AppButton(onClick = onSendToTv) {
-                        Text("Send to TV", fontSize = 18.sp)
+                    AppButton(onClick = onAddUrl) {
+                        Text("▶  Play a video URL", fontSize = 18.sp)
                     }
-                    AppButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier.focusRequester(settingsRequester),
-                    ) {
-                        Text("Settings", fontSize = 18.sp)
+                    AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) {
+                        Text("⚙  Settings", fontSize = 17.sp)
                     }
                 }
+                Spacer(Modifier.height(18.dp))
+                Text("Use ↑ ↓ to choose an action and OK to open. Press Back to return.", color = Muted, fontSize = 14.sp)
             }
-            Spacer(Modifier.width(56.dp))
+            Spacer(Modifier.width(44.dp))
             Surface(
-                modifier = Modifier.size(width = 390.dp, height = 250.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = SurfaceDefaults.colors(containerColor = Color(0xFF12243A)),
+                modifier = Modifier.width(398.dp).height(414.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = SurfaceDefaults.colors(containerColor = Color(0xFF12283D)),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
                 ) {
-                    Text("RECENTLY PLAYED", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(10.dp))
-                    val replayable = entries.filter { it.mediaUrl != null }.take(3)
-                    if (replayable.isEmpty()) {
-                        Text("Play a direct video link to see it here.", color = Muted, fontSize = 17.sp)
-                    } else {
-                        replayable.forEach { entry ->
-                            AppButton(onClick = { onReplay(entry) }) {
-                                Column {
-                                    Text(
-                                        entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } },
-                                        fontSize = 17.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text("${entry.sourceHost} · ${formatTime(entry.positionMs)}", color = Muted, fontSize = 13.sp)
+                    Text("CONTINUE WATCHING", color = Teal, fontSize = 14.sp, letterSpacing = 1.5.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("Your recent direct links", color = Muted, fontSize = 14.sp)
+                    Spacer(Modifier.height(14.dp))
+                    Column(
+                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (replayable.isEmpty()) {
+                            Text("Nothing here yet", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.height(4.dp))
+                            Text("Send a video from your phone or add a link to start watching.", color = Muted, fontSize = 16.sp, lineHeight = 23.sp)
+                        } else {
+                            replayable.forEach { entry ->
+                                AppButton(onClick = { onReplay(entry) }, modifier = Modifier.fillMaxWidth()) {
+                                    Column {
+                                        Text(
+                                            entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } },
+                                            fontSize = 16.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            "Resume at ${formatTime(entry.positionMs)} · ${entry.sourceHost}",
+                                            color = Muted,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Local playback history", color = Muted, fontSize = 12.sp)
                 }
             }
         }
