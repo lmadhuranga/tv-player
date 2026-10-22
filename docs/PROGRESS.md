@@ -704,3 +704,13 @@ Verification record:
 - Focused source checks confirmed the Home action calls `AppRoute.HANDOFF`, Settings retains its focus requester, Recently played replay wiring remains present, and Handoff Back still targets Home. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 69: `69-qr-build-version-label`
+
+The QR/Handoff page now displays the app version from generated `BuildConfig.VERSION_NAME` below its Settings and Back actions. Gradle explicitly enables BuildConfig generation; the configured version name and code are unchanged.
+
+Verification record:
+
+- Focused source checks confirmed the label reads `BuildConfig.VERSION_NAME`, BuildConfig generation is enabled, and version metadata remains unchanged. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, or preview was performed.

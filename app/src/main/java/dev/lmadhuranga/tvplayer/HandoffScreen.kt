@@ -192,6 +192,8 @@ fun HandoffScreen(
                     AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
                     AppButton(onClick = onBack) { Text("Back") }
                 }
+                Spacer(Modifier.height(8.dp))
+                Text("Version ${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 12.sp)
             }
         }
     }
