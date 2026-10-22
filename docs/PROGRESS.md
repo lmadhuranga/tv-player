@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `30-browser-dark-theme` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `30-browser-dark-theme`
+- Implemented through milestone: `32-fullscreen-dark-timeline` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `32-fullscreen-dark-timeline`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -54,6 +54,8 @@
 | 28 | `28-collapsible-subtitle` | `de73547` |
 | 29 | `29-minimal-phone-page` | `6e3d3fe` |
 | 30 | `30-browser-dark-theme` | branch HEAD (`git rev-parse 30-browser-dark-theme`) |
+| 31 | `31-video-send-history` | `0a0d95c` |
+| 32 | `32-fullscreen-dark-timeline` | `bd145b5` |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -339,3 +341,13 @@ Verification record:
 - Extracted the embedded script to `/tmp/tv-player-handoff.js`; `node --check` and 10 focused source assertions passed for initial disabled state, whitespace trimming, active URL/file selection, mode/busy recalculation, accessible collapsed history, collapse after selection/source entry, local TTL storage, and clear-control visibility. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date).
 - No TV contact, install, launch, or browser visual preview was performed.
+
+## Milestone 32: `32-fullscreen-dark-timeline`
+
+Refined the empty fullscreen player into a friendly “Your screen. Your video.” state that explains phone handoff and direct-link entry, with a remote-focusable Add a video link action. The playback controls keep the shared dark-at-rest, white-on-focus `AppButton` colors. Moved the playback seek timeline beneath the controls at the bottom edge, reduced resting timeline brightness, and made elapsed/total time labels smaller and more transparent. Focused seeking remains outlined and brighter, and the auto-hidden timeline remains visible with lower contrast.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date).
+- `git diff --check` and eight focused assertions passed for the empty-state copy/action, shared button colors, timeline placement, seek focus styling, subdued hidden progress, and retained auto-hide timing.
+- No TV contact, install, launch, or visual preview was performed; remote focus and on-screen positioning remain source-checked only.

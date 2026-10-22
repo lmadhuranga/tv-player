@@ -90,6 +90,7 @@ fun FullscreenPlayerScreen(
     val optionsFirstFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val newLinkFocus = remember { FocusRequester() }
+    val emptyPlayerFocus = remember { FocusRequester() }
 
     DisposableEffect(window) {
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -142,7 +143,7 @@ fun FullscreenPlayerScreen(
                     state.error != null -> if (state.canRetry) retryFocus.requestFocus() else newLinkFocus.requestFocus()
                     state.subtitleError != null -> optionsFocus.requestFocus()
                     state.title != null -> playFocus.requestFocus()
-                    else -> backFocus.requestFocus()
+                    else -> emptyPlayerFocus.requestFocus()
                 }
             } else {
                 rootFocus.requestFocus()
@@ -281,12 +282,27 @@ fun FullscreenPlayerScreen(
         )
 
         if (state.title == null) {
-            Text(
-                "Nothing is playing yet",
-                color = Color.White,
-                fontSize = 28.sp,
-                modifier = Modifier.align(Alignment.Center),
-            )
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    "Your screen. Your video.",
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Send a video from your phone, or add a direct link from Options.",
+                    color = Color.White.copy(alpha = 0.68f),
+                    fontSize = 18.sp,
+                )
+                AppButton(
+                    onClick = { interacted(onAddUrl) },
+                    modifier = Modifier.focusRequester(emptyPlayerFocus),
+                ) { Text("Add a video link", fontSize = 17.sp) }
+            }
         }
 
         if (state.isBuffering && !controlsVisible) {
@@ -303,7 +319,7 @@ fun FullscreenPlayerScreen(
                 durationMs = state.durationMs,
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 58.dp, vertical = 18.dp),
+                    .padding(start = 58.dp, end = 58.dp, bottom = 6.dp),
             )
         }
 
@@ -360,20 +376,18 @@ fun FullscreenPlayerScreen(
             }
 
             Column(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 58.dp, vertical = 24.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .padding(start = 58.dp, end = 58.dp, top = 24.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(formatPlayerTime(state.positionMs), color = Color.White, fontSize = 16.sp)
-                    Spacer(Modifier.weight(1f))
-                    Text(formatPlayerTime(state.durationMs), color = Muted, fontSize = 16.sp)
+                state.error?.let { message ->
+                    Text(message, color = Color(0xFFFFC2B7), fontSize = 16.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AppButton(onClick = { interacted(playback::retryPlayback) }, enabled = state.canRetry, modifier = Modifier.focusRequester(retryFocus)) { Text("Retry") }
+                        AppButton(onClick = { interacted(onAddUrl) }, modifier = Modifier.focusRequester(newLinkFocus)) { Text("Enter another link") }
+                    }
                 }
-                PlayerProgress(
-                    positionMs = state.positionMs,
-                    bufferedPositionMs = state.bufferedPositionMs,
-                    durationMs = state.durationMs,
-                    onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
-                )
+                state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AppButton(
                         onClick = { interacted(playback::toggleSubtitles) },
@@ -401,14 +415,17 @@ fun FullscreenPlayerScreen(
                         Text("${state.speed}×", fontSize = 16.sp)
                     }
                 }
-                state.error?.let { message ->
-                    Text(message, color = Color(0xFFFFC2B7), fontSize = 16.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        AppButton(onClick = { interacted(playback::retryPlayback) }, enabled = state.canRetry, modifier = Modifier.focusRequester(retryFocus)) { Text("Retry") }
-                        AppButton(onClick = { interacted(onAddUrl) }, modifier = Modifier.focusRequester(newLinkFocus)) { Text("Enter another link") }
-                    }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.62f), fontSize = 14.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.42f), fontSize = 14.sp)
                 }
-                state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
+                PlayerProgress(
+                    positionMs = state.positionMs,
+                    bufferedPositionMs = state.bufferedPositionMs,
+                    durationMs = state.durationMs,
+                    onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
+                )
             }
         }
     }
@@ -423,7 +440,7 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
         modifier = Modifier
             .fillMaxWidth()
             .height(if (focused) 14.dp else 7.dp)
-            .background(Color.White.copy(alpha = 0.24f), RoundedCornerShape(8.dp))
+            .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
             .then(if (focused) Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
@@ -439,8 +456,8 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
             }
             .focusable(),
     ) {
-        Box(Modifier.fillMaxWidth(buffered).height(if (focused) 14.dp else 7.dp).background(Color(0xFFBDBDBD), RoundedCornerShape(8.dp)))
-        Box(Modifier.fillMaxWidth(progress).height(if (focused) 14.dp else 7.dp).background(Color(0xFF454545), RoundedCornerShape(8.dp)))
+        Box(Modifier.fillMaxWidth(buffered).height(if (focused) 14.dp else 7.dp).background(Color.White.copy(alpha = 0.34f), RoundedCornerShape(8.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(if (focused) 14.dp else 7.dp).background(Color.White.copy(alpha = 0.68f), RoundedCornerShape(8.dp)))
     }
 }
 
@@ -453,9 +470,9 @@ private fun HiddenPlaybackProgress(
 ) {
     val progress = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     val buffered = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs).coerceIn(progress, 1f) else 0f
-    Box(modifier.height(5.dp).background(Color(0x66444444), RoundedCornerShape(4.dp))) {
-        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color(0xFFBDBDBD), RoundedCornerShape(4.dp)))
-        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color(0xFF454545), RoundedCornerShape(4.dp)))
+    Box(modifier.height(5.dp).background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(4.dp))) {
+        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color.White.copy(alpha = 0.24f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color.White.copy(alpha = 0.42f), RoundedCornerShape(4.dp)))
     }
 }
 
