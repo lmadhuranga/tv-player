@@ -161,3 +161,24 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [x] `:app:testDebugUnitTest` passed with traversal, symlink, overwrite, partial cleanup, cancellation, stale temporary cleanup, and non-empty-folder checks.
 - [ ] Final `:app:assembleDebug`, `:app:lintDebug`, embedded JavaScript `node --check`, and `git diff --check` are pending after feature 88 integration.
 - [ ] Browser visual QA is pending: the sandbox denied binding the local mock fixture port, and the shared Playwright browser profile was locked by another session. No TV access was attempted.
+
+## File Manager: Download and trusted browser access (branch 87)
+
+1. Build, install and launch with `bash scripts/tv.sh deploy`, then keep **TV Player → Send to TV** open.
+2. On a computer or phone on the same private LAN, open `http://TV_IP:8765/files`.
+3. At the first connection, the TV offers **Deny**, **Allow once**, or **Trust 30 days**. Choose **Trust 30 days** to remember this browser. The browser retains a random secret in same-origin local storage; the TV stores only its hash, bound to the browser's User-Agent, for up to 30 days.
+4. Reopening `/files`, restarting the app, or switching between the `/files` and `/` pages should reuse trust without the approval dialog. A browser with cleared site data, a private session, or a significantly changed User-Agent must be approved again.
+5. Select any normal visible file and choose **Download**, or use **Download** from the image/video preview. The TV sends the original bytes to your browser's download folder, through a time-limited LAN-only link. Video playback remains dependent on the receiving browser's codec support.
+6. From the TV's **Send to TV** screen, choose **Forget trusted browsers → Forget all** to revoke every saved trusted browser and active sessions. Existing preview and download streams are interrupted.
+7. When the TV Player handoff screen closes or the application leaves the foreground, its local server stops. Keep it open during larger transfers.
+
+**Security:** Browser trust is for your own devices on your private home network. The server uses local plain HTTP (not TLS), so browser trust secrets could be intercepted by someone with access to untrusted LAN traffic. Do not use this facility on guest/public Wi-Fi or expose port 8765 through router forwarding.
+
+**QA checklist (pending physical-device validation):**
+- Verify a trusted browser reconnects without a second approval after refresh and TV-app restart.
+- Verify **Allow once** requires approval again after session restart.
+- Verify **Forget all** immediately prevents downloading, uploading, and listing files.
+- Download an image, MP4/MOV, and a non-media document; compare the received bytes and file names.
+- Verify Range seeking works for browser media preview and that a second browser cannot reuse the download ticket from a different IP.
+- Verify interrupted downloads leave no altered file on the TV (downloads are read-only) and that USB disconnection reports an error.
+- Check large downloads against TV memory/storage constraints and report any TV lifecycle interruptions.
