@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `57-repeat-two-minute-hold-seek` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `57-repeat-two-minute-hold-seek`
+- Implemented through milestone: `58-half-progress-opacity` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `58-half-progress-opacity`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -59,6 +59,7 @@
 | 35 | `35-icon-player-controls` | branch HEAD (`git rev-parse 35-icon-player-controls`) |
 | 56 | `56-fullscreen-progress-time-labels` | pending local commit |
 | 57 | `57-repeat-two-minute-hold-seek` | pending local commit |
+| 58 | `58-half-progress-opacity` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -591,5 +592,15 @@ Hidden-control fullscreen Left/Right taps continue to seek 30 seconds on KeyUp. 
 Verification record:
 
 - Focused source assertions confirmed tap seeking occurs only on KeyUp when no repeats were received, repeat deltas apply each two-minute increment once, repeat state resets on release, and the hidden-controls gate continues to preserve visible navigation. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or preview was performed.
+
+## Milestone 58: `58-half-progress-opacity`
+
+Halved the opacity of the progress-bar tracks in both fullscreen control states. Visible rail, buffered, and played tracks now use 8%, 14%, and 45% opacity; hidden-control tracks use 6%, 14%, and 45%. The focused playhead, track heights, and time-label opacity remain unchanged.
+
+Verification record:
+
+- Focused source assertions confirmed both track-alpha triplets and that playhead, track heights, and time-label opacity stayed unchanged; `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or preview was performed.

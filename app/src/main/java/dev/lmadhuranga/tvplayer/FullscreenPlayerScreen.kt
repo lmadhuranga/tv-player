@@ -740,9 +740,9 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
             }
             .focusable(),
     ) {
-        Box(Modifier.fillMaxWidth().height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(2.dp)))
-        Box(Modifier.fillMaxWidth(buffered).height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.28f), RoundedCornerShape(2.dp)))
-        Box(Modifier.fillMaxWidth(progress).height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth().height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth(buffered).height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.45f), RoundedCornerShape(2.dp)))
         Box(Modifier.fillMaxWidth(progress).height(12.dp), contentAlignment = Alignment.CenterEnd) {
             Box(Modifier.size(if (focused) 12.dp else 8.dp).background(if (focused) Color(0xFF52A6FF) else Color.White, CircleShape))
         }
@@ -758,9 +758,9 @@ private fun HiddenPlaybackProgress(
 ) {
     val progress = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     val buffered = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs).coerceIn(progress, 1f) else 0f
-    Box(modifier.height(2.5.dp).background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(4.dp))) {
-        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color.White.copy(alpha = 0.28f), RoundedCornerShape(4.dp)))
-        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color.White.copy(alpha = 0.9f), RoundedCornerShape(4.dp)))
+    Box(modifier.height(2.5.dp).background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(4.dp))) {
+        Box(Modifier.fillMaxWidth(buffered).fillMaxSize().background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(progress).fillMaxSize().background(Color.White.copy(alpha = 0.45f), RoundedCornerShape(4.dp)))
     }
 }
 
