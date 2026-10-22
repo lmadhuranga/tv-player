@@ -2,6 +2,7 @@ package dev.lmadhuranga.tvplayer
 
 import android.view.Window
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,12 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -68,6 +73,7 @@ import java.util.Locale
 private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 
 private enum class OptionsFocusOrigin { HEADER, AUDIO }
+private enum class PlayerTransportGlyph { PREVIOUS, PLAY, PAUSE, NEXT }
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
@@ -507,7 +513,7 @@ private fun TransportControls(
             diameter = 56.dp,
         ) { Text("-10", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
         PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Previous item unavailable" }, diameter = 56.dp) {
-            Text("|◀", fontSize = 19.sp)
+            PlayerTransportIcon(PlayerTransportGlyph.PREVIOUS)
         }
         PlayerCircleButton(
             onClick = onTogglePlayback,
@@ -516,9 +522,9 @@ private fun TransportControls(
                 contentDescription = if (isPlaying) "Pause video" else "Play video"
             },
             diameter = 64.dp,
-        ) { Text(if (isPlaying) "Ⅱ" else "▶", fontSize = 25.sp, fontWeight = FontWeight.Bold) }
+        ) { PlayerTransportIcon(if (isPlaying) PlayerTransportGlyph.PAUSE else PlayerTransportGlyph.PLAY) }
         PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Next item unavailable" }, diameter = 56.dp) {
-            Text("▶|", fontSize = 19.sp)
+            PlayerTransportIcon(PlayerTransportGlyph.NEXT)
         }
         PlayerCircleButton(
             onClick = onSeekForward,
@@ -535,7 +541,7 @@ private fun PlayerCircleButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     diameter: androidx.compose.ui.unit.Dp = 50.dp,
-    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
     TvButton(
         onClick = onClick,
@@ -560,14 +566,60 @@ private fun PlayerCircleButton(
             disabledContentColor = Color(0xFF5E5E5E),
         ),
         content = {
-            Row(
+            Box(
                 modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                content = content,
-            )
+                contentAlignment = Alignment.Center,
+            ) { content() }
         },
     )
+}
+
+@Composable
+private fun PlayerTransportIcon(glyph: PlayerTransportGlyph) {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(28.dp)) {
+        val w = size.width
+        val h = size.height
+        when (glyph) {
+            PlayerTransportGlyph.PREVIOUS -> {
+                drawRect(color, Offset(w * 0.19f, h * 0.18f), Size(w * 0.12f, h * 0.64f))
+                drawPath(
+                    Path().apply {
+                        moveTo(w * 0.84f, h * 0.18f)
+                        lineTo(w * 0.42f, h * 0.5f)
+                        lineTo(w * 0.84f, h * 0.82f)
+                        close()
+                    },
+                    color,
+                )
+            }
+            PlayerTransportGlyph.PLAY -> drawPath(
+                Path().apply {
+                    moveTo(w * 0.30f, h * 0.14f)
+                    lineTo(w * 0.99f, h * 0.5f)
+                    lineTo(w * 0.30f, h * 0.86f)
+                    close()
+                },
+                color,
+            )
+            PlayerTransportGlyph.PAUSE -> {
+                drawRect(color, Offset(w * 0.27f, h * 0.15f), Size(w * 0.17f, h * 0.70f))
+                drawRect(color, Offset(w * 0.58f, h * 0.15f), Size(w * 0.17f, h * 0.70f))
+            }
+            PlayerTransportGlyph.NEXT -> {
+                drawPath(
+                    Path().apply {
+                        moveTo(w * 0.16f, h * 0.18f)
+                        lineTo(w * 0.58f, h * 0.5f)
+                        lineTo(w * 0.16f, h * 0.82f)
+                        close()
+                    },
+                    color,
+                )
+                drawRect(color, Offset(w * 0.69f, h * 0.18f), Size(w * 0.12f, h * 0.64f))
+            }
+        }
+    }
 }
 
 @Composable
