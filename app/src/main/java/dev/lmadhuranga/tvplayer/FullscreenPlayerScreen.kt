@@ -67,7 +67,7 @@ import java.util.Locale
 
 private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 
-private enum class OptionsFocusOrigin { HEADER, AUDIO, CONTROLLER }
+private enum class OptionsFocusOrigin { HEADER, AUDIO }
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
@@ -94,7 +94,6 @@ fun FullscreenPlayerScreen(
     val playFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val optionsFocus = remember { FocusRequester() }
-    val controllerOptionsFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
     val optionsFirstFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
@@ -143,7 +142,6 @@ fun FullscreenPlayerScreen(
             when (optionsFocusOrigin) {
                 OptionsFocusOrigin.HEADER -> optionsFocus.requestFocus()
                 OptionsFocusOrigin.AUDIO -> audioFocus.requestFocus()
-                OptionsFocusOrigin.CONTROLLER -> controllerOptionsFocus.requestFocus()
             }
             returningFromOptions = false
         }
@@ -428,7 +426,7 @@ fun FullscreenPlayerScreen(
                     Spacer(Modifier.width(12.dp))
                     Text(formatPlayerTime(state.durationMs), color = Color.White, fontSize = 14.sp)
                 }
-                Box(modifier = Modifier.fillMaxWidth().height(58.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().height(64.dp)) {
                     SubtitleAudioControls(
                         subtitlesEnabled = state.subtitlesEnabled,
                         subtitlesAvailable = state.subtitlesAvailable,
@@ -447,22 +445,12 @@ fun FullscreenPlayerScreen(
                         onTogglePlayback = { interacted(playback::togglePlayPause) },
                         onSeekForward = { interacted { playback.seekBy(10_000L) } },
                     )
-                    Row(
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        PlayerCircleButton(
-                            onClick = { interacted(playback::cycleSpeed) },
-                            enabled = state.title != null,
-                            modifier = Modifier.semantics { contentDescription = "Playback speed: ${state.speed}×" },
-                        ) { Text("${state.speed}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-                        PlayerCircleButton(
-                            onClick = { interacted { openOptions(OptionsFocusOrigin.CONTROLLER) } },
-                            modifier = Modifier.focusRequester(controllerOptionsFocus).semantics { contentDescription = "Player options" },
-                            diameter = 50.dp,
-                        ) { Text("•••", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
-                    }
+                    PlayerCircleButton(
+                        onClick = { interacted(playback::cycleSpeed) },
+                        enabled = state.title != null,
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                            .semantics { contentDescription = "Playback speed: ${state.speed}×" },
+                    ) { Text("${state.speed}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -571,7 +559,14 @@ private fun PlayerCircleButton(
             disabledContainerColor = Color(0xFF151515),
             disabledContentColor = Color(0xFF5E5E5E),
         ),
-        content = content,
+        content = {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+                content = content,
+            )
+        },
     )
 }
 

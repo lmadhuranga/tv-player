@@ -429,3 +429,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`; `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 41: `41-balanced-player-controls`
+
+Balanced the fullscreen controller row by keeping the centered transport group, left subtitle/audio controls, and a single playback-speed control at the far right. The row matches the 64dp play button height, and content is explicitly centered inside each circular button. Player Options remains available from the header gear, which also returns focus when Options closes; opening Options from Audio returns focus to Audio. Auto-hide, D-pad skips, and both visible and hidden progress/time displays remain in place.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`; `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.
