@@ -885,7 +885,9 @@ When Android's all-files permission is unavailable on Android 11+, removable dri
 Verification record:
 
 - [x] `./gradlew :app:testDebugUnitTest` passed after adding symlink and cancelled-upload regression cases.
-- [ ] Final `:app:assembleDebug`, `:app:lintDebug`, embedded JavaScript `node --check`, and `git diff --check` are pending after feature 88 integration.
+- [x] After integrating the compact explorer change into branch 92, `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 16 executed, 39 up-to-date).
+- [x] Embedded File Manager JavaScript passed `node --check`.
+- [x] `git diff --check` passed for the integration.
 - [ ] Browser screenshot/interaction verification remains pending because the sandbox refused the local mock server bind and the shared Playwright browser profile was locked; no TV contact, install, or runtime verification was performed.
 
 ## Milestone 88: `88-tv-explorer-space`
@@ -894,5 +896,5 @@ The USB browser now uses compact page padding, a single 24 sp folder heading, 52
 
 Verification record:
 
-- [x] `git diff --check` passed; `./gradlew :app:assembleDebug --console=plain` passed (39 actionable tasks); `./gradlew :app:lintDebug --console=plain` passed (30 actionable tasks).
+- [x] `git diff --check` and integrated branch `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 16 executed, 39 up-to-date); embedded File Manager JavaScript passed `node --check`.
 - [ ] TV visual and remote runtime behavior remain pending; no TV contact or installation was performed.
