@@ -512,3 +512,13 @@ Verification record:
 - The embedded handoff JavaScript passed `node --check`; focused source assertions confirmed recent-link clicks do not invoke `submitSend`, both recent-link status messages prompt explicit Send, and the Send button remains wired to submission. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - Confirmed the connected ADB target as `BRAVIA_VU3` / `BRAVIA_VU3_4K`, installed `app-debug.apk`, launched `dev.lmadhuranga.tvplayer/.MainActivity`, and verified it is the top resumed activity. The app was left running. No handoff interaction, playback, or subtitle behavior was tested on the TV.
+
+## Milestone 50: `50-long-press-minute-seek`
+
+With fullscreen controllers hidden, D-pad Left/Right short taps still seek 30 seconds, now on KeyUp so an initial press cannot add a duplicate skip before a hold is recognized. The first repeated KeyDown during a hold seeks 60 seconds in that direction; later repeats do not seek again, and the matching KeyUp is consumed. When controllers are visible, Left/Right remains available for focus/navigation.
+
+Verification record:
+
+- Focused source assertions confirmed ±30-second KeyUp actions, ±60-second first-repeat actions, and hidden-key KeyUp consumption; `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- No TV contact, install, launch, or preview was performed. Remote hold timing and visible-controller focus behavior remain unverified on a device.

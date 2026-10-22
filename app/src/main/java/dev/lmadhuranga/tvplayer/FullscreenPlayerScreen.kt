@@ -97,6 +97,8 @@ fun FullscreenPlayerScreen(
     var consumedMediaKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenLeftKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
+    var longHiddenLeftSeekTriggered by remember { mutableStateOf(false) }
+    var longHiddenRightSeekTriggered by remember { mutableStateOf(false) }
     var consumedSkipBackwardKeyUp by remember { mutableStateOf(false) }
     var consumedSkipForwardKeyUp by remember { mutableStateOf(false) }
     var interactionSerial by remember { mutableIntStateOf(0) }
@@ -293,22 +295,40 @@ fun FullscreenPlayerScreen(
                     } else {
                         false
                     }
-                } else if (!controlsVisible && state.title != null && event.key == Key.DirectionLeft) {
+                } else if (event.key == Key.DirectionLeft &&
+                    (consumedHiddenLeftKeyUp || (!controlsVisible && state.title != null))
+                ) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedHiddenLeftKeyUp = true
-                        if (event.nativeKeyEvent.repeatCount == 0) playback.seekBy(-30_000L)
+                        if (event.nativeKeyEvent.repeatCount == 0) {
+                            longHiddenLeftSeekTriggered = false
+                        } else if (!longHiddenLeftSeekTriggered) {
+                            playback.seekBy(-60_000L)
+                            longHiddenLeftSeekTriggered = true
+                        }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenLeftKeyUp) {
                         consumedHiddenLeftKeyUp = false
+                        if (!longHiddenLeftSeekTriggered && state.title != null) playback.seekBy(-30_000L)
+                        longHiddenLeftSeekTriggered = false
                         true
                     } else false
-                } else if (!controlsVisible && state.title != null && event.key == Key.DirectionRight) {
+                } else if (event.key == Key.DirectionRight &&
+                    (consumedHiddenRightKeyUp || (!controlsVisible && state.title != null))
+                ) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedHiddenRightKeyUp = true
-                        if (event.nativeKeyEvent.repeatCount == 0) playback.seekBy(30_000L)
+                        if (event.nativeKeyEvent.repeatCount == 0) {
+                            longHiddenRightSeekTriggered = false
+                        } else if (!longHiddenRightSeekTriggered) {
+                            playback.seekBy(60_000L)
+                            longHiddenRightSeekTriggered = true
+                        }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenRightKeyUp) {
                         consumedHiddenRightKeyUp = false
+                        if (!longHiddenRightSeekTriggered && state.title != null) playback.seekBy(30_000L)
+                        longHiddenRightSeekTriggered = false
                         true
                     } else false
                 } else {
