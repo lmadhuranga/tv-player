@@ -272,9 +272,27 @@ A screenshot of the old preview showed a dark media element and endless-looking 
 4. Click Play: verify loading state, playback controls, seeking, fullscreen, sound, Download, and Close.
 5. Verify unsupported MKV/codecs, slow storage, connection interruption, Retry, and re-opening another file.
 6. Check image preview and small mobile viewport, with keyboard Escape to dismiss.
+
 ### Milestone 88 USB explorer space
 
 - [ ] On a 960 × 540 logical TV display, confirm the USB list shows about seven rows, with one compact folder heading and the breadcrumb in a small fixed footer.
 - [ ] Confirm no `../` row appears in normal, empty, or error views. Use Left to move to the parent folder and Back to return to the parent or drive list.
 - [ ] In an empty folder and a folder containing only unsupported files, confirm focus remains usable and Left/Back still work. In an error view, confirm focus lands on the first available action.
 - [x] Source checks and local debug build/lint are recorded in `docs/PROGRESS.md`; TV visual and remote behavior remain unverified.
+
+### Milestone 97 USB playback return and subtitle focus
+
+- [ ] Play a USB folder video with a matching subtitle, then use the player Home action; confirm the same folder returns, focus and scroll land on the played video, and the subtitle remains auto-selected when selected again.
+- [ ] On the subtitle choice screen, confirm **Play video** initially has focus even when a subtitle is auto-selected; choose another subtitle and confirm playback uses that choice.
+- [ ] Repeat with an indexed USB video; confirm the USB browser is the return destination.
+- [ ] Play a handoff URL, browser-uploaded video, and recently played URL; confirm player Home returns to Send to TV.
+- [ ] Unplug the USB drive during playback and return; confirm a reconnect message appears and the app stays in USB browsing.
+- [x] Local debug build, lint, and diff checks are recorded in `docs/PROGRESS.md`; physical TV behavior remains unverified.
+
+## Branch 98 — USB hidden files and folders
+
+The TV Settings dialog includes **Show hidden files and folders**, default Off. When enabled, dot-prefixed names such as `.Trash`, `.DS_Store`, and `._movie.mp4` appear in USB root/folder and indexed-video listings, and immediate folder counts include them. Dot-prefixed subtitle files become manually selectable; automatic subtitle matching continues to ignore them.
+
+Source checks: `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` and `git diff --check`.
+
+Manual BRAVIA QA remains pending: use the remote to toggle the setting and confirm focus remains clear, restart TV Player and confirm the choice persists, compare hidden names and root/folder counts with the setting Off and On, and verify dot-prefixed subtitles are selectable manually but never selected automatically. No TV install or interaction is claimed by source/build checks.

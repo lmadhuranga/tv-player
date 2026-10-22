@@ -907,3 +907,23 @@ Verification record:
 
 - [x] `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (39 actionable tasks; 4 executed, 35 up-to-date).
 - [ ] TV remote focus behavior pending runtime verification; no TV contact or installation performed.
+
+## Milestone 97: `97-usb-playback-return-focus`
+
+USB file playback now returns to the retained USB browser folder, rechecks that the drive is still mounted, reloads the folder, and restores scroll and focus to the played video. If the drive was removed, the browser stays open with a reconnect message. Indexed USB playback also retains the USB browser as its return route. URL playback, recent URL replay, browser uploads, and resume prompts continue returning to Send to TV. The subtitle choice screen now initially focuses **Play video** while keeping the automatically selected subtitle and allowing the user to change it.
+
+Verification record:
+
+- [x] `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 15 executed, 40 up-to-date).
+- [x] `git diff --check` passed.
+- [ ] Remote-control route and focus behavior, including unplugging the drive during playback, remain pending physical TV verification; no TV contact or installation was performed.
+
+## Milestone 98: `98-show-hidden-files-folders`
+
+Added a persisted **Show hidden files and folders** option to TV Settings, defaulting to Off. The preference controls dot-prefixed entries in mounted USB root and folder listings, MediaStore indexed-video results, and immediate child counts. When enabled, dot-prefixed subtitle files appear for manual selection; automatic subtitle matching still ignores them so metadata sidecars such as `._movie.srt` cannot be selected by fallback. Changing the preference refreshes a visible USB browser folder or root list. The web File Manager's independent hidden-file policy and its security checks are unchanged.
+
+Verification record:
+
+- [x] `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 18 executed, 37 up-to-date). Lint completed without errors.
+- [x] `git diff --check` passed.
+- [ ] Physical TV Settings focus, persistence after app restart, and USB visibility/count behavior remain pending manual validation; no TV contact or installation was performed by this branch implementation.
