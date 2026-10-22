@@ -87,7 +87,7 @@ class UsbVideoRepository(private val context: Context) {
                 }
             }
         }
-        videos
+        videos.filterNot { it.name.startsWith('.') }
     }
 
     suspend fun listRoots(): List<UsbRoot> = withContext(Dispatchers.IO) {
@@ -109,7 +109,7 @@ class UsbVideoRepository(private val context: Context) {
         (safeDirectory.listFiles() ?: throw IllegalStateException("Could not read the contents of this USB folder."))
             .asSequence()
             .filter { it.isDirectory || it.isFile }
-            .filterNot { it.isDirectory && it.name.startsWith('.') }
+            .filterNot { it.name.startsWith('.') }
             .map { file ->
                 val isDirectory = file.isDirectory
                 val childCounts = if (isDirectory) file.childCounts() else null
@@ -130,7 +130,7 @@ class UsbVideoRepository(private val context: Context) {
         require(!video.isDirectory && video.file.isFile && video.file.canRead()) { "This USB video is no longer available." }
         val siblings = video.file.parentFile?.listFiles().orEmpty()
         val subtitles = siblings.asSequence()
-            .filter { it.isFile && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
+            .filter { it.isFile && !it.name.startsWith('.') && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
             .map { UsbEntry(it.name, it, false, fileSizeBytes(it)) }
             .sortedBy { it.name.lowercase(Locale.ROOT) }
             .toList()
@@ -156,7 +156,8 @@ class UsbVideoRepository(private val context: Context) {
     private fun File.childCounts(): Pair<Int, Int>? {
         if (!isDirectory || !canRead()) return null
         val children = listFiles() ?: return null
-        return children.count { it.isDirectory && !it.name.startsWith('.') } to children.count { it.isFile }
+        return children.count { !it.name.startsWith('.') && it.isDirectory } to
+            children.count { !it.name.startsWith('.') && it.isFile }
     }
 
     private fun Cursor.toIndexedVideo(collection: Uri, hasRelativePath: Boolean): UsbIndexedVideo {

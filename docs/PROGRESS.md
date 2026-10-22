@@ -867,7 +867,7 @@ Verification record:
 
 ## Milestone 86: `86-usb-bottom-parent`
 
-The USB explorer places the `../` parent row after the folder contents, including the empty-folder and error views, and removes its Back to Home button. The existing remote Back handler remains responsible for leaving the USB browser from the drive list, and Left navigates to the parent from folder context. Initial focus scrolls to and targets the first actionable folder or file, the parent row when a folder has no actionable entries, or the first available access, indexed-video, scan, or drive action. USB folder rows omit dot-prefixed directories, and immediate folder counts exclude those directories while continuing to count regular files.
+The USB explorer places the `../` parent row after the folder contents, including the empty-folder and error views, and removes its Back to Home button. The existing remote Back handler remains responsible for leaving the USB browser from the drive list, and Left navigates to the parent from folder context. Initial focus scrolls to and targets the first actionable folder or file, the parent row when a folder has no actionable entries, or the first available access, indexed-video, scan, or drive action. Explorer rows, immediate folder counts, and subtitle matching omit dot-prefixed entries; the synthetic `../` parent row remains visible.
 
 Verification record:
 
