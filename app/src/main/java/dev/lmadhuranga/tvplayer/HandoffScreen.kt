@@ -56,6 +56,7 @@ fun HandoffScreen(
     settingsRequester: FocusRequester,
     onVideoSubmitted: (SubmittedVideo) -> Unit,
     onBack: () -> Unit,
+    onAddUrl: () -> Unit,
     onGoToPlayer: () -> Unit,
     onOpenSettings: () -> Unit,
     onApprovalPending: (Boolean) -> Unit,
@@ -103,9 +104,22 @@ fun HandoffScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text("SEND TO TV", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
+                Spacer(Modifier.height(10.dp))
+                Text("Play something from your phone", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(9.dp))
+                Text(
+                    if (state.isRunning) "● Ready for a connection" else "● Connecting to your network",
+                    color = if (state.isRunning) Teal else Muted,
+                    fontSize = 16.sp,
+                )
                 Spacer(Modifier.height(14.dp))
-                Text("Scan to open the send page.", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(16.dp))
+                Text(
+                    "1  Connect your phone to the same Wi-Fi.\n2  Scan the QR code or enter the address below.\n3  Approve the connection on this TV.",
+                    color = Muted,
+                    fontSize = 17.sp,
+                    lineHeight = 26.sp,
+                )
+                Spacer(Modifier.height(14.dp))
                 state.address?.let { address ->
                     Text("Or open:", color = Muted, fontSize = 16.sp)
                     Text("http://$address:8765", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
@@ -187,10 +201,13 @@ fun HandoffScreen(
                         }
                     }
                 }
-                Spacer(Modifier.height(18.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Spacer(Modifier.height(12.dp))
+                Text("Your phone opens a private local-network page.", color = Muted, fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AppButton(onClick = onAddUrl) { Text("Enter URL") }
                     AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
-                    AppButton(onClick = onBack) { Text("Back") }
+                    AppButton(onClick = onBack) { Text("Home") }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text("Version ${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 12.sp)
