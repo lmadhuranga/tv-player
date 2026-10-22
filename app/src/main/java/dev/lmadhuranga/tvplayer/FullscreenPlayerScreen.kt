@@ -72,7 +72,7 @@ import java.util.Locale
 
 private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 
-private enum class OptionsFocusOrigin { HEADER, AUDIO }
+private enum class OptionsFocusOrigin { HEADER, AUDIO, BOTTOM }
 private enum class PlayerTransportGlyph { PREVIOUS, PLAY, PAUSE, NEXT }
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
@@ -97,12 +97,15 @@ fun FullscreenPlayerScreen(
     var consumedMediaKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenLeftKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
+    var consumedSkipBackwardKeyUp by remember { mutableStateOf(false) }
+    var consumedSkipForwardKeyUp by remember { mutableStateOf(false) }
     var interactionSerial by remember { mutableIntStateOf(0) }
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val optionsFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
+    val bottomOptionsFocus = remember { FocusRequester() }
     val optionsFirstFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val newLinkFocus = remember { FocusRequester() }
@@ -150,6 +153,7 @@ fun FullscreenPlayerScreen(
             when (optionsFocusOrigin) {
                 OptionsFocusOrigin.HEADER -> optionsFocus.requestFocus()
                 OptionsFocusOrigin.AUDIO -> audioFocus.requestFocus()
+                OptionsFocusOrigin.BOTTOM -> bottomOptionsFocus.requestFocus()
             }
             returningFromOptions = false
         }
@@ -227,6 +231,12 @@ fun FullscreenPlayerScreen(
         optionsOpen = true
     }
 
+    fun seekTenSeconds(deltaMs: Long) {
+        interacted { playback.seekBy(deltaMs) }
+        seekTimeLabelsVisible = true
+        seekTimeLabelSerial++
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -234,7 +244,30 @@ fun FullscreenPlayerScreen(
             .focusRequester(rootFocus)
             .focusProperties { canFocus = !controlsVisible }
             .onPreviewKeyEvent { event ->
-                if (event.key == Key.MediaPlayPause) {
+                val nativeKeyCode = event.nativeKeyEvent.keyCode
+                if (nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_REWIND ||
+                    nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD
+                ) {
+                    if (event.type == KeyEventType.KeyDown) {
+                        consumedSkipBackwardKeyUp = true
+                        if (event.nativeKeyEvent.repeatCount == 0 && state.title != null) seekTenSeconds(-10_000L)
+                        true
+                    } else if (event.type == KeyEventType.KeyUp && consumedSkipBackwardKeyUp) {
+                        consumedSkipBackwardKeyUp = false
+                        true
+                    } else false
+                } else if (nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ||
+                    nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD
+                ) {
+                    if (event.type == KeyEventType.KeyDown) {
+                        consumedSkipForwardKeyUp = true
+                        if (event.nativeKeyEvent.repeatCount == 0 && state.title != null) seekTenSeconds(10_000L)
+                        true
+                    } else if (event.type == KeyEventType.KeyUp && consumedSkipForwardKeyUp) {
+                        consumedSkipForwardKeyUp = false
+                        true
+                    } else false
+                } else if (event.key == Key.MediaPlayPause) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedMediaKeyUp = true
                         if (event.nativeKeyEvent.repeatCount == 0) {
@@ -478,24 +511,26 @@ fun FullscreenPlayerScreen(
                         enabled = state.title != null,
                         playFocus = playFocus,
                         modifier = Modifier.align(Alignment.Center),
-                        onSeekBackward = {
-                            interacted { playback.seekBy(-10_000L) }
-                            seekTimeLabelsVisible = true
-                            seekTimeLabelSerial++
-                        },
+                        onSeekBackward = { seekTenSeconds(-10_000L) },
                         onTogglePlayback = { interacted(playback::togglePlayPause) },
-                        onSeekForward = {
-                            interacted { playback.seekBy(10_000L) }
-                            seekTimeLabelsVisible = true
-                            seekTimeLabelSerial++
-                        },
+                        onSeekForward = { seekTenSeconds(10_000L) },
                     )
-                    PlayerCircleButton(
-                        onClick = { interacted(playback::cycleSpeed) },
-                        enabled = state.title != null,
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                            .semantics { contentDescription = "Playback speed: ${state.speed}×" },
-                    ) { Text("${state.speed}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        PlayerCircleButton(
+                            onClick = { interacted(playback::cycleSpeed) },
+                            enabled = state.title != null,
+                            modifier = Modifier.semantics { contentDescription = "Playback speed: ${state.speed}×" },
+                        ) { Text("${state.speed}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                        PlayerCircleButton(
+                            onClick = { interacted { openOptions(OptionsFocusOrigin.BOTTOM) } },
+                            modifier = Modifier.focusRequester(bottomOptionsFocus)
+                                .semantics { contentDescription = "Options" },
+                        ) { Text("⋯", fontSize = 28.sp, fontWeight = FontWeight.Bold) }
+                    }
                 }
             }
         }
@@ -792,8 +827,8 @@ private fun PlayerOptionsScreen(
                     }
                 }
             }
+            Text("VIDEO QUALITY", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
             if (state.videoVariantChoices.size > 1) {
-                Text("STREAM VARIANT", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
                 AppButton(onClick = playback::selectAutomaticVideoVariant) {
                     Text("${if (state.selectedVideoVariantKey == null) "✓ " else ""}Auto select")
                 }
@@ -802,6 +837,8 @@ private fun PlayerOptionsScreen(
                         Text("${if (choice.selected) "✓ " else ""}${choice.label}")
                     }
                 }
+            } else {
+                Text("No alternate quality available for this video", color = Muted, fontSize = 16.sp)
             }
             Spacer(Modifier.height(6.dp))
             AppButton(onClick = onClose) { Text("Back to video") }

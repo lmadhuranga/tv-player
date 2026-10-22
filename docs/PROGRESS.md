@@ -484,3 +484,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed successfully; `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 47: `47-player-skip-options-quality`
+
+Dedicated remote rewind/fast-forward and media skip-backward/skip-forward keys now seek by 10 seconds and show the transient elapsed/total labels. Hidden-control D-pad Left/Right remains at 30 seconds, and visible D-pad navigation remains in place. Added an ellipsis Options button beside playback speed at the bottom right while retaining the header gear; closing Options returns focus to the button that opened it. Player Options always shows VIDEO QUALITY: multiple variants retain Auto select and the available choices, while single/no-variant sources explain that no alternate quality is available.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date); `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.
