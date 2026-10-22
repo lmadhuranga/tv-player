@@ -654,3 +654,13 @@ Verification record:
 - Focused source checks verified concise labels, the dynamic IP:8765 URL, server messages, recent items, approval dialog, Settings and Back controls, and unchanged row/focus structure. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 64: `64-swap-fullscreen-time-labels`
+
+Swapped the fullscreen playback-controls time labels so total duration appears to the left of the progress bar and elapsed/current position appears to the right. Their accessibility descriptions move with the corresponding values. Progress calculation, seeking, and the hidden-controls progress strip are unchanged.
+
+Verification record:
+
+- Focused source checks confirmed total duration precedes the progress bar, elapsed time follows it, the accessibility descriptions match each displayed value, and seek/progress wiring and hidden-controls labels are unchanged. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- No TV contact, install, launch, or preview was performed.
