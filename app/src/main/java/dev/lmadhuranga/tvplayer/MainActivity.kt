@@ -459,6 +459,11 @@ private fun UsbVideoBrowserScreen(
     val listState = rememberLazyListState()
     var consumedParentKeyUp by remember { mutableStateOf(false) }
     val breadcrumb = if (root != null && directory != null) usbBreadcrumb(root, directory) else "USB drives"
+    val folderTitle = when {
+        root == null || directory == null -> "USB drives"
+        directory.canonicalFile == root.directory.canonicalFile -> "USB drive"
+        else -> directory.name
+    }
     TVBackground {
         Column(
             modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -478,21 +483,20 @@ private fun UsbVideoBrowserScreen(
                     else -> false
                 }
             },
-            verticalArrangement = Arrangement.Center,
         ) {
             Text("USB BROWSE", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
             Text(
-                breadcrumb,
+                folderTitle,
                 color = Color.White,
-                fontSize = 28.sp,
+                fontSize = 34.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                overflow = TextOverflow.StartEllipsis,
-                modifier = Modifier.fillMaxWidth().semantics { contentDescription = breadcrumb },
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(20.dp))
             Surface(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 shape = RoundedCornerShape(24.dp),
                 colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
             ) {
@@ -548,6 +552,16 @@ private fun UsbVideoBrowserScreen(
                     }
                 }
             }
+            Text(
+                breadcrumb,
+                color = Muted,
+                fontSize = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.StartEllipsis,
+                modifier = Modifier.fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 20.dp)
+                    .semantics { contentDescription = breadcrumb },
+            )
         }
     }
     LaunchedEffect(loading, error, roots.size, entries.size, root, directory) {
@@ -571,7 +585,7 @@ private fun usbBreadcrumb(root: UsbRoot, directory: java.io.File): String {
         ?.takeUnless { it == ".." || it.startsWith("..${java.io.File.separator}") }
         .orEmpty()
     val folders = relativePath.split(java.io.File.separatorChar).filter { it.isNotBlank() && it != "." }
-    return (listOf("USB") + folders).joinToString(" / ")
+    return (listOf("USB drive") + folders).joinToString(" > ")
 }
 
 private enum class ExplorerIcon { DRIVE, PARENT, FOLDER, VIDEO, FILE }
