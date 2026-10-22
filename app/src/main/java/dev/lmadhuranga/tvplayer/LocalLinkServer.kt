@@ -1,5 +1,6 @@
 package dev.lmadhuranga.tvplayer
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
@@ -64,6 +65,7 @@ private const val APPROVAL_RETRY_COOLDOWN_MS = 3_000L
 
 /** Foreground-only paired handoff. Link requests stay small; optional files stream to private cache. */
 class LocalLinkServer(
+    private val appContext: Context,
     private val cacheDirectory: File,
     private val onVideoSubmitted: (SubmittedVideo) -> Unit,
 ) {
@@ -83,6 +85,7 @@ class LocalLinkServer(
     private val uploadLock = Any()
     private val stagedUploads = mutableMapOf<UploadKind, StagedUpload>()
     private val inFlightUploads = mutableSetOf<File>()
+    private val fileManager = NetworkFileManager(appContext)
 
     private enum class UploadKind { VIDEO, SUBTITLE }
     private data class StagedUpload(val file: File, val name: String, val token: String)
@@ -266,8 +269,11 @@ class LocalLinkServer(
         }
 
         val method = request[0]
-        val path = request[1].substringBefore('?')
+        val target = request[1]
+        val path = target.substringBefore('?')
         if (method == "GET" && path == "/") return respond(socket.getOutputStream(), 200, "OK", LINK_ENTRY_PAGE, "text/html; charset=utf-8")
+        if (method == "GET" && path == "/files") return respond(socket.getOutputStream(), 200, "OK", FileManagerPage.html, "text/html; charset=utf-8")
+        if (path.startsWith("/api/files/")) return handleFileManagerRequest(socket, input, method, path, target, headers, listener, runId)
         if (method == "POST" && path == "/api/pair") {
             if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
             val requesterAddress = socket.inetAddress.hostAddress ?: "Unknown address"
@@ -358,6 +364,85 @@ class LocalLinkServer(
     private fun isAuthorized(token: String): Boolean {
         val expected = sessionToken.toByteArray(StandardCharsets.UTF_8)
         return expected.isNotEmpty() && MessageDigest.isEqual(expected, token.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    private fun handleFileManagerRequest(
+        socket: Socket,
+        input: BufferedInputStream,
+        method: String,
+        path: String,
+        target: String,
+        headers: Map<String, String>,
+        listener: ServerSocket,
+        runId: Long,
+    ) {
+        val output = socket.getOutputStream()
+        val token = headers["x-pairing-token"].orEmpty()
+        if (method == "GET") {
+            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "Open the file manager from this TV's local network")
+            if (!isAuthorized(token)) return respond(output, 401, "Unauthorized", "Request approval on the TV before managing files")
+            val query = try { parseQuery(target.substringAfter('?', "")) } catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid folder path") }
+            val body = try {
+                when (path) {
+                    "/api/files/roots" -> fileManager.rootsJson()
+                    "/api/files/list" -> fileManager.listJson(query["root"].orEmpty(), query["path"].orEmpty())
+                    else -> return respond(output, 404, "Not Found", "Not found")
+                }
+            } catch (error: Exception) {
+                return respond(output, 400, "Bad Request", error.message ?: "Could not read this location")
+            }
+            return respond(output, 200, "OK", body, "application/json; charset=utf-8")
+        }
+        if (method != "POST") return respond(output, 405, "Method Not Allowed", "Use GET or POST")
+        if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(output, 403, "Forbidden", "Open the file manager from this TV's local network")
+        if (!isAuthorized(token)) return respond(output, 401, "Unauthorized", "Request approval on the TV before managing files")
+        if (headers["transfer-encoding"] != null) return respond(output, 400, "Bad Request", "Chunked requests are not supported")
+        if (path == "/api/files/upload") {
+            val length = headers["content-length"]?.toLongOrNull() ?: return respond(output, 411, "Length Required", "File size is required")
+            if (length !in 1..NetworkFileManager.MAX_FILE_BYTES) return respond(output, 413, "Payload Too Large", "Files must be between 1 byte and 8 GiB")
+            if (!headers["content-type"].orEmpty().lowercase(Locale.ROOT).startsWith("application/octet-stream")) return respond(output, 415, "Unsupported Media Type", "Upload as a binary file")
+            val query = try { parseQuery(target.substringAfter('?', "")) } catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid destination") }
+            return try {
+                fileManager.upload(query["root"].orEmpty(), query["path"].orEmpty(), query["name"].orEmpty(), length, input) {
+                    isCurrent(listener, runId) && isAuthorized(token)
+                }
+                respond(output, 201, "Created", "File added")
+            } catch (error: Exception) {
+                val status = when (error) {
+                    is NetworkFileManager.FileExistsException -> 409 to "Conflict"
+                    is NetworkFileManager.InsufficientSpaceException -> 507 to "Insufficient Storage"
+                    else -> 400 to "Bad Request"
+                }
+                respond(output, status.first, status.second, error.message ?: "Upload failed")
+            }
+        }
+        val bodyLength = headers["content-length"]?.toIntOrNull() ?: return respond(output, 411, "Length Required", "Request size required")
+        if (bodyLength !in 1..4_096) return respond(output, 413, "Payload Too Large", "Request is too large")
+        val bytes = ByteArray(bodyLength)
+        var offset = 0
+        while (offset < bodyLength) {
+            val count = input.read(bytes, offset, bodyLength - offset)
+            if (count < 0) return respond(output, 400, "Bad Request", "Incomplete request")
+            offset += count
+        }
+        val json = try { JSONObject(String(bytes, StandardCharsets.UTF_8)) }
+        catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid request") }
+        return try {
+            when (path) {
+                "/api/files/create" -> fileManager.createFolder(json.optString("root"), json.optString("path"), json.optString("name"))
+                "/api/files/delete" -> fileManager.delete(json.optString("root"), json.optString("path"), json.optString("name"))
+                else -> return respond(output, 404, "Not Found", "Not found")
+            }
+            respond(output, 200, "OK", "Done")
+        } catch (error: Exception) {
+            val status = if (error is NetworkFileManager.FileExistsException) 409 to "Conflict" else 400 to "Bad Request"
+            respond(output, status.first, status.second, error.message ?: "Could not update this location")
+        }
+    }
+
+    private fun parseQuery(query: String): Map<String, String> = query.split('&').filter(String::isNotEmpty).associate { item ->
+        java.net.URLDecoder.decode(item.substringBefore('='), "UTF-8") to
+            java.net.URLDecoder.decode(item.substringAfter('=', ""), "UTF-8")
     }
 
     private fun effectiveUploadLimit(kind: UploadKind): Long {
@@ -732,7 +817,7 @@ class LocalLinkServer(
             @media(max-width:380px){body{padding-left:10px;padding-right:10px}main{padding:14px;border-radius:14px}.choice{padding:12px}.mode-options{max-width:none}.url-row{grid-template-columns:minmax(0,1fr) auto}.url-row input{grid-column:1/-1;grid-row:1}.url-row button{width:100%}}
             @media(min-width:800px){body{display:grid;align-items:center}main{padding:30px}}
             </style>
-            <main><h1>Send to your TV</h1>
+            <main><h1>Send to your TV</h1><a class="file-manager-link" style="display:block;margin:-8px 0 16px;color:#b9c8d9" href="/files">Open File Manager</a>
             <section class="choice"><strong>Video</strong><fieldset class="mode"><legend>Video source</legend><div class="mode-options" role="group" aria-label="Video input mode" data-mode-group="videoMode"><button class="mode-button" type="button" data-mode="url" aria-pressed="true">URL</button><button class="mode-button" type="button" data-mode="file" aria-pressed="false">File</button></div></fieldset><div id="videoUrlMode"><label for="video">Video URL</label><div class="url-row"><input id="video" type="url" autocomplete="url" maxlength="4096" placeholder="https://example.com/video.mp4"><button type="button" data-clear-url="video">Clear</button><button type="button" data-paste-url="video">Paste</button></div><button id="videoHistoryToggle" class="history-toggle" type="button" aria-expanded="false" aria-controls="videoHistory">Recent links</button><div id="videoHistory" class="history-list" aria-live="polite" hidden></div></div><div id="videoFileMode" hidden><label for="videoFile">Video file</label><input id="videoFile" class="file-input" type="file" accept=".mp4,.m4v,.mov,.3gp,.mkv,.webm,.ts,.m2ts,.mpg,.mpeg" disabled><button class="dropzone" type="button" data-dropzone="video" aria-controls="videoFile"><strong>Tap to choose a video</strong><small>or drop an MP4, MOV, MKV, WebM, TS, MPG, or MPEG file</small></button><div class="file-actions"><small id="videoFileName">No video selected</small><button class="file-clear" type="button" data-clear-file="video">Clear</button></div></div><small id="videoLimit"></small></section>
             <button id="subtitleToggle" type="button" aria-expanded="false" aria-controls="subtitleSection">Add subtitle</button>
             <section id="subtitleSection" class="choice" hidden aria-labelledby="subtitleHeading"><strong id="subtitleHeading">Subtitle</strong><fieldset class="mode"><legend>Subtitle source</legend><div class="mode-options" role="group" aria-label="Subtitle input mode" data-mode-group="subtitleMode"><button class="mode-button" type="button" data-mode="url" aria-pressed="true" disabled>URL</button><button class="mode-button" type="button" data-mode="file" aria-pressed="false" disabled>File</button></div></fieldset><div id="subtitleUrlMode"><label for="subtitle">Subtitle URL</label><div class="url-row"><input id="subtitle" type="url" maxlength="4096" placeholder="https://example.com/subtitles.srt" disabled><button type="button" data-clear-url="subtitle" disabled>Clear</button><button type="button" data-paste-url="subtitle" disabled>Paste</button></div><strong class="history-heading">Recent subtitle links</strong><div id="subtitleHistory" class="history-list" aria-live="polite"></div></div><div id="subtitleFileMode" hidden><label for="subtitleFile">Subtitle file</label><input id="subtitleFile" class="file-input" type="file" accept=".srt,.vtt" disabled><button class="dropzone" type="button" data-dropzone="subtitle" aria-controls="subtitleFile"><strong>Tap to choose a subtitle</strong><small>or drop an SRT or WebVTT file</small></button><div class="file-actions"><small id="subtitleFileName">No subtitle selected</small><button class="file-clear" type="button" data-clear-file="subtitle">Clear</button></div></div><small>SRT or WebVTT · Max 8 MiB</small></section>

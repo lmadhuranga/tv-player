@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -61,7 +62,8 @@ fun HandoffScreen(
     onReplay: (HistoryEntry) -> Unit,
 ) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
-    val server = remember { LocalLinkServer(cacheDirectory) { latestCallback(it) } }
+    val appContext = LocalContext.current.applicationContext
+    val server = remember { LocalLinkServer(appContext, cacheDirectory) { latestCallback(it) } }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val denyRequester = remember { FocusRequester() }
@@ -210,7 +212,7 @@ fun HandoffScreen(
                 ) {
                     Text("APPROVE PHONE CONNECTION?", color = Teal, fontSize = 15.sp, letterSpacing = 2.sp)
                     Text(
-                        "${state.requesterDevice ?: "A browser"} at ${state.requesterAddress ?: "an unknown address"} wants to connect and send media.",
+                        "${state.requesterDevice ?: "A browser"} at ${state.requesterAddress ?: "an unknown address"} wants to connect, send media, and manage files on accessible storage.",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Medium,

@@ -199,6 +199,12 @@ private fun TVPlayerApp(
             usbError = "Video access was not allowed. Folder and subtitle browsing needs full storage access."
         }
     }
+    val legacyStoragePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.all { it }) loadUsbRoots() else {
+            route = AppRoute.USB_BROWSER
+            usbError = "Storage access was not allowed. File management needs read and write access on Android 8 and 9."
+        }
+    }
     val allFilesSettingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) loadUsbRoots()
         else {
@@ -215,11 +221,12 @@ private fun TVPlayerApp(
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             route = AppRoute.USB_BROWSER
             usbError = "Folder browsing on Android 10 is not available on this TV."
-        } else if (context.checkSelfPermission(usbPermission) == PackageManager.PERMISSION_GRANTED) {
+        } else if (context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
             loadUsbRoots()
         } else {
             route = AppRoute.USB_BROWSER
-            usbPermissionLauncher.launch(usbPermission)
+            legacyStoragePermissionLauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE))
         }
     }
     fun requestUsbStorageAccess() {

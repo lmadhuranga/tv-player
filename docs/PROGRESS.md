@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `81-usb-explorer-list-design` (debug build and lint passed; no TV validation)
-- Current branch: `81-usb-explorer-list-design`
+- Implemented through milestone: `87-network-file-manager` (unit tests, debug build, and lint passed; browser visual and TV validation pending)
+- Current branch: `87-network-file-manager`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -875,3 +875,15 @@ Verification record:
 - [x] `./gradlew :app:assembleDebug --console=plain` passed (39 actionable tasks; 4 executed, 35 up-to-date).
 - [ ] USB navigation, focus, and hidden-directory behavior remain pending TV runtime verification.
 - No TV contact, installation, or runtime verification was performed.
+
+## Milestone 87: `87-network-file-manager`
+
+Added an “Open File Manager” link to the existing same-network handoff page and a responsive dark browser page with a storage/folder tree, back/up/refresh controls, breadcrumbs, grid/list views, item counts, known file sizes, and destination free space. Browsing and file writes use the existing TV-approved browser token, and the TV approval prompt clearly includes storage management. Reads reject a supplied cross-origin Origin; every write requires the exact local origin and active token. Server-side roots are rediscovered from mounted removable volumes and the public Movies folder. Requests use root IDs and relative paths; canonical containment, hidden/reserved-name filtering, symlink rejection (including links targeting another location inside the same root), mount revalidation, and write-permission checks protect the storage boundary. Uploads stream up to 8 GiB to same-directory temporary files, preserve a 16 MiB reserve, reject overwrites, sync before a no-replace move, report progress, and clean incomplete files on interruption or cancellation. Before a new upload, only files matching the app-generated temporary filename pattern are removed; concurrent uploads and symlinks are skipped. The browser supports creating folders and deleting selected files or empty folders after naming the selected item in a confirmation. No rename, move, download, or folder-upload action is exposed.
+
+When Android's all-files permission is unavailable on Android 11+, removable drives are omitted and the browser reports the access requirement. Android 8 and 9 request both read and write storage permissions for browsing; Android 10 remains read-only because scoped storage blocks these direct writes. Public Movies is shown only when it is readable, and each destination is checked again during operations.
+
+Verification record:
+
+- [x] `./gradlew :app:testDebugUnitTest` passed after adding symlink and cancelled-upload regression cases.
+- [ ] Final `:app:assembleDebug`, `:app:lintDebug`, embedded JavaScript `node --check`, and `git diff --check` are pending after feature 88 integration.
+- [ ] Browser screenshot/interaction verification remains pending because the sandbox refused the local mock server bind and the shared Playwright browser profile was locked; no TV contact, install, or runtime verification was performed.

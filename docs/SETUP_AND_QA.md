@@ -150,3 +150,14 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] With player controls visible, confirm the top-right receive rate updates about once per second in KB/s or MB/s. Hide controls and confirm both the rate label and sampling stop; background the app and confirm sampling pauses and resumes with a fresh baseline.
 - [ ] Confirm the header has no Options button and the bottom-row Options button still opens settings and restores focus on close.
 - [ ] Run `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`, and `git diff --check`; physical BRAVIA validation remains separate.
+
+### Milestone 87 network file manager
+
+- [ ] Pair from the existing handoff page, open File Manager, and confirm removable roots and the accessible public Movies folder appear with honest read-only/free-space status.
+- [ ] Browse nested folders from the tree, breadcrumb, grid, and list views; confirm dot entries, reserved Android/data/obb paths, and all symlinks stay unavailable.
+- [ ] Upload a small file and a larger file; observe progress and cancel an in-flight transfer. Confirm partial temporary files are removed, low-space requests fail safely, and existing files are never overwritten.
+- [ ] Create a folder; delete a file and an empty folder after the exact-name confirmation; confirm a non-empty folder is rejected and its contents remain.
+- [ ] Verify unpaired or expired tokens cannot list or mutate, supplied cross-origin GETs are rejected, and cross-origin or tokenless POSTs are rejected.
+- [x] `:app:testDebugUnitTest` passed with traversal, symlink, overwrite, partial cleanup, cancellation, stale temporary cleanup, and non-empty-folder checks.
+- [ ] Final `:app:assembleDebug`, `:app:lintDebug`, embedded JavaScript `node --check`, and `git diff --check` are pending after feature 88 integration.
+- [ ] Browser visual QA is pending: the sandbox denied binding the local mock fixture port, and the shared Playwright browser profile was locked by another session. No TV access was attempted.
