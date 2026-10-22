@@ -109,6 +109,7 @@ class UsbVideoRepository(private val context: Context) {
         (safeDirectory.listFiles() ?: throw IllegalStateException("Could not read the contents of this USB folder."))
             .asSequence()
             .filter { it.isDirectory || it.isFile }
+            .filterNot { it.isDirectory && it.name.startsWith('.') }
             .map { file ->
                 val isDirectory = file.isDirectory
                 val childCounts = if (isDirectory) file.childCounts() else null
@@ -151,11 +152,11 @@ class UsbVideoRepository(private val context: Context) {
         return UsbRoot(directory.name.ifBlank { getDescription(context) }, directory, childCounts?.first, childCounts?.second)
     }
 
-    /** Counts immediate visible and hidden children only. Null means the directory could not be read. */
+    /** Counts immediate visible folders and regular files. Null means the directory could not be read. */
     private fun File.childCounts(): Pair<Int, Int>? {
         if (!isDirectory || !canRead()) return null
         val children = listFiles() ?: return null
-        return children.count { it.isDirectory } to children.count { it.isFile }
+        return children.count { it.isDirectory && !it.name.startsWith('.') } to children.count { it.isFile }
     }
 
     private fun Cursor.toIndexedVideo(collection: Uri, hasRelativePath: Boolean): UsbIndexedVideo {

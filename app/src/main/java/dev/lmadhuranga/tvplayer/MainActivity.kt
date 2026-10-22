@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -44,6 +45,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -321,7 +323,6 @@ private fun TVPlayerApp(
                 } else loadIndexedUsbVideos()
             },
             onRetry = ::browseUsb,
-            onBack = { route = AppRoute.HOME },
         )
 
         AppRoute.USB_SUBTITLES -> UsbSubtitleChoiceScreen(
@@ -445,9 +446,10 @@ private fun UsbVideoBrowserScreen(
     onShowIndexedVideos: () -> Unit,
     onIndexedVideo: (UsbIndexedVideo) -> Unit,
     onRetry: () -> Unit,
-    onBack: () -> Unit,
 ) {
     val firstEntryRequester = remember { FocusRequester() }
+    val firstActionableEntry = entries.firstOrNull { it.isDirectory || it.canPlay }
+    val listState = rememberLazyListState()
     TVBackground {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -462,6 +464,7 @@ private fun UsbVideoBrowserScreen(
                 colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
             ) {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
@@ -469,22 +472,20 @@ private fun UsbVideoBrowserScreen(
                         loading -> item { Text("Scanning mounted USB drives…", color = Muted, fontSize = 20.sp) }
                         error != null -> {
                             item { Text(error, color = Muted, fontSize = 20.sp) }
-                            if (root != null && directory != null) {
-                                item {
-                                    UsbExplorerRow("..", if (directory.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester))
-                                }
-                            }
                             if (needsStorageAccess) item {
                                 AppButton(onClick = onRequestAccess, modifier = Modifier.focusRequester(firstEntryRequester)) { Text("Allow USB folder access") }
                             }
                             if (needsStorageAccess || indexedVideos.isEmpty()) item {
-                                AppButton(onClick = onShowIndexedVideos, modifier = if (!needsStorageAccess) Modifier.focusRequester(firstEntryRequester) else Modifier) { Text("Show indexed videos") }
+                                AppButton(onClick = onShowIndexedVideos, modifier = if (!needsStorageAccess && indexedVideos.isEmpty()) Modifier.focusRequester(firstEntryRequester) else Modifier) { Text("Show indexed videos") }
                             }
                             item {
-                                AppButton(onClick = onRetry, modifier = if (root == null && !needsStorageAccess && indexedVideos.isNotEmpty()) Modifier.focusRequester(firstEntryRequester) else Modifier) { Text("Scan USB drives") }
+                                AppButton(onClick = onRetry, modifier = if (!needsStorageAccess && !indexedVideos.isEmpty()) Modifier.focusRequester(firstEntryRequester) else Modifier) { Text("Scan USB drives") }
                             }
                             items(indexedVideos, key = { it.uri.toString() }) { video ->
                                 UsbExplorerRow(video.name, video.sizeBytes?.let { "${video.folder} · ${formatFileSize(it)}" } ?: video.folder, ExplorerIcon.VIDEO, onClick = { onIndexedVideo(video) })
+                            }
+                            if (root != null && directory != null) item {
+                                UsbExplorerRow("../", if (directory.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent)
                             }
                         }
                         root == null -> {
@@ -493,9 +494,6 @@ private fun UsbVideoBrowserScreen(
                             }
                         }
                         else -> {
-                            item {
-                                UsbExplorerRow("..", if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester))
-                            }
                             if (entries.isEmpty()) item { Text("This folder is empty.", color = Muted, fontSize = 18.sp, modifier = Modifier.padding(12.dp)) }
                             items(entries, key = { it.file.path }) { entry ->
                                 val description = if (entry.isDirectory) folderCountsLabel(entry.folderCount, entry.fileCount)
@@ -507,20 +505,30 @@ private fun UsbVideoBrowserScreen(
                                     enabled = entry.isDirectory || entry.canPlay,
                                     trailingChevron = entry.isDirectory,
                                     onClick = { if (entry.isDirectory) onOpenFolder(entry) else if (entry.canPlay) onChooseVideo(entry) },
+                                    modifier = if (entry == firstActionableEntry) Modifier.focusRequester(firstEntryRequester) else Modifier,
                                 )
                             }
+                            item {
+                                UsbExplorerRow("../", if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder", ExplorerIcon.PARENT, onClick = onParent, modifier = if (entries.none { it.isDirectory || it.canPlay }) Modifier.focusRequester(firstEntryRequester) else Modifier)
+                            }
                         }
-                    }
-                    item {
-                        Spacer(Modifier.height(12.dp))
-                        AppButton(onClick = onBack) { Text("Back to Home") }
                     }
                 }
             }
         }
     }
-    LaunchedEffect(loading, error, roots.size, entries.size, root) {
-        if (!loading && (root != null || roots.isNotEmpty() || error != null)) firstEntryRequester.requestFocus()
+    LaunchedEffect(loading, error, roots.size, entries.size, root, directory) {
+        if (!loading && (root != null || roots.isNotEmpty() || error != null)) {
+            val focusIndex = when {
+                error != null -> 1
+                root == null -> 0
+                firstActionableEntry != null -> entries.indexOf(firstActionableEntry)
+                else -> entries.size + if (entries.isEmpty()) 1 else 0
+            }
+            listState.scrollToItem(focusIndex)
+            withFrameNanos { }
+            firstEntryRequester.requestFocus()
+        }
     }
 }
 
