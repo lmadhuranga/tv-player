@@ -727,6 +727,12 @@ private fun HomeScreen(
     onOpenSettings: () -> Unit,
     onReplay: (HistoryEntry) -> Unit,
 ) {
+    val sendToTvRequester = remember { FocusRequester() }
+    // Select Send to TV whenever the Home route is entered from another screen.
+    // This runs only when Home is newly composed, so closing Settings can restore
+    // focus to the Settings button without this request overriding it.
+    LaunchedEffect(Unit) { sendToTvRequester.requestFocus() }
+
     TVBackground {
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -762,6 +768,7 @@ private fun HomeScreen(
                         label = "Send to TV",
                         icon = R.drawable.ic_home_send,
                         onClick = onSendToTv,
+                        modifier = Modifier.focusRequester(sendToTvRequester),
                     )
                     HomeMenuButton(
                         label = "Settings",
