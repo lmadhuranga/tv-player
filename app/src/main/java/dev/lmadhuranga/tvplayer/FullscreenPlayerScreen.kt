@@ -67,6 +67,8 @@ import java.util.Locale
 
 private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 
+private enum class OptionsFocusOrigin { HEADER, AUDIO, CONTROLLER }
+
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 @Composable
 fun FullscreenPlayerScreen(
@@ -81,7 +83,7 @@ fun FullscreenPlayerScreen(
     val state by playback.state.collectAsState()
     var controlsVisible by remember { mutableStateOf(true) }
     var optionsOpen by remember { mutableStateOf(false) }
-    var optionsOpenedFromAudio by remember { mutableStateOf(false) }
+    var optionsFocusOrigin by remember { mutableStateOf(OptionsFocusOrigin.HEADER) }
     var returningFromOptions by remember { mutableStateOf(false) }
     var consumedDownKeyUp by remember { mutableStateOf(false) }
     var consumedMediaKeyUp by remember { mutableStateOf(false) }
@@ -92,6 +94,7 @@ fun FullscreenPlayerScreen(
     val playFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
     val optionsFocus = remember { FocusRequester() }
+    val controllerOptionsFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
     val optionsFirstFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
@@ -137,7 +140,11 @@ fun FullscreenPlayerScreen(
         if (optionsOpen) {
             optionsFirstFocus.requestFocus()
         } else if (returningFromOptions) {
-            if (optionsOpenedFromAudio) audioFocus.requestFocus() else optionsFocus.requestFocus()
+            when (optionsFocusOrigin) {
+                OptionsFocusOrigin.HEADER -> optionsFocus.requestFocus()
+                OptionsFocusOrigin.AUDIO -> audioFocus.requestFocus()
+                OptionsFocusOrigin.CONTROLLER -> controllerOptionsFocus.requestFocus()
+            }
             returningFromOptions = false
         }
     }
@@ -198,8 +205,8 @@ fun FullscreenPlayerScreen(
         action()
     }
 
-    fun openOptions(fromAudioButton: Boolean = false) {
-        optionsOpenedFromAudio = fromAudioButton
+    fun openOptions(origin: OptionsFocusOrigin) {
+        optionsFocusOrigin = origin
         optionsOpen = true
     }
 
@@ -389,7 +396,7 @@ fun FullscreenPlayerScreen(
                         )
                     }
                     PlayerCircleButton(
-                        onClick = { interacted { openOptions() } },
+                        onClick = { interacted { openOptions(OptionsFocusOrigin.HEADER) } },
                         modifier = Modifier.focusRequester(optionsFocus).semantics { contentDescription = "Player options" },
                     ) { Text("⚙", fontSize = 22.sp) }
                 }
@@ -429,7 +436,7 @@ fun FullscreenPlayerScreen(
                         audioFocus = audioFocus,
                         modifier = Modifier.align(Alignment.CenterStart),
                         onToggleSubtitles = { interacted(playback::toggleSubtitles) },
-                        onOpenAudio = { interacted { openOptions(fromAudioButton = true) } },
+                        onOpenAudio = { interacted { openOptions(OptionsFocusOrigin.AUDIO) } },
                     )
                     TransportControls(
                         isPlaying = state.isPlaying,
@@ -451,8 +458,8 @@ fun FullscreenPlayerScreen(
                             modifier = Modifier.semantics { contentDescription = "Playback speed: ${state.speed}×" },
                         ) { Text("${state.speed}×", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
                         PlayerCircleButton(
-                            onClick = { interacted { openOptions() } },
-                            modifier = Modifier.focusRequester(optionsFocus).semantics { contentDescription = "Player options" },
+                            onClick = { interacted { openOptions(OptionsFocusOrigin.CONTROLLER) } },
+                            modifier = Modifier.focusRequester(controllerOptionsFocus).semantics { contentDescription = "Player options" },
                             diameter = 50.dp,
                         ) { Text("•••", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
                     }
