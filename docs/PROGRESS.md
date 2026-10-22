@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `24-phone-url-history` (source implementation; local build/lint recorded below, TV not contacted)
-- Current branch: `24-phone-url-history`
+- Implemented through milestone: `25-phone-mode-buttons` (source implementation; local build/lint and install/launch recorded below; browser behavior under test)
+- Current branch: `25-phone-mode-buttons`
 - Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
 - The milestone 19 debug APK was installed and launched on the authorized Sony BRAVIA VU3 (Android API 34). No D-pad input, visual inspection, playback, subtitle, pairing, Settings reopen, or other functional runtime QA was performed.
 
@@ -48,6 +48,7 @@
 | 22 | `22-buffering-choice` | `54acfe2` |
 | 23 | `23-phone-input-mode` | branch HEAD (`git rev-parse 23-phone-input-mode`) |
 | 24 | `24-phone-url-history` | branch HEAD (`git rev-parse 24-phone-url-history`) |
+| 25 | `25-phone-mode-buttons` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -226,7 +227,7 @@ Verification record:
 
 ## Current execution boundary
 
-Milestones 2–23 are committed on separate local branches, stacked sequentially. Milestone 21 was built, linted, installed, and launched on the approved BRAVIA; read-only Origin regression requests passed. Phone-browser upload and other behavioral/runtime QA remain pending. Milestones 22–24 have not been installed or launched; the TV was not contacted for these milestones. Optional Seedr discovery remains deferred.
+Milestones 2–24 are committed on separate local branches, stacked sequentially. The milestone 25 APK includes the preceding source and has been installed and launched on the approved BRAVIA; the Activity remained top-resumed. Phone-browser controls are being checked separately; media playback/history restoration, upload, subtitle rendering, D-pad, and buffering behavior remain unverified. Optional Seedr discovery remains deferred.
 
 ## Milestone 21: `21-limits-origin-fix`
 
@@ -269,3 +270,14 @@ Verification record:
 - With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks); lint passed with 0 errors and 25 warnings.
 - Debug APK: `app/build/outputs/apk/debug/app-debug.apk` (16 MiB).
 - No TV connection, install, or launch was performed. Browser runtime, expiry, storage-denial, and no-auto-submit behavior remain unverified.
+
+## Milestone 25: `25-phone-mode-buttons`
+
+Replaced the paired phone page's URL/File radio inputs with two accessible button groups, one for video and one for subtitles. URL is selected by default in each group; the selected mode is visually white and unselected mode dark, with `aria-pressed` and group labels for assistive technology. The existing inactive-field hiding, disabling and clearing, URL-history restoration, and in-progress lock behavior now use these buttons. History still fills URL mode without submitting.
+
+Verification record:
+
+- `git diff --check` and the embedded page JavaScript `node --check` passed.
+- With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks).
+- The debug APK was installed with `adb install -r` on the verified Sony BRAVIA VU3 (Android API 34); `am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting`, the process remained alive, and `dumpsys activity activities` showed `MainActivity` top-resumed. The handoff page and QR became available after initial startup. A fresh PIN was generated for the lead's separate browser check.
+- The lead's separate browser check reported successful URL/URL submission, loaded limits and video/subtitle history buttons, unlocked controls, and no JavaScript errors. The TV fetched the synthetic 10-second silent WAV and SRT fixtures (both HTTP 200). The player showed the WAV filename, 0:10 duration, CC On, and no visible error; the captured image was at the end of the silent audio sample, so audible playback and subtitle cue rendering were not confirmed. Back returned to Handoff with QR/URL. Settings showed 1 minute initially; after selecting 2 minutes, closing/reopening Settings retained 2 minutes, and 1 minute was restored. The position-history toggle remained Off after an accidental toggle was immediately reverted. The new mode buttons still need explicit URL/File switching checks; no video image/codec playback was tested.

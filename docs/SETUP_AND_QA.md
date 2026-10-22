@@ -1,6 +1,6 @@
 # Local build and TV QA guide
 
-This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34). A read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. Milestones 22–24 are local-only builds; the TV was not contacted for them. No visual inspection, D-pad interaction, playback, phone-browser upload, local subtitle import, Settings reopen, Back routing, or other runtime QA was performed.
+This guide records completed local build/lint, install, and launch commands, plus checks still pending. The milestone 21 debug APK was installed and launched on a Sony BRAVIA VU3 (Android API 34); a read-only GET check returned 401 without Origin/token and 403 for a mismatched Origin. The milestone 25 APK was also built, installed, and launched on that TV; the handoff screen and QR became available after initial startup. Milestones 22–24 were not installed as separate APKs. No D-pad interaction, playback, phone-browser submission, local subtitle import, Settings reopen, Back routing, or other feature QA is claimed here.
 
 ## Local toolchain
 
@@ -28,7 +28,7 @@ TV_SERIAL="<authorized-device-id>"
 adb -s "$TV_SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`adb install -r` returned `Success` on `192.168.8.100:5555`, verified immediately beforehand as manufacturer Sony, model BRAVIA VU3, API 34. A read-only package check confirmed path `/data/app/.../dev.lmadhuranga.tvplayer.../base.apk`, versionCode 1 / versionName 0.1.0, minSdk 26, and targetSdk 36. `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. No D-pad input or visual inspection was performed. The APK manifest declares application ID `dev.lmadhuranga.tvplayer` and a Leanback launcher entry.
+`adb install -r` returned `Success` on `192.168.8.100:5555`, verified immediately beforehand as manufacturer Sony, model BRAVIA VU3, API 34. A read-only package check confirmed path `/data/app/.../dev.lmadhuranga.tvplayer.../base.apk`, versionCode 1 / versionName 0.1.0, minSdk 26, and targetSdk 36. `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. The milestone 25 install repeated this on the same verified device; the process was alive and `MainActivity` top-resumed. The handoff page and QR appeared in a read-only screen capture after initial startup. No D-pad input, phone-page control operation, or playback test was performed by this agent. The APK manifest declares application ID `dev.lmadhuranga.tvplayer` and a Leanback launcher entry.
 
 ## Release build and signing
 
@@ -70,11 +70,14 @@ Record each result, device model/software, network conditions, test source/conta
 - [ ] Enable local position history, resume a selected saved position, choose start over, clear history, disable history, restart the app, and verify that video/subtitle URLs are never persisted.
 - [ ] Review cleartext HTTP policy, LAN endpoint bounds/session checks, backup policy, permissions, cache cleanup, release shrinking, and signing setup.
 - [ ] In Settings, choose each 1-, 2-, and 5-minute maximum buffer, restart the app to confirm persistence, and verify the selected maximum applies to the next video only. Confirm a new video still starts after the existing 2.5-second threshold, rebuffer behavior remains 5 seconds, and actual buffer may be shorter because of the 64 MiB target-buffer byte estimate, memory availability, or stream characteristics.
+- [x] On the milestone 25 install, Settings initially showed 1 minute; selecting 2 minutes, closing/reopening Settings, and seeing 2 minutes remain selected verified persistence across the Settings screen lifecycle. The one-minute default was restored. App-process restart and actual next-video buffering duration remain unverified.
 - [x] Milestone 13 debug APK install on Sony BRAVIA VU3 and package metadata verification; the app was not launched.
 - [x] Install and launch the milestone 21 APK on the Sony BRAVIA (install and Activity start command only; visual/runtime behavior unverified).
 - [ ] Milestone 22 was built/linted locally; no install, launch, or TV contact was performed for this version. Manual Settings persistence and buffering behavior remain pending.
 - [ ] Milestone 23 phone-page mode selectors were built/linted locally; no install, launch, or TV contact was performed for this version. Browser mode switching, submission combinations, and stale-upload behavior remain pending.
 - [ ] Milestone 24 browser-local URL history was built/linted locally; no install, launch, or TV contact was performed for this version. LocalStorage TTL, clear, safe labels, selection, and no-auto-submit behavior remain pending.
+- [x] Milestone 25 button-selector APK built/linted, installed, and launched; MainActivity remained top-resumed and the handoff QR appeared. The lead reported successful URL/URL form submission with no JavaScript errors; the TV fetched both synthetic WAV and SRT fixtures and the player showed the audio filename and 0:10 duration with CC On. Audible output and rendered subtitle cues were not confirmed.
+- [ ] Explicitly switch the new phone-page buttons between URL and File for both media types; confirm visible selected state, `aria-pressed`, inactive clearing, send-time lock, and that selecting history fills URL mode without submitting.
 - [ ] Confirm fullscreen video extends under hidden system bars, the player canvas/shutter and Fit letterboxes are black without cropping/stretching, and bars restore after leaving the player.
 - [ ] Confirm controls appear initially, hide after about four seconds of active playback, remain visible while paused/buffering/error/settings, and return when pressing Down with Play/Pause focused.
 - [ ] Focus the seek/time row and verify left/right seek in ten-second steps, focus remains visible, and time/progress updates.
