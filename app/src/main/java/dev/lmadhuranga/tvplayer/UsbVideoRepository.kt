@@ -14,15 +14,22 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class UsbRoot(val name: String, val directory: File)
+data class UsbRoot(
+    val name: String,
+    val directory: File,
+    val folderCount: Int?,
+    val fileCount: Int?,
+)
 
-data class UsbIndexedVideo(val uri: Uri, val name: String, val folder: String, val sizeBytes: Long)
+data class UsbIndexedVideo(val uri: Uri, val name: String, val folder: String, val sizeBytes: Long?)
 
 data class UsbEntry(
     val name: String,
     val file: File,
     val isDirectory: Boolean,
-    val sizeBytes: Long,
+    val sizeBytes: Long?,
+    val folderCount: Int? = null,
+    val fileCount: Int? = null,
 ) {
     val typeLabel: String
         get() = when {
@@ -80,7 +87,7 @@ class UsbVideoRepository(private val context: Context) {
                 }
             }
         }
-        videos
+        videos.filterNot { it.name.startsWith('.') }
     }
 
     suspend fun listRoots(): List<UsbRoot> = withContext(Dispatchers.IO) {
@@ -102,7 +109,19 @@ class UsbVideoRepository(private val context: Context) {
         (safeDirectory.listFiles() ?: throw IllegalStateException("Could not read the contents of this USB folder."))
             .asSequence()
             .filter { it.isDirectory || it.isFile }
-            .map { file -> UsbEntry(file.name, file, file.isDirectory, if (file.isFile) file.length().coerceAtLeast(0L) else 0L) }
+            .filterNot { it.name.startsWith('.') }
+            .map { file ->
+                val isDirectory = file.isDirectory
+                val childCounts = if (isDirectory) file.childCounts() else null
+                UsbEntry(
+                    file.name,
+                    file,
+                    isDirectory,
+                    fileSizeBytes(file),
+                    childCounts?.first,
+                    childCounts?.second,
+                )
+            }
             .sortedWith(compareBy<UsbEntry>({ !it.isDirectory }, { it.name.lowercase(Locale.ROOT) }))
             .toList()
     }
@@ -111,8 +130,8 @@ class UsbVideoRepository(private val context: Context) {
         require(!video.isDirectory && video.file.isFile && video.file.canRead()) { "This USB video is no longer available." }
         val siblings = video.file.parentFile?.listFiles().orEmpty()
         val subtitles = siblings.asSequence()
-            .filter { it.isFile && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
-            .map { UsbEntry(it.name, it, false, it.length().coerceAtLeast(0L)) }
+            .filter { it.isFile && !it.name.startsWith('.') && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
+            .map { UsbEntry(it.name, it, false, fileSizeBytes(it)) }
             .sortedBy { it.name.lowercase(Locale.ROOT) }
             .toList()
         val match = SubtitleMatcher.match(video.name, subtitles.map { it.name })
@@ -129,7 +148,16 @@ class UsbVideoRepository(private val context: Context) {
         } else {
             uuid?.let { File("/storage", it) }
         } ?: return null
-        return UsbRoot(directory.name.ifBlank { getDescription(context) }, directory)
+        val childCounts = directory.childCounts()
+        return UsbRoot(directory.name.ifBlank { getDescription(context) }, directory, childCounts?.first, childCounts?.second)
+    }
+
+    /** Counts immediate visible folders and regular files. Null means the directory could not be read. */
+    private fun File.childCounts(): Pair<Int, Int>? {
+        if (!isDirectory || !canRead()) return null
+        val children = listFiles() ?: return null
+        return children.count { !it.name.startsWith('.') && it.isDirectory } to
+            children.count { !it.name.startsWith('.') && it.isFile }
     }
 
     private fun Cursor.toIndexedVideo(collection: Uri, hasRelativePath: Boolean): UsbIndexedVideo {
@@ -139,9 +167,12 @@ class UsbVideoRepository(private val context: Context) {
         val rawPath = getString(getColumnIndexOrThrow(pathColumn)).orEmpty()
         val folder = if (hasRelativePath) rawPath.trim('/').ifBlank { "USB root" } else rawPath.substringBeforeLast('/', "USB root")
         val sizeIndex = getColumnIndex(MediaStore.Video.Media.SIZE)
-        val size = if (sizeIndex >= 0) getLong(sizeIndex).coerceAtLeast(0L) else 0L
+        val size = if (sizeIndex >= 0 && !isNull(sizeIndex)) getLong(sizeIndex).takeIf { it >= 0L } else null
         return UsbIndexedVideo(ContentUris.withAppendedId(collection, id), name, folder, size)
     }
+
+    private fun fileSizeBytes(file: File): Long? =
+        if (file.isFile && file.canRead()) file.length().takeIf { it >= 0L } else null
 
     private fun isSupportedMedia(extension: String, extensions: Set<String>): Boolean =
         extension.lowercase(Locale.ROOT) in extensions

@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `78-usb-all-folder-files` (local checks recorded below; no TV validation)
-- Current branch: `78-usb-all-folder-files`
+- Implemented through milestone: `81-usb-explorer-list-design` (debug build and lint passed; no TV validation)
+- Current branch: `81-usb-explorer-list-design`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -64,6 +64,9 @@
 | 72 | `72-home-recent-title-ellipsis` | pending local commit |
 | 77 | `77-playback-keep-awake` | branch HEAD (`git rev-parse 77-playback-keep-awake`) |
 | 78 | `78-usb-all-folder-files` | pending local commit |
+| 79 | `79-usb-folder-counts` | `54eee8c` |
+| 80 | `80-hide-unavailable-file-size` | `d1c6b46` |
+| 81 | `81-usb-explorer-list-design` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -791,3 +794,84 @@ Verification record:
 - [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 13 executed, 37 up-to-date). No TV runtime verification was performed.
 - [ ] TV browsing, D-pad focus, playback selection, and empty/read-error states verified manually.
 - No TV contact, installation, or runtime validation is implied.
+
+## Milestone 79: `79-usb-folder-counts`
+
+USB drive and directory rows now show immediate child directory/file counts, including hidden entries, with singular/plural labels. Counts are collected alongside the existing directory listing on IO dispatchers; unreadable directories show “Contents unavailable” instead of a false zero. File rows retain their type and size labels. Counts are not recursive.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 12 executed, 38 up-to-date).
+- [ ] Verify on the TV that counts match mixed folders, singular/plural labels read correctly, and unreadable folders report unavailable counts.
+- No TV contact, installation, or runtime verification was performed.
+
+## Milestone 80: `80-hide-unavailable-file-size`
+
+USB file rows now omit the size and its separator when size metadata is unavailable. Indexed MediaStore rows preserve missing or negative size values as unknown, while readable direct files retain real sizes, including zero-byte files. Known sub-megabyte sizes display in bytes or kilobytes. Folder and file counts and row type labels are unchanged.
+
+Verification record:
+
+- [x] `git diff --check` and `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 50 actionable tasks, 12 executed, 38 up-to-date).
+- [ ] TV runtime verification not performed.
+- No TV contact, installation, or runtime validation is implied.
+
+## Milestone 81: `81-usb-explorer-list-design`
+
+USB drives, parent navigation, folders, indexed videos, and direct file entries now use compact explorer rows rather than pill-shaped AppButtons. Rows use simple drawn folder, drive, video, file, and up icons, a single metadata line, and a trailing chevron for folders. Focus adds a restrained background and outline without changing row geometry or text size. Unsupported and subtitle files remain visible as subdued non-actionable rows. The browser uses a keyed `LazyColumn` so large folders are composed as needed; existing Back handling and the separate subtitle-choice screen are unchanged.
+
+Verification record:
+
+- [x] `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed (50 actionable tasks; 13 executed, 37 up-to-date).
+- [ ] D-pad focus, row activation, long-folder scrolling, and parent navigation remain pending TV runtime verification.
+- No TV contact, installation, or runtime validation was performed.
+
+## Milestone 82: `82-player-loading-network-speed`
+
+The fullscreen player now shows an animated “Loading...” pill whenever Media3 reports buffering, including while controls are visible. The receive-speed label uses the app UID's `TrafficStats` RX byte counter, samples about once per second, and formats bytes as KB/s or MB/s. Sampling runs only while media is loaded, controls are visible, and the Activity lifecycle is started; it resets to a fresh baseline after hidden/background periods. The header Options gear is removed, while the bottom-row Options entry continues to open settings and restore focus. Added focused unit coverage for throughput calculations, unsupported/reset samples, and byte-based formatting.
+
+Verification record:
+
+- [x] `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 17 executed, 38 up-to-date).
+- [ ] URL, browser-upload, USB buffering states, visible/hidden speed behavior, and bottom Options focus remain pending runtime verification.
+- No TV contact, installation, or runtime validation was performed for this change.
+
+## Milestone 83: `83-buffering-dots-only`
+
+The centered buffering indicator now displays only its existing animated dots. In the visible player controls, receive speed appears beside the resolution or other playback metadata instead of at the far right of the header. Buffering detection and the speed sampling/visibility rules are unchanged.
+
+Verification record:
+
+- [x] `git diff --check` passed.
+- [x] `./gradlew :app:assembleDebug --console=plain` passed.
+- [ ] Buffering indicator appearance remains pending TV runtime verification.
+- No TV contact, installation, or runtime verification was performed for this change.
+
+## Milestone 84: `84-explorer-text-contrast`
+
+USB explorer row names now use explicit white text when actionable and readable medium gray when disabled. Metadata keeps its existing muted color for enabled rows and uses a lighter gray for disabled rows, improving legibility over both normal and focused dark row backgrounds. Font sizes, focus highlight, row layout, and actions are unchanged.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (39 actionable tasks; 4 executed, 35 up-to-date).
+- [ ] TV runtime appearance pending manual verification; no TV contact, installation, or runtime validation performed.
+
+## Milestone 85: `85-player-timer-order`
+
+The visible player timeline now shows elapsed playback time on the left and total movie duration on the right, with matching accessibility descriptions. The hidden-controller seek row already used this order and remains unchanged. USB root and folder counts now list files before folders while preserving pluralization and unavailable-count handling.
+
+Verification record:
+
+- [x] `./gradlew :app:assembleDebug --console=plain` passed (39 actionable tasks; 4 executed, 35 up-to-date).
+- [x] `git diff --check` passed.
+- No TV contact, installation, or runtime validation performed.
+
+## Milestone 86: `86-usb-bottom-parent`
+
+The USB explorer shows a friendly `USB drive > …` breadcrumb in a fixed footer below the scrolling folder list, with the complete path preserved for accessibility when the visible line truncates. The header keeps the current folder title. The `../` parent row follows folder contents, including empty-folder and error views, and the Back to Home button is removed. The existing remote Back handler leaves the browser from the drive list, and Left navigates to the parent from folder context. Initial focus scrolls to and targets the first actionable folder or file, the parent row when a folder has no actionable entries, or the first available access, indexed-video, scan, or drive action. Explorer rows, immediate folder counts, and subtitle matching omit dot-prefixed entries; the synthetic `../` parent row remains visible.
+
+Verification record:
+
+- [x] `git diff --check` passed.
+- [x] `./gradlew :app:assembleDebug --console=plain` passed (39 actionable tasks; 4 executed, 35 up-to-date).
+- [ ] USB navigation, focus, and hidden-directory behavior remain pending TV runtime verification.
+- No TV contact, installation, or runtime verification was performed.
