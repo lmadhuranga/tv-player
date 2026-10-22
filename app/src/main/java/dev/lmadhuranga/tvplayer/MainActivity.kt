@@ -112,11 +112,17 @@ private fun TVPlayerApp(
 
     fun startVideo(url: String, subtitleUrl: String?) {
         val identity = HistoryRepository.mediaIdentity(url)
-        val candidates = recentEntries.filter { it.positionMs > 5_000L && it.mediaUrl?.let { savedUrl -> HistoryRepository.mediaIdentity(savedUrl) } == identity }
+        val sameVideo = identity?.let { mediaIdentity ->
+            recentEntries.firstOrNull { it.mediaUrl?.let(HistoryRepository::mediaIdentity) == mediaIdentity }
+        }
+        val playbackSubtitleUrl = subtitleUrl ?: sameVideo?.subtitleUrl
+        val candidates = if (identity == null) emptyList() else recentEntries.filter {
+            it.positionMs > 5_000L && it.mediaUrl?.let(HistoryRepository::mediaIdentity) == identity
+        }
         if (rememberPositions && identity != null && candidates.isNotEmpty()) {
-            pendingStart = PendingPlayback(url, subtitleUrl, candidates)
+            pendingStart = PendingPlayback(url, playbackSubtitleUrl, candidates)
         } else {
-            playback.playUrl(url, subtitleUrl)
+            playback.playUrl(url, playbackSubtitleUrl)
             route = AppRoute.PLAYER
         }
     }
@@ -135,7 +141,7 @@ private fun TVPlayerApp(
             onOpenSettings = { settingsOpen = true },
             onReplay = { entry ->
                 val url = entry.mediaUrl ?: return@HomeScreen
-                playback.playUrl(url, startPositionMs = entry.positionMs.takeIf { it > 5_000L } ?: 0L)
+                playback.playUrl(url, entry.subtitleUrl, entry.positionMs.takeIf { it > 5_000L } ?: 0L)
                 route = AppRoute.PLAYER
             },
         )
@@ -172,7 +178,7 @@ private fun TVPlayerApp(
             onApprovalPending = { pending -> if (pending) settingsOpen = false },
             onReplay = { entry ->
                 val url = entry.mediaUrl ?: return@HandoffScreen
-                playback.playUrl(url, startPositionMs = entry.positionMs.takeIf { it > 5_000L } ?: 0L)
+                playback.playUrl(url, entry.subtitleUrl, entry.positionMs.takeIf { it > 5_000L } ?: 0L)
                 route = AppRoute.PLAYER
             },
         )
@@ -332,7 +338,7 @@ private fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("PRIVACY & HISTORY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
-                Text("History saves direct video URLs on this device so you can replay them. Links may expire. App data backups may include these saved URLs. Subtitle URLs are never saved.", color = Muted, fontSize = 18.sp)
+                Text("History can save direct video and subtitle URLs on this device so you can replay them. Links may expire. App data backups may include these saved URLs.", color = Muted, fontSize = 18.sp)
                 AppButton(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
                     Text("Remember positions: ${if (rememberPositions) "On" else "Off"}")
                 }

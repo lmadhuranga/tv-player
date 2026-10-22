@@ -624,3 +624,13 @@ Verification record:
 - `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - ADB identified `192.168.8.100:5555` as Sony `BRAVIA VU3` (`BRAVIA_VU3_4K`), API 34. The latest debug APK installed successfully. `dumpsys activity activities` reported `dev.lmadhuranga.tvplayer/.MainActivity` as top-resumed and focused, and the app was left open.
 - No D-pad input, screenshot, playback, or visible history-row interaction was exercised. The list layout and replay interaction still need visual/runtime confirmation.
+
+## Milestone 61: `61-history-subtitle-url`
+
+Playback history now stores validated HTTP(S) subtitle URLs alongside replayable HTTP(S) video URLs. Older entries without `subtitleUrl` still decode with a null subtitle. History updates retain a prior subtitle when the same normalized video is played without a new subtitle URL; a newly provided valid URL replaces it. Home and QR/handoff history replay both restore the saved subtitle and position. Resume prompts only match a valid same-video identity, and a newly submitted subtitle URL remains pending through that prompt. Settings now explains that video and subtitle URLs can be stored and backed up and may expire. Clear History removes the containing records and subtitle metadata. Temporary uploaded subtitle files remain deleted after playback and are not persisted or replayable.
+
+Verification record:
+
+- Focused Python source assertions passed for legacy decoding, validated subtitle URL encode/decode, URL-only persistence, preservation/replacement on same-identity saves, Home and handoff replay arguments, same-identity resume matching, clear-history removal, and the privacy copy. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- ADB discovery found `192.168.8.100:5555` and verified `product:BRAVIA_VU3`, model `BRAVIA VU3`, device `BRAVIA_VU3_4K`, API 34. The debug APK installed successfully, `MainActivity` launched, and `dumpsys activity` reported it as `ResumedActivity`; the app was left open. Uploaded subtitle file replay and subtitle rendering were not exercised.

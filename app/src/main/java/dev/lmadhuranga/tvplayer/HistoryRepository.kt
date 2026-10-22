@@ -21,11 +21,12 @@ data class HistoryEntry(
     val durationMs: Long,
     val updatedAtMs: Long,
     val mediaUrl: String? = null,
+    val subtitleUrl: String? = null,
 )
 
 private val Context.historyDataStore by preferencesDataStore(name = "playback_history")
 
-/** Stores local labels, direct video links, and resume positions. Subtitle URLs are never persisted. */
+/** Stores local labels, direct video and subtitle links, and resume positions. */
 class HistoryRepository(private val context: Context) {
     private val enabledKey = booleanPreferencesKey("remember_positions")
     private val entriesKey = stringPreferencesKey("recent_positions")
@@ -43,12 +44,14 @@ class HistoryRepository(private val context: Context) {
     suspend fun save(entry: HistoryEntry) {
         context.historyDataStore.edit { prefs ->
             if (prefs[enabledKey] == false) return@edit
+            val previous = decode(prefs[entriesKey]).firstOrNull { it.id == entry.id || (entry.mediaUrl != null && it.mediaUrl?.let(::mediaIdentity) == mediaIdentity(entry.mediaUrl)) }
+            val saved = entry.copy(subtitleUrl = entry.subtitleUrl ?: previous?.subtitleUrl)
             val current = decode(prefs[entriesKey]).filterNot { it.id == entry.id || (entry.mediaUrl != null && it.mediaUrl?.let(::mediaIdentity) == mediaIdentity(entry.mediaUrl)) }
-            prefs[entriesKey] = encode((listOf(entry) + current).take(MAX_ENTRIES))
+            prefs[entriesKey] = encode((listOf(saved) + current).take(MAX_ENTRIES))
         }
     }
 
-    fun newEntry(title: String, host: String, url: String? = null): HistoryEntry {
+    fun newEntry(title: String, host: String, url: String? = null, subtitleUrl: String? = null): HistoryEntry {
         val replayUrl = url?.takeIf { mediaIdentity(it) != null }
         val identity = replayUrl?.let(::mediaIdentity)
         return HistoryEntry(
@@ -59,6 +62,7 @@ class HistoryRepository(private val context: Context) {
             durationMs = 0L,
             updatedAtMs = System.currentTimeMillis(),
             mediaUrl = replayUrl,
+            subtitleUrl = subtitleUrl?.takeIf { replayUrl != null && isValidHttpUrl(it) },
         )
     }
 
@@ -76,6 +80,7 @@ class HistoryRepository(private val context: Context) {
                 put("duration", entry.durationMs)
                 put("updated", entry.updatedAtMs)
                 entry.mediaUrl?.let { put("mediaUrl", it) }
+                entry.subtitleUrl?.let { put("subtitleUrl", it) }
             })
         }
     }.toString()
@@ -86,6 +91,7 @@ class HistoryRepository(private val context: Context) {
             val item = json.optJSONObject(index) ?: return@mapNotNull null
             val id = item.optString("id").takeIf(String::isNotBlank) ?: return@mapNotNull null
             val mediaUrl = item.optString("mediaUrl").takeIf { it.isNotBlank() && mediaIdentity(it) != null }
+            val subtitleUrl = item.optString("subtitleUrl").takeIf { it.isNotBlank() && isValidHttpUrl(it) }
             val title = item.optString("title", "Video").take(100)
             val host = item.optString("host").take(253)
             HistoryEntry(
@@ -96,6 +102,7 @@ class HistoryRepository(private val context: Context) {
                 durationMs = item.optLong("duration").coerceAtLeast(0),
                 updatedAtMs = item.optLong("updated").coerceAtLeast(0),
                 mediaUrl = mediaUrl,
+                subtitleUrl = subtitleUrl,
             )
         }.sortedByDescending(HistoryEntry::updatedAtMs).distinctBy { entry ->
             entry.mediaUrl?.let(::mediaIdentity) ?: "legacy:${entry.title.lowercase()}@${entry.sourceHost.lowercase()}"
@@ -117,6 +124,14 @@ class HistoryRepository(private val context: Context) {
                 val path = (uri.rawPath.orEmpty().ifBlank { "/" }).replace(Regex("/{2,}"), "/").let { if (it.length > 1) it.trimEnd('/') else it }
                 "$scheme://$host${if (port >= 0) ":$port" else ""}$path"
             } catch (_: Exception) { null }
+        }
+
+        internal fun isValidHttpUrl(url: String): Boolean {
+            if (url.length > 4096 || url != url.trim()) return false
+            return try {
+                val uri = URI(url)
+                uri.scheme?.lowercase() in setOf("http", "https") && !uri.host.isNullOrBlank()
+            } catch (_: Exception) { false }
         }
 
         private fun stableId(identity: String): String = "url:" + MessageDigest.getInstance("SHA-256")

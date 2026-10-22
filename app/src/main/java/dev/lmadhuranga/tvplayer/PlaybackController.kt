@@ -155,7 +155,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         val cleanTitle = titleOverride ?: videoFilenameFromUrl(url)
         val host = if (uploadedVideoFile != null) "Local upload" else Uri.parse(url).host.orEmpty()
         historyEntry = null
-        historyEntry = historyRepository.newEntry(cleanTitle, host, url)
+        historyEntry = historyRepository.newEntry(cleanTitle, host, url, subtitleUrl)
         saveHistoryNow()
         mutableState.value = PlaybackUiState(
             title = cleanTitle,
