@@ -116,6 +116,27 @@ class NetworkFileManagerTest {
         assertEquals("safe", target.readText())
     }
 
+    @Test fun videoAndImagePreviewStayInsideAllowedDrive() {
+        val folder = File(root, "Movies").apply { mkdir() }
+        File(folder, "holiday.mov").writeBytes(byteArrayOf(0, 1, 2, 3))
+        File(folder, "poster.png").writeBytes(byteArrayOf(7, 8, 9))
+        assertEquals("video/quicktime", manager.previewFile("usb-fixture", "Movies", "holiday.mov").mimeType)
+        assertEquals("image/png", manager.previewFile("usb-fixture", "Movies", "poster.png").mimeType)
+        assertRejected { manager.previewFile("usb-fixture", "Movies", "../../escape.mp4") }
+        assertRejected { manager.previewFile("usb-fixture", "Movies", "not-found.mp4") }
+        assertRejected { manager.previewFile("usb-fixture", "../", "poster.png") }
+    }
+
+    @Test fun previewRejectsHiddenUnsupportedAndSymlinkedFiles() {
+        File(root, ".secret.jpg").writeText("hidden")
+        File(root, "private.html").writeText("<script>alert(1)</script>")
+        val outside = File(sandbox, "outside.mp4").apply { writeText("external") }
+        Files.createSymbolicLink(File(root, "link.mp4").toPath(), outside.toPath())
+        assertRejected { manager.previewFile("usb-fixture", "", ".secret.jpg") }
+        assertRejected { manager.previewFile("usb-fixture", "", "private.html") }
+        assertRejected { manager.previewFile("usb-fixture", "", "link.mp4") }
+    }
+
     private fun assertRejected(action: () -> Unit) {
         try {
             action()
