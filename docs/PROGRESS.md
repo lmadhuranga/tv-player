@@ -382,3 +382,13 @@ Verification record:
 - Focused source assertions confirmed icon-only transport labels, exact ±30,000 ms seek callbacks, play/pause toggle wiring and state, and accessible descriptions. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or visual preview was performed. Android TV font rendering and on-device assistive-technology announcements remain unverified.
+
+## Milestone 36: `36-center-player-controls`
+
+Centered the rewind, play/pause, forward, and playback-speed controls across the fullscreen controller's available width. CC and optional Audio remain aligned at the left. At narrow widths the two groups stack, keeping the centered transport cluster clear of the left controls. Existing button actions, accessible descriptions, focus requester, icon-only labels, shared dark/white focus colors, and timeline position are retained.
+
+Verification record:
+
+- Focused source assertions confirmed the centered transport layout, narrow-width stacking, seek/toggle/speed actions, accessible descriptions, and unchanged timeline placement. `git diff --check` passed.
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, or visual preview was performed. Runtime focus behavior and visual spacing remain unverified on-device.

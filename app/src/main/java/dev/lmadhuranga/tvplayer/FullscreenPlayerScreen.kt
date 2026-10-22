@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -394,41 +395,53 @@ fun FullscreenPlayerScreen(
                     }
                 }
                 state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AppButton(
-                        onClick = { interacted(playback::toggleSubtitles) },
-                        enabled = state.subtitlesAvailable,
-                    ) { Text(if (state.subtitlesEnabled) "CC  On" else "CC  Off", fontSize = 16.sp) }
-                    if (state.audioChoices.size > 1) {
-                        AppButton(
-                            onClick = { interacted { openOptions(fromAudioButton = true) } },
-                            modifier = Modifier.focusRequester(audioFocus),
-                        ) { Text("Audio", fontSize = 16.sp) }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    AppButton(
-                        onClick = { interacted { playback.seekBy(-30_000L) } },
-                        enabled = state.title != null,
-                        modifier = Modifier.semantics { contentDescription = "Seek backward 30 seconds" },
-                    ) {
-                        Text("⏪︎", fontSize = 22.sp)
-                    }
-                    AppButton(
-                        onClick = { interacted(playback::togglePlayPause) },
-                        enabled = state.title != null,
-                        modifier = Modifier.focusRequester(playFocus).semantics {
-                            contentDescription = if (state.isPlaying) "Pause video" else "Play video"
-                        },
-                    ) { Text(if (state.isPlaying) "⏸︎" else "▶︎", fontSize = 22.sp) }
-                    AppButton(
-                        onClick = { interacted { playback.seekBy(30_000L) } },
-                        enabled = state.title != null,
-                        modifier = Modifier.semantics { contentDescription = "Seek forward 30 seconds" },
-                    ) {
-                        Text("⏩︎", fontSize = 22.sp)
-                    }
-                    AppButton(onClick = { interacted(playback::cycleSpeed) }, enabled = state.title != null) {
-                        Text("${state.speed}×", fontSize = 16.sp)
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    if (maxWidth < 720.dp) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SubtitleAudioControls(
+                                subtitlesEnabled = state.subtitlesEnabled,
+                                subtitlesAvailable = state.subtitlesAvailable,
+                                showAudio = state.audioChoices.size > 1,
+                                audioFocus = audioFocus,
+                                onToggleSubtitles = { interacted(playback::toggleSubtitles) },
+                                onOpenAudio = { interacted { openOptions(fromAudioButton = true) } },
+                            )
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                TransportControls(
+                                    isPlaying = state.isPlaying,
+                                    speed = state.speed,
+                                    enabled = state.title != null,
+                                    playFocus = playFocus,
+                                    onSeekBackward = { interacted { playback.seekBy(-30_000L) } },
+                                    onTogglePlayback = { interacted(playback::togglePlayPause) },
+                                    onSeekForward = { interacted { playback.seekBy(30_000L) } },
+                                    onCycleSpeed = { interacted(playback::cycleSpeed) },
+                                )
+                            }
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            SubtitleAudioControls(
+                                subtitlesEnabled = state.subtitlesEnabled,
+                                subtitlesAvailable = state.subtitlesAvailable,
+                                showAudio = state.audioChoices.size > 1,
+                                audioFocus = audioFocus,
+                                modifier = Modifier.align(Alignment.CenterStart),
+                                onToggleSubtitles = { interacted(playback::toggleSubtitles) },
+                                onOpenAudio = { interacted { openOptions(fromAudioButton = true) } },
+                            )
+                            TransportControls(
+                                isPlaying = state.isPlaying,
+                                speed = state.speed,
+                                enabled = state.title != null,
+                                playFocus = playFocus,
+                                modifier = Modifier.align(Alignment.Center),
+                                onSeekBackward = { interacted { playback.seekBy(-30_000L) } },
+                                onTogglePlayback = { interacted(playback::togglePlayPause) },
+                                onSeekForward = { interacted { playback.seekBy(30_000L) } },
+                                onCycleSpeed = { interacted(playback::cycleSpeed) },
+                            )
+                        }
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -444,6 +457,70 @@ fun FullscreenPlayerScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SubtitleAudioControls(
+    subtitlesEnabled: Boolean,
+    subtitlesAvailable: Boolean,
+    showAudio: Boolean,
+    audioFocus: FocusRequester,
+    modifier: Modifier = Modifier,
+    onToggleSubtitles: () -> Unit,
+    onOpenAudio: () -> Unit,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AppButton(onClick = onToggleSubtitles, enabled = subtitlesAvailable) {
+            Text(if (subtitlesEnabled) "CC  On" else "CC  Off", fontSize = 16.sp)
+        }
+        if (showAudio) {
+            AppButton(onClick = onOpenAudio, modifier = Modifier.focusRequester(audioFocus)) {
+                Text("Audio", fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransportControls(
+    isPlaying: Boolean,
+    speed: Float,
+    enabled: Boolean,
+    playFocus: FocusRequester,
+    modifier: Modifier = Modifier,
+    onSeekBackward: () -> Unit,
+    onTogglePlayback: () -> Unit,
+    onSeekForward: () -> Unit,
+    onCycleSpeed: () -> Unit,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AppButton(
+            onClick = onSeekBackward,
+            enabled = enabled,
+            modifier = Modifier.semantics { contentDescription = "Seek backward 30 seconds" },
+        ) { Text("⏪︎", fontSize = 22.sp) }
+        AppButton(
+            onClick = onTogglePlayback,
+            enabled = enabled,
+            modifier = Modifier.focusRequester(playFocus).semantics {
+                contentDescription = if (isPlaying) "Pause video" else "Play video"
+            },
+        ) { Text(if (isPlaying) "⏸︎" else "▶︎", fontSize = 22.sp) }
+        AppButton(
+            onClick = onSeekForward,
+            enabled = enabled,
+            modifier = Modifier.semantics { contentDescription = "Seek forward 30 seconds" },
+        ) { Text("⏩︎", fontSize = 22.sp) }
+        AppButton(onClick = onCycleSpeed, enabled = enabled) { Text("${speed}×", fontSize = 16.sp) }
     }
 }
 
