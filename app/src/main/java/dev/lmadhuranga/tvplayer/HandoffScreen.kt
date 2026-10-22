@@ -48,12 +48,14 @@ private val QrLightBackgroundArgb = android.graphics.Color.rgb(214, 214, 214)
 fun HandoffScreen(
     cacheDirectory: java.io.File,
     hasActiveMedia: Boolean,
+    recentEntries: List<HistoryEntry>,
     settingsRequester: FocusRequester,
     onVideoSubmitted: (SubmittedVideo) -> Unit,
     onBack: () -> Unit,
     onGoToPlayer: () -> Unit,
     onOpenSettings: () -> Unit,
     onApprovalPending: (Boolean) -> Unit,
+    onReplay: (HistoryEntry) -> Unit,
 ) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
     val server = remember { LocalLinkServer(cacheDirectory) { latestCallback(it) } }
@@ -108,6 +110,43 @@ fun HandoffScreen(
                     Text("Send from your phone, then approve the request on this TV.", color = Muted, fontSize = 15.sp)
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
+                Spacer(Modifier.height(18.dp))
+                Text("RECENTLY PLAYED", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
+                val handoffEntries = remember(recentEntries) {
+                    recentEntries.distinctBy { entry ->
+                        entry.mediaUrl?.let { HistoryRepository.mediaIdentity(it) }
+                            ?: "legacy:${entry.title.lowercase()}@${entry.sourceHost.lowercase()}"
+                    }.take(3)
+                }
+                if (handoffEntries.isEmpty()) {
+                    Text("Play a video to see it here.", color = Muted, fontSize = 16.sp)
+                } else {
+                    handoffEntries.forEach { entry ->
+                        val title = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }
+                        if (entry.mediaUrl != null) {
+                            AppButton(onClick = { onReplay(entry) }) {
+                                Column {
+                                    Text(title, fontSize = 17.sp)
+                                    Text(
+                                        "${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}",
+                                        color = Muted,
+                                        fontSize = 13.sp,
+                                    )
+                                }
+                            }
+                        } else {
+                            Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                                Text(title, color = Color.White, fontSize = 17.sp)
+                                Text(
+                                    "${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}",
+                                    color = Muted,
+                                    fontSize = 13.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 Spacer(Modifier.height(26.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (!state.isRunning && state.message != null) {
@@ -179,6 +218,15 @@ fun HandoffScreen(
             }
         }
     }
+}
+
+private fun formatHandoffTime(milliseconds: Long): String {
+    val totalSeconds = milliseconds.coerceAtLeast(0L) / 1_000L
+    val hours = totalSeconds / 3_600L
+    val minutes = (totalSeconds % 3_600L) / 60L
+    val seconds = totalSeconds % 60L
+    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds)
+    else "%d:%02d".format(minutes, seconds)
 }
 
 private fun createQrBitmap(contents: String): Bitmap? = runCatching {

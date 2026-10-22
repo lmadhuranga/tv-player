@@ -614,3 +614,13 @@ Verification record:
 - Focused source assertions passed for canonical URL identity and hashing, legacy entries without `mediaUrl`, default-on/explicit-off behavior, start and periodic saves, upload URL exclusion, Home replay and identity matching, expiry status copy, and subtitle URL exclusion. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - ADB identified `192.168.8.100:5555` as `product:BRAVIA_VU3 model:BRAVIA_VU3`; the debug APK installed successfully, and `dumpsys activity` reported `dev.lmadhuranga.tvplayer/.MainActivity` as `ResumedActivity`. Playback of a media URL and on-screen D-pad behavior were not exercised.
+
+## Milestone 60: `60-handoff-recent-history`
+
+The initial QR/handoff screen now shows up to three deduplicated recent videos with their title, source host, and saved position. Entries with a valid saved URL are focusable replay buttons; replay restores positions beyond five seconds and starts at the beginning otherwise. Legacy rows without a URL remain informational and cannot be replayed. The history sits in the existing scrollable content, leaving the QR tile, phone pairing approval, and existing controls in place.
+
+Verification record:
+
+- `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- ADB identified `192.168.8.100:5555` as Sony `BRAVIA VU3` (`BRAVIA_VU3_4K`), API 34. The latest debug APK installed successfully. `dumpsys activity activities` reported `dev.lmadhuranga.tvplayer/.MainActivity` as top-resumed and focused, and the app was left open.
+- No D-pad input, screenshot, playback, or visible history-row interaction was exercised. The list layout and replay interaction still need visual/runtime confirmation.

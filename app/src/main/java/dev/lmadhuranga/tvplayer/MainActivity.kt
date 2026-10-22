@@ -150,6 +150,7 @@ private fun TVPlayerApp(
         AppRoute.HANDOFF -> HandoffScreen(
             cacheDirectory = playback.cacheDirectory,
             hasActiveMedia = playbackState.hasMedia,
+            recentEntries = recentEntries,
             settingsRequester = settingsOpenerRequester,
             onVideoSubmitted = { submission ->
                 pendingStart = null
@@ -169,6 +170,11 @@ private fun TVPlayerApp(
             onGoToPlayer = { route = AppRoute.PLAYER },
             onOpenSettings = { settingsOpen = true },
             onApprovalPending = { pending -> if (pending) settingsOpen = false },
+            onReplay = { entry ->
+                val url = entry.mediaUrl ?: return@HandoffScreen
+                playback.playUrl(url, startPositionMs = entry.positionMs.takeIf { it > 5_000L } ?: 0L)
+                route = AppRoute.PLAYER
+            },
         )
 
         AppRoute.PLAYER -> FullscreenPlayerScreen(
