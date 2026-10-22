@@ -164,7 +164,7 @@ private fun TVPlayerApp(
                     usbRoot = root
                     usbDirectory = directory
                     usbEntries = entries
-                    usbError = if (entries.isEmpty()) "This folder has no supported videos or folders." else null
+                    usbError = null
                 }
                 .onFailure { error ->
                     usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not read this USB folder."
@@ -495,11 +495,15 @@ private fun UsbVideoBrowserScreen(
                             AppButton(onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester)) {
                                 Text(if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder")
                             }
+                            if (entries.isEmpty()) Text("This folder is empty.", color = Muted, fontSize = 20.sp)
                             entries.forEach { entry ->
-                                AppButton(onClick = { if (entry.isDirectory) onOpenFolder(entry) else onChooseVideo(entry) }) {
+                                AppButton(
+                                    onClick = { if (entry.isDirectory) onOpenFolder(entry) else if (entry.canPlay) onChooseVideo(entry) },
+                                    enabled = entry.isDirectory || entry.canPlay,
+                                ) {
                                     Column {
-                                        Text((if (entry.isDirectory) "📁  " else "▶  ") + entry.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        if (!entry.isDirectory) Text(formatFileSize(entry.sizeBytes), color = Muted, fontSize = 14.sp)
+                                        Text((if (entry.isDirectory) "📁  " else if (entry.canPlay) "▶  " else "📄  ") + entry.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${entry.typeLabel} · ${formatFileSize(entry.sizeBytes)}", color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }

@@ -121,4 +121,11 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] Pause, allow media to end, trigger a playback/stall error, leave the player, and background the app; confirm each path releases the keep-screen-on behavior and normal TV sleep resumes.
 - [ ] `FLAG_KEEP_SCREEN_ON` state follows active playback intent and terminal playback status; fullscreen disposal clears it as a defensive lifecycle cleanup.
 - [x] `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed locally. Lint reports 28 warnings and 0 errors, including the existing `MANAGE_EXTERNAL_STORAGE` policy warning. No TV runtime verification was performed.
+
+### Milestone 78 USB file explorer listing
+
+- [ ] Browse a mixed USB folder and confirm files, hidden entries, and folders appear, with folders first and type/size labels.
+- [ ] Confirm folders navigate, videos open the existing subtitle choice screen, and subtitle/unsupported file rows cannot start playback.
+- [ ] Confirm a genuinely empty folder says “This folder is empty” and read failures show an error.
+- [ ] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` results are recorded in `docs/PROGRESS.md`; TV behavior remains pending until manually checked.
 - [x] Milestone 30 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the color change.

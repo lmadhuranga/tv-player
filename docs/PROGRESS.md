@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `77-playback-keep-awake` (local checks recorded below; no TV validation)
-- Current branch: `77-playback-keep-awake`
+- Implemented through milestone: `78-usb-all-folder-files` (local checks recorded below; no TV validation)
+- Current branch: `78-usb-all-folder-files`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -63,6 +63,7 @@
 | 71 | `71-outline-paused-indicator` | branch HEAD (`git rev-parse 71-outline-paused-indicator`) |
 | 72 | `72-home-recent-title-ellipsis` | pending local commit |
 | 77 | `77-playback-keep-awake` | branch HEAD (`git rev-parse 77-playback-keep-awake`) |
+| 78 | `78-usb-all-folder-files` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -780,3 +781,13 @@ Verification record:
 - Added unit coverage for intended playback during buffering and flag release after pause, end, playback error, or missing media.
 - `git diff --check` and `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed. Lint reports 28 existing warnings and 0 errors, including the known Google Play restriction warning for `MANAGE_EXTERNAL_STORAGE`.
 - No TV contact, installation, or runtime verification was performed.
+
+## Milestone 78: `78-usb-all-folder-files`
+
+USB folders now display every regular file and directory, including hidden entries, with folders sorted first. Folder and supported-video rows remain actionable; subtitle and unsupported-file rows show their type and size but cannot start playback. Subtitles remain available from the existing video selection flow. A truly empty folder has a dedicated message, and an enumeration failure is reported as a read error.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 13 executed, 37 up-to-date). No TV runtime verification was performed.
+- [ ] TV browsing, D-pad focus, playback selection, and empty/read-error states verified manually.
+- No TV contact, installation, or runtime validation is implied.

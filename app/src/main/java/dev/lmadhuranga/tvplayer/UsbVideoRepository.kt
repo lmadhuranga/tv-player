@@ -23,7 +23,21 @@ data class UsbEntry(
     val file: File,
     val isDirectory: Boolean,
     val sizeBytes: Long,
-)
+) {
+    val typeLabel: String
+        get() = when {
+            isDirectory -> "Folder"
+            file.extension.equals("srt", ignoreCase = true) || file.extension.equals("vtt", ignoreCase = true) -> "Subtitle"
+            file.extension.lowercase(Locale.ROOT) in VIDEO_EXTENSIONS -> "Video"
+            else -> "File"
+        }
+
+    val canPlay: Boolean get() = !isDirectory && typeLabel == "Video"
+
+    companion object {
+        private val VIDEO_EXTENSIONS = setOf("mp4", "mkv", "m4v", "webm", "mov", "avi", "mpg", "mpeg", "ts", "3gp")
+    }
+}
 
 data class UsbVideoSelection(
     val video: UsbEntry,
@@ -85,10 +99,9 @@ class UsbVideoRepository(private val context: Context) {
             "This folder is outside the mounted USB drive."
         }
         require(safeDirectory.isDirectory && safeDirectory.canRead()) { "This USB folder is no longer available." }
-        safeDirectory.listFiles().orEmpty()
+        (safeDirectory.listFiles() ?: throw IllegalStateException("Could not read the contents of this USB folder."))
             .asSequence()
-            .filterNot { it.name.startsWith('.') }
-            .filter { it.isDirectory || it.isFile && isSupportedMedia(it.extension, VIDEO_EXTENSIONS) }
+            .filter { it.isDirectory || it.isFile }
             .map { file -> UsbEntry(file.name, file, file.isDirectory, if (file.isFile) file.length().coerceAtLeast(0L) else 0L) }
             .sortedWith(compareBy<UsbEntry>({ !it.isDirectory }, { it.name.lowercase(Locale.ROOT) }))
             .toList()
@@ -134,7 +147,6 @@ class UsbVideoRepository(private val context: Context) {
         extension.lowercase(Locale.ROOT) in extensions
 
     companion object {
-        private val VIDEO_EXTENSIONS = setOf("mp4", "mkv", "m4v", "webm", "mov", "avi", "mpg", "mpeg", "ts", "3gp")
         private val SUBTITLE_EXTENSIONS = setOf("srt", "vtt")
     }
 }
