@@ -466,3 +466,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed successfully; `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 45: `45-transport-skip-adjacency`
+
+Reordered the fullscreen transport controls to Previous, −10 seconds, Play/Pause, +10 seconds, Next. The enabled skip buttons now sit beside Play/Pause; button behavior, labels, disabled state, focus requester, spacing, and diameters are unchanged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date); `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.

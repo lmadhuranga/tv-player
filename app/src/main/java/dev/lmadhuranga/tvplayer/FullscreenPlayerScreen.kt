@@ -502,15 +502,15 @@ private fun TransportControls(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Previous item unavailable" }, diameter = 56.dp) {
+            PlayerTransportIcon(PlayerTransportGlyph.PREVIOUS)
+        }
         PlayerCircleButton(
             onClick = onSeekBackward,
             enabled = enabled,
             modifier = Modifier.semantics { contentDescription = "Seek backward 10 seconds" },
             diameter = 56.dp,
         ) { Text("-10", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
-        PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Previous item unavailable" }, diameter = 56.dp) {
-            PlayerTransportIcon(PlayerTransportGlyph.PREVIOUS)
-        }
         PlayerCircleButton(
             onClick = onTogglePlayback,
             enabled = enabled,
@@ -519,15 +519,15 @@ private fun TransportControls(
             },
             diameter = 64.dp,
         ) { PlayerTransportIcon(if (isPlaying) PlayerTransportGlyph.PAUSE else PlayerTransportGlyph.PLAY) }
-        PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Next item unavailable" }, diameter = 56.dp) {
-            PlayerTransportIcon(PlayerTransportGlyph.NEXT)
-        }
         PlayerCircleButton(
             onClick = onSeekForward,
             enabled = enabled,
             modifier = Modifier.semantics { contentDescription = "Seek forward 10 seconds" },
             diameter = 56.dp,
         ) { Text("+10", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+        PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Next item unavailable" }, diameter = 56.dp) {
+            PlayerTransportIcon(PlayerTransportGlyph.NEXT)
+        }
     }
 }
 
