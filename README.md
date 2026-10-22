@@ -1,14 +1,20 @@
 # TV Player
 
-TV Player is a native Android TV app for playing direct video URLs on Android TV. A small page served by the TV lets a paired phone or laptop on the same Wi-Fi submit a video URL or upload a video file, plus an optional subtitle URL or SRT/WebVTT file. URL media is fetched by the TV; uploaded files are streamed into private temporary TV cache and removed after playback or when the flow is cancelled/exits.
+A remote-first Android TV video player for direct links and USB drives, with subtitles, playback history, and an easy phone-to-TV handoff.
 
-The first release is centered on reliable remote control use, direct HTTP(S) links, external subtitles, and clear network and playback errors. It will not depend on Seedr or any cloud service.
+TV Player plays direct HTTP(S) video links and videos indexed on mounted USB drives. Its phone-friendly handoff page lets you send a link or upload a video and optional subtitle from another device on the same Wi-Fi. Playback, settings, and the handoff interface are designed for the TV remote. The app does not depend on Seedr or a cloud service.
 
-The player interface, settings, and errors are English-only. Subtitle tracks may contain any language and Unicode text supported by the media stack.
+## Preview
+
+| Home | Browse videos on USB |
+|:--:|:--:|
+| ![TV Player home screen, with recent videos and Browse USB videos](docs/screenshots/home.png) | ![USB video browser listing movies found on the connected drive](docs/screenshots/usb-video-browser.png) |
+
+The player UI, settings, and errors are in English. Subtitle tracks may contain any language and Unicode text supported by the media stack.
 
 ## Project status
 
-Milestone 20 adds paired phone upload choices for both video and subtitle files while preserving URL submission. Video uploads are capped at 8 GiB and further limited by available TV cache space while reserving 512 MiB; subtitle uploads are capped at 8 MiB. Milestone 21 fixes the browser's read-only upload-limit lookup when GET omits Origin while retaining token authentication and rejecting supplied mismatches. Milestone 22 adds persisted Settings choices for a 1/2/5-minute maximum forward buffer; changes take effect on the next video, and the existing 64 MiB target-buffer estimate can shorten actual buffered time. Milestone 23 adds separate URL/File selectors for video and optional subtitles, defaulting to URL and clearing the inactive input. Milestone 24 adds up to 20 successful video/subtitle URLs to browser-local history for 24 hours, with clear and fill-without-submit actions; signed links may expire sooner. Milestones 22–24 are built/linted locally only; the TV was not contacted, and runtime behavior remains unverified. See the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md) for evidence and remaining checks.
+The roadmap, completed milestones, and verification notes are tracked in the [implementation plan](docs/PLAN.md), [progress log](docs/PROGRESS.md), and [local build and TV QA guide](docs/SETUP_AND_QA.md).
 
 ## Development workflow
 
