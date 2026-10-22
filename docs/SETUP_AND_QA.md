@@ -251,3 +251,24 @@ The same port **8765** is used for either protocol, not both. Once HTTPS is enab
 - Verify macOS, iPhone Safari, and Android Chrome trust instructions on devices you personally control.
 
 **Status:** Source changes and setup script are committed; no Mac/BRAVIA build, certificate provisioning, browser tests, or successful TLS handshake is claimed yet.
+
+
+## Branch 92 — play-first media preview modal
+
+A screenshot of the old preview showed a dark media element and endless-looking browser loading indicator before the user even asked to play. Branch `92-video-preview-first-impression` refines the web File Manager's media dialog without changing its server API.
+
+- On **Play video**, show a polished movie preview cover first: media icon, filename, file format, size, **Play video** action, Download, and Close. **No media request is made before Play is clicked.**
+- Once Play is clicked, show branded loading feedback while the browser requests a read-only media ticket and obtains a playable frame. The native player controls appear when ready.
+- The player has a 20-second initial-loading fallback with **Try again** and a useful explanation; unsupported codecs and disconnected TVs show a failure state rather than an indefinite spinner. Download of the original file remains available.
+- Image previews show a consistent loading placeholder while retrieving the full-resolution image, then display the image itself.
+- Closing the modal stops video playback, clears its media source and loading timer, and ignores late ticket/image responses. Responsive layouts support desktop and smaller screens; reduced-motion preferences are respected.
+
+**Source-level verification:** JavaScript parses successfully, and a mocked DOM test confirmed that opening a video triggers **zero** ticket requests; clicking Play starts the ticket request, native video controls appear on load, and Close stops/clears the video. Real Android TV/browser testing, video decoding, and HTTPS streaming are not yet confirmed.
+
+**Manual QA:**
+1. `git switch 92-video-preview-first-impression`; run `bash scripts/tv.sh deploy`.
+2. Open `https://TV_IP:8765/files` after your HTTPS configuration, or use the URL shown on TV Player.
+3. Double-click an MP4: verify that the initial modal has a visible **Play video** button, not a spinning/blank video.
+4. Click Play: verify loading state, playback controls, seeking, fullscreen, sound, Download, and Close.
+5. Verify unsupported MKV/codecs, slow storage, connection interruption, Retry, and re-opening another file.
+6. Check image preview and small mobile viewport, with keyboard Escape to dismiss.
