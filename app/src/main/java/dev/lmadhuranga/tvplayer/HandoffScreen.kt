@@ -22,9 +22,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -61,10 +64,12 @@ fun HandoffScreen(
     onReplay: (HistoryEntry) -> Unit,
 ) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
-    val server = remember { LocalLinkServer(cacheDirectory) { latestCallback(it) } }
+    val appContext = LocalContext.current.applicationContext
+    val server = remember { LocalLinkServer(appContext, cacheDirectory) { latestCallback(it) } }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val denyRequester = remember { FocusRequester() }
+    var confirmForget by remember { mutableStateOf(false) }
 
     androidx.compose.runtime.LaunchedEffect(state.pendingApprovalId) {
         onApprovalPending(state.pendingApprovalId != null)
@@ -104,9 +109,17 @@ fun HandoffScreen(
                 Spacer(Modifier.height(14.dp))
                 Text("Scan to open the send page.", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(16.dp))
-                state.address?.let { address ->
-                    Text("Or open:", color = Muted, fontSize = 16.sp)
-                    Text("http://$address:8765", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
+                state.pageUrl?.let { url ->
+                    Text(if (state.isHttps) "Secure LAN connection:" else "Local connection (HTTP):", color = Muted, fontSize = 16.sp)
+                    Text(url, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
+                    if (!state.isHttps) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "Not encrypted. Use scripts/https-tv.sh to enable HTTPS for this TV.",
+                            color = Color(0xFFFFC589),
+                            fontSize = 15.sp,
+                        )
+                    }
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(18.dp))
@@ -191,6 +204,10 @@ fun HandoffScreen(
                     AppButton(onClick = onBack) { Text("Back") }
                 }
                 Spacer(Modifier.height(8.dp))
+                AppButton(onClick = { confirmForget = true }) {
+                    Text("Forget trusted browsers", fontSize = 14.sp)
+                }
+                Spacer(Modifier.height(8.dp))
                 Text("Version ${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 12.sp)
             }
         }
@@ -210,18 +227,43 @@ fun HandoffScreen(
                 ) {
                     Text("APPROVE PHONE CONNECTION?", color = Teal, fontSize = 15.sp, letterSpacing = 2.sp)
                     Text(
-                        "${state.requesterDevice ?: "A browser"} at ${state.requesterAddress ?: "an unknown address"} wants to connect and send media.",
+                        "${state.requesterDevice ?: "A browser"} at ${state.requesterAddress ?: "an unknown address"} wants to connect, send media, and manage files on accessible storage.",
                         color = Color.White,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Medium,
                     )
-                    Text("Only allow devices you recognize on your local network.", color = Muted, fontSize = 17.sp)
+                    Text("Allow once for this session, or trust this browser for 30 days. Trusted browsers reconnect without another prompt while TV Player is open.", color = Muted, fontSize = 17.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         AppButton(
                             onClick = { server.denyPairingRequest(approvalId) },
                             modifier = Modifier.focusRequester(denyRequester),
                         ) { Text("Deny") }
-                        AppButton(onClick = { server.approvePairingRequest(approvalId) }) { Text("Allow") }
+                        AppButton(onClick = { server.approvePairingRequest(approvalId, trustBrowser = false) }) { Text("Allow once") }
+                        AppButton(onClick = { server.approvePairingRequest(approvalId, trustBrowser = true) }) { Text("Trust 30 days") }
+                    }
+                }
+            }
+        }
+    }
+    if (confirmForget) {
+        Dialog(onDismissRequest = { confirmForget = false }) {
+            Surface(
+                modifier = Modifier.width(620.dp),
+                shape = RoundedCornerShape(22.dp),
+                colors = SurfaceDefaults.colors(containerColor = Color(0xFF18263A)),
+            ) {
+                Column(modifier = Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("FORGET TRUSTED BROWSERS?", color = Teal, fontSize = 17.sp)
+                    Text(
+                        "This revokes saved browser access and disconnects current file manager sessions. Browsers will need approval again.",
+                        color = Color.White, fontSize = 20.sp,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AppButton(onClick = { confirmForget = false }) { Text("Cancel") }
+                        AppButton(onClick = {
+                            server.forgetTrustedBrowsers()
+                            confirmForget = false
+                        }) { Text("Forget all") }
                     }
                 }
             }

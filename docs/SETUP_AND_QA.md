@@ -150,3 +150,131 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] With player controls visible, confirm the top-right receive rate updates about once per second in KB/s or MB/s. Hide controls and confirm both the rate label and sampling stop; background the app and confirm sampling pauses and resumes with a fresh baseline.
 - [ ] Confirm the header has no Options button and the bottom-row Options button still opens settings and restores focus on close.
 - [ ] Run `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`, and `git diff --check`; physical BRAVIA validation remains separate.
+
+### Milestone 87 network file manager
+
+- [ ] Pair from the existing handoff page, open File Manager, and confirm removable roots and the accessible public Movies folder appear with honest read-only/free-space status.
+- [ ] Browse nested folders from the tree, breadcrumb, grid, and list views; confirm dot entries, reserved Android/data/obb paths, and all symlinks stay unavailable.
+- [ ] Upload a small file and a larger file; observe progress and cancel an in-flight transfer. Confirm partial temporary files are removed, low-space requests fail safely, and existing files are never overwritten.
+- [ ] Create a folder; delete a file and an empty folder after the exact-name confirmation; confirm a non-empty folder is rejected and its contents remain.
+- [ ] Verify unpaired or expired tokens cannot list or mutate, supplied cross-origin GETs are rejected, and cross-origin or tokenless POSTs are rejected.
+- [x] `:app:testDebugUnitTest` passed with traversal, symlink, overwrite, partial cleanup, cancellation, stale temporary cleanup, and non-empty-folder checks.
+- [ ] Final `:app:assembleDebug`, `:app:lintDebug`, embedded JavaScript `node --check`, and `git diff --check` are pending after feature 88 integration.
+- [ ] Browser visual QA is pending: the sandbox denied binding the local mock fixture port, and the shared Playwright browser profile was locked by another session. No TV access was attempted.
+
+## File Manager: Download and trusted browser access (branch 87)
+
+1. Build, install and launch with `bash scripts/tv.sh deploy`, then keep **TV Player → Send to TV** open.
+2. On a computer or phone on the same private LAN, open `http://TV_IP:8765/files`.
+3. At the first connection, the TV offers **Deny**, **Allow once**, or **Trust 30 days**. Choose **Trust 30 days** to remember this browser. The browser retains a random secret in same-origin local storage; the TV stores only its hash, bound to the browser's User-Agent, for up to 30 days.
+4. Reopening `/files`, restarting the app, or switching between the `/files` and `/` pages should reuse trust without the approval dialog. A browser with cleared site data, a private session, or a significantly changed User-Agent must be approved again.
+5. Select any normal visible file and choose **Download**, or use **Download** from the image/video preview. The TV sends the original bytes to your browser's download folder, through a time-limited LAN-only link. Video playback remains dependent on the receiving browser's codec support.
+6. From the TV's **Send to TV** screen, choose **Forget trusted browsers → Forget all** to revoke every saved trusted browser and active sessions. Existing preview and download streams are interrupted.
+7. When the TV Player handoff screen closes or the application leaves the foreground, its local server stops. Keep it open during larger transfers.
+
+**Security:** Browser trust is for your own devices on your private home network. The server uses local plain HTTP (not TLS), so browser trust secrets could be intercepted by someone with access to untrusted LAN traffic. Do not use this facility on guest/public Wi-Fi or expose port 8765 through router forwarding.
+
+**QA checklist (pending physical-device validation):**
+- Verify a trusted browser reconnects without a second approval after refresh and TV-app restart.
+- Verify **Allow once** requires approval again after session restart.
+- Verify **Forget all** immediately prevents downloading, uploading, and listing files.
+- Download an image, MP4/MOV, and a non-media document; compare the received bytes and file names.
+- Verify Range seeking works for browser media preview and that a second browser cannot reuse the download ticket from a different IP.
+- Verify interrupted downloads leave no altered file on the TV (downloads are read-only) and that USB disconnection reports an error.
+- Check large downloads against TV memory/storage constraints and report any TV lifecycle interruptions.
+
+
+## Contextual file actions (branch 89)
+
+The phone/computer web File Manager now offers contextual actions when a file, folder or storage root is selected.
+
+- **Single-click or tap a file tile:** select it and show relevant actions below the toolbar.
+- **Right-click on a tile or folder in the Storage sidebar:** open the action menu at the pointer.
+- **Three-dot (⋮) button:** open the same menu on any tile or sidebar folder, including touch devices.
+- **Touch and hold a tile:** open its context menu after a short press.
+- **Shift+F10 or the Context Menu key:** open actions for the currently selected item.
+- **Double-click or keyboard-activate a video:** open its browser preview/player; an image opens the preview.
+- **Double-click or keyboard-activate a folder:** browse inside it.
+
+| Selection | Available actions |
+| --- | --- |
+| Video | Play video, Download file, Delete file |
+| Image | Preview image, Download file, Delete file |
+| Other file | Download file, Delete file |
+| Folder | Open folder, New folder inside, Upload here, Delete folder |
+| Storage root | Open drive, New folder, Upload here |
+
+Delete is disabled on read-only storage. Nonempty folders cannot be deleted; this restriction is enforced by the server, not just the UI. Folder downloads as ZIP archives are **not included** in this branch; ordinary individual file downloads are supported.
+
+**Manual QA required on the Sony BRAVIA and computer/phone browser:** verify menu placement near screen edges; mouse right-click; long-press; ⋮ buttons; selection toolbar in grid/list views; Escape/menu dismissal; playback/preview; download; upload into a chosen nested folder; deleting an empty folder and a file after confirmation; no delete for populated folders; read-only drive behavior; keyboard Shift+F10. Build/run using `bash scripts/tv.sh deploy` from branch `89-file-context-actions`. No hardware run is claimed here.
+
+
+## Branch 90 — LAN HTTPS (opt-in debug provisioning)
+
+### Why HTTPS isn't just a URL change
+
+The TV previously listened on plain HTTP at `http://TV_IP:8765/`. Browser access to a private LAN IP cannot be made securely HTTPS just by changing the scheme. TLS requires a unique certificate with an **IP address Subject Alternative Name** and the client browser must trust the certificate issuer.
+
+A trusted public certificate for `192.168.x.x` is not available through Let's Encrypt IP validation: Let's Encrypt's new IP certificates require public proof via HTTP-01 or TLS-ALPN-01 and expire after about six days. For this local-TV developer workflow we use **mkcert** and a local CA instead.
+
+### Mac and Sony BRAVIA setup
+
+1. Check out the separate feature branch `90-lan-https`. Keep Android SDK 36, JDK 17, and ADB available.
+2. Build and install the debug app first: `bash scripts/tv.sh deploy`.
+3. On the Mac: `brew install mkcert`. Run **`mkcert -install`**, which installs a development CA in this Mac's trust store. Only do this on your own trusted computer.
+4. With ADB connected to the BRAVIA, run `bash scripts/https-tv.sh install`. This generates a certificate for the TV's current IP, packages it as PKCS12, verifies the transfer, and stores it in the *debug app's private files directory*. The certificate, key, password and PKCS12 files remain under `.local-https/` on the Mac, which is Git-ignored.
+5. Open **`https://TV_IP:8765/files`**, not the old HTTP URL. The Send to TV screen's QR and text automatically switch to HTTPS once provisioning succeeds.
+6. For other phones/computers, export **only** `$(mkcert -CAROOT)/rootCA.pem` from your Mac and install it as a trusted CA on the receiving device. On iOS, installing a profile is not sufficient: full trust must be enabled in Settings → General → About → Certificate Trust Settings. Never distribute `rootCA-key.pem`, `.p12`, `.pass`, or the private leaf key.
+7. Re-approve browser trust once after switching schemes: HTTP and HTTPS have **different browser storage origins**. After that, the existing 30-day trusted-browser mechanism works under HTTPS.
+
+The same port **8765** is used for either protocol, not both. Once HTTPS is enabled, HTTP requests to port 8765 will fail; no insecure HTTP listener or silent downgrade is added.
+
+### Operational rules
+
+- `bash scripts/https-tv.sh status`: check whether HTTPS provisioning is enabled.
+- If the TV's LAN IP changes, rerun `bash scripts/https-tv.sh install` using the new address and update any saved browser bookmark. A certificate made for one IP does not validate a different IP.
+- A missing, expired, invalid, or IP-mismatched certificate causes the TV handoff listener to **fail closed** and display an error; it will **not** drop to HTTP.
+- To explicitly roll back the development configuration, run `bash scripts/https-tv.sh disable`. This removes the app-private TLS files and **restores HTTP**. Do not use on shared/untrusted networks.
+- ADB `run-as` provisioning is for **debug builds only**. Release deployment needs a secure TV-side certificate import and renewal UI before HTTPS can be enabled for retail distribution.
+- There is no need for an always-on Mac *after* provisioning. The Android TV serves TLS itself whenever the Send to TV screen is running.
+- HTTPS encrypts the browser connection; it does not automatically fix 401 pairing-token errors, media codecs, transfer timeouts, or disconnects when the app is backgrounded.
+- Protect the mkcert root CA and its *private key* on your Mac, and use the trusted-browser approval/revocation controls on your TV.
+
+### Validation still required on the physical TV
+
+- Build `./gradlew testDebugUnitTest assembleDebug --console=plain` and install.
+- Provision certificate and confirm the displayed TV QR code and URL are HTTPS.
+- Verify `curl --cacert "$(mkcert -CAROOT)/rootCA.pem" "https://TV_IP:8765/files"` returns the file manager with successful certificate/IP validation.
+- Confirm plain HTTP on port 8765 does *not* return the file manager after provisioning.
+- Confirm approval/trusted-browser reconnect, download, preview seeking, uploads, browser CSP, and Same-Origin POSTs succeed over HTTPS.
+- Confirm an IP change, expired certificate, or deleted PKCS12 blocks listener startup instead of downgrading.
+- Verify macOS, iPhone Safari, and Android Chrome trust instructions on devices you personally control.
+
+**Status:** Source changes and setup script are committed; no Mac/BRAVIA build, certificate provisioning, browser tests, or successful TLS handshake is claimed yet.
+
+
+## Branch 92 — play-first media preview modal
+
+A screenshot of the old preview showed a dark media element and endless-looking browser loading indicator before the user even asked to play. Branch `92-video-preview-first-impression` refines the web File Manager's media dialog without changing its server API.
+
+- On **Play video**, show a polished movie preview cover first: media icon, filename, file format, size, **Play video** action, Download, and Close. **No media request is made before Play is clicked.**
+- Once Play is clicked, show branded loading feedback while the browser requests a read-only media ticket and obtains a playable frame. The native player controls appear when ready.
+- The player has a 20-second initial-loading fallback with **Try again** and a useful explanation; unsupported codecs and disconnected TVs show a failure state rather than an indefinite spinner. Download of the original file remains available.
+- Image previews show a consistent loading placeholder while retrieving the full-resolution image, then display the image itself.
+- Closing the modal stops video playback, clears its media source and loading timer, and ignores late ticket/image responses. Responsive layouts support desktop and smaller screens; reduced-motion preferences are respected.
+
+**Source-level verification:** JavaScript parses successfully, and a mocked DOM test confirmed that opening a video triggers **zero** ticket requests; clicking Play starts the ticket request, native video controls appear on load, and Close stops/clears the video. Real Android TV/browser testing, video decoding, and HTTPS streaming are not yet confirmed.
+
+**Manual QA:**
+1. `git switch 92-video-preview-first-impression`; run `bash scripts/tv.sh deploy`.
+2. Open `https://TV_IP:8765/files` after your HTTPS configuration, or use the URL shown on TV Player.
+3. Double-click an MP4: verify that the initial modal has a visible **Play video** button, not a spinning/blank video.
+4. Click Play: verify loading state, playback controls, seeking, fullscreen, sound, Download, and Close.
+5. Verify unsupported MKV/codecs, slow storage, connection interruption, Retry, and re-opening another file.
+6. Check image preview and small mobile viewport, with keyboard Escape to dismiss.
+### Milestone 88 USB explorer space
+
+- [ ] On a 960 × 540 logical TV display, confirm the USB list shows about seven rows, with one compact folder heading and the breadcrumb in a small fixed footer.
+- [ ] Confirm no `../` row appears in normal, empty, or error views. Use Left to move to the parent folder and Back to return to the parent or drive list.
+- [ ] In an empty folder and a folder containing only unsupported files, confirm focus remains usable and Left/Back still work. In an error view, confirm focus lands on the first available action.
+- [x] Source checks and local debug build/lint are recorded in `docs/PROGRESS.md`; TV visual and remote behavior remain unverified.

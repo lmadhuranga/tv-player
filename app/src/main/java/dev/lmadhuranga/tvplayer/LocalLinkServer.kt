@@ -1,5 +1,6 @@
 package dev.lmadhuranga.tvplayer
 
+import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
@@ -10,6 +11,7 @@ import java.io.OutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -25,6 +27,10 @@ import java.security.SecureRandom
 import java.util.Collections
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.CountDownLatch
@@ -44,12 +50,13 @@ data class SubmittedVideo(
 data class HandoffState(
     val address: String? = null,
     val isRunning: Boolean = false,
+    val isHttps: Boolean = false,
     val message: String? = null,
     val pendingApprovalId: String? = null,
     val requesterDevice: String? = null,
     val requesterAddress: String? = null,
 ) {
-    val pageUrl: String? get() = address?.let { "http://$it:$HANDOFF_PORT/" }
+    val pageUrl: String? get() = address?.let { "${if (isHttps) "https" else "http"}://$it:$HANDOFF_PORT/" }
 }
 
 private const val HANDOFF_PORT = 8765
@@ -64,6 +71,7 @@ private const val APPROVAL_RETRY_COOLDOWN_MS = 3_000L
 
 /** Foreground-only paired handoff. Link requests stay small; optional files stream to private cache. */
 class LocalLinkServer(
+    private val appContext: Context,
     private val cacheDirectory: File,
     private val onVideoSubmitted: (SubmittedVideo) -> Unit,
 ) {
@@ -73,9 +81,14 @@ class LocalLinkServer(
     private val stopped = AtomicBoolean(true)
     private val generation = AtomicLong(0L)
     @Volatile private var server: ServerSocket? = null
-    @Volatile private var activeSocket: Socket? = null
+    @Volatile private var secureConnection = false
+    private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
+    private val clientWorkers = ThreadPoolExecutor(4, 4, 0L, TimeUnit.MILLISECONDS,
+        ArrayBlockingQueue<Runnable>(8), { task -> Thread(task, "tv-player-http-client").apply { isDaemon = true } })
     @Volatile private var approvalSocket: Socket? = null
     @Volatile private var sessionToken: String = ""
+    private val authorizedSessions = ConcurrentHashMap.newKeySet<String>()
+    private val trustedBrowsers = TrustedBrowserRegistry(appContext)
     private var pendingApproval: PendingApproval? = null
     private var lastApprovalRequestAtMs = 0L
     private val uploadDirectory = File(cacheDirectory, "handoff-uploads").apply { mkdirs() }
@@ -83,6 +96,9 @@ class LocalLinkServer(
     private val uploadLock = Any()
     private val stagedUploads = mutableMapOf<UploadKind, StagedUpload>()
     private val inFlightUploads = mutableSetOf<File>()
+    private val fileManager = NetworkFileManager(appContext)
+    private data class PreviewGrant(val root: String, val path: String, val name: String, val peer: String, val expiresAt: Long, val download: Boolean)
+    private val previewGrants = ConcurrentHashMap<String, PreviewGrant>()
 
     private enum class UploadKind { VIDEO, SUBTITLE }
     private data class StagedUpload(val file: File, val name: String, val token: String)
@@ -91,6 +107,8 @@ class LocalLinkServer(
         val id: String,
         val requesterDevice: String,
         val requesterAddress: String,
+        val userAgent: String,
+        @Volatile var trustBrowser: Boolean = false,
         @Volatile var decision: ApprovalDecision = ApprovalDecision.PENDING,
     ) {
         val completed = CountDownLatch(1)
@@ -100,6 +118,7 @@ class LocalLinkServer(
     fun start() {
         if (!stopped.compareAndSet(true, false)) return
         clearUploads()
+        previewGrants.clear()
         uploadDirectory.listFiles()?.forEach { it.delete() }
         val runId = generation.incrementAndGet()
         val lanAddress = findLanAddress()
@@ -113,11 +132,15 @@ class LocalLinkServer(
             var listener: ServerSocket? = null
             for (attempt in 0..1) {
                 try {
-                    listener = ServerSocket().apply {
-                        // Permit a quick same-process restart after accepted connections close.
-                        reuseAddress = true
-                        soTimeout = 0
-                        bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
+                    val candidate = LanHttps.unboundListener(appContext, lanAddress)
+                    try {
+                        candidate.reuseAddress = true
+                        candidate.soTimeout = 0
+                        candidate.bind(InetSocketAddress(InetAddress.getByName("0.0.0.0"), HANDOFF_PORT), 4)
+                        listener = candidate
+                    } catch (error: Exception) {
+                        runCatching { candidate.close() }
+                        throw error
                     }
                     break
                 } catch (error: BindException) {
@@ -127,6 +150,7 @@ class LocalLinkServer(
             val boundListener = listener ?: throw BindException("Could not bind port $HANDOFF_PORT")
             socket = boundListener
             server = boundListener
+            secureConnection = LanHttps.isConfigured(appContext)
             synchronized(listenerOwnershipLock) { appOwnedListener = boundListener }
             publishPairingState(address = lanAddress)
             Thread({ acceptLoop(boundListener, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
@@ -168,10 +192,12 @@ class LocalLinkServer(
         try { socket?.close() } catch (_: Exception) { }
         clearListenerOwnership(socket)
         server = null
+        secureConnection = false
         stopped.set(true)
         generation.incrementAndGet()
         approvalSocket = null
         sessionToken = ""
+        authorizedSessions.clear()
         releasePendingApproval()
         mutableState.value = HandoffState(message = message)
     }
@@ -181,12 +207,14 @@ class LocalLinkServer(
         if (stopped.getAndSet(true)) return
         generation.incrementAndGet()
         sessionToken = ""
-        val awaitingSocket = activeSocket?.takeIf { approvalSocket === it }
+        authorizedSessions.clear()
+        val awaitingSocket = approvalSocket
         releasePendingApproval()
-        if (awaitingSocket == null) try { activeSocket?.close() } catch (_: Exception) { }
-        activeSocket = null
+        clientSockets.forEach { client -> if (client !== awaitingSocket) runCatching { client.close() } }
+        previewGrants.clear()
         val current = server
         server = null
+        secureConnection = false
         try { current?.close() } catch (_: Exception) { }
         clearListenerOwnership(current)
         clearUploads()
@@ -204,20 +232,28 @@ class LocalLinkServer(
                 stopAfterListenerFailure(listener, runId)
                 return
             }
-            activeSocket = client
+            clientSockets.add(client)
             try {
-                client.use { socket ->
-                    socket.soTimeout = 4_000
-                    if (!isCurrent(listener, runId)) return
-                    if (isAllowedPeer(socket.inetAddress)) handleRequest(socket, listener, runId)
-                    else respond(socket.getOutputStream(), 403, "Forbidden", "Local network only")
+                clientWorkers.execute {
+                    try {
+                        client.use { socket ->
+                            socket.soTimeout = 4_000
+                            if (isCurrent(listener, runId)) {
+                                if (isAllowedPeer(socket.inetAddress)) handleRequest(socket, listener, runId)
+                                else respond(socket.getOutputStream(), 403, "Forbidden", "Local network only")
+                            }
+                        }
+                    } catch (_: SocketTimeoutException) {
+                        // Close stalled HTTP requests without blocking another preview or upload.
+                    } catch (_: Exception) {
+                        // A peer may disconnect during a long upload or range response.
+                    } finally {
+                        clientSockets.remove(client)
+                    }
                 }
-            } catch (_: SocketTimeoutException) {
-                // Drop partial requests without affecting the next local client.
-            } catch (_: Exception) {
-                // The peer may close early. Continue accepting only while this server generation is current.
-            } finally {
-                if (activeSocket === client) activeSocket = null
+            } catch (_: RejectedExecutionException) {
+                clientSockets.remove(client)
+                runCatching { client.close() }
             }
         }
     }
@@ -231,9 +267,11 @@ class LocalLinkServer(
         stopped.set(true)
         val failedGeneration = generation.incrementAndGet()
         server = null
-        activeSocket = null
+        clientSockets.forEach { client -> runCatching { client.close() } }
+        previewGrants.clear()
         approvalSocket = null
         sessionToken = ""
+        authorizedSessions.clear()
         releasePendingApproval()
         try { listener.close() } catch (_: Exception) { }
         clearListenerOwnership(listener)
@@ -266,13 +304,24 @@ class LocalLinkServer(
         }
 
         val method = request[0]
-        val path = request[1].substringBefore('?')
+        val target = request[1]
+        val path = target.substringBefore('?')
         if (method == "GET" && path == "/") return respond(socket.getOutputStream(), 200, "OK", LINK_ENTRY_PAGE, "text/html; charset=utf-8")
+        if (method == "GET" && path == "/files") return respond(socket.getOutputStream(), 200, "OK", FileManagerPage.html, "text/html; charset=utf-8")
+        if (path.startsWith("/api/files/")) return handleFileManagerRequest(socket, input, method, path, target, headers, listener, runId)
         if (method == "POST" && path == "/api/pair") {
             if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
             val requesterAddress = socket.inetAddress.hostAddress ?: "Unknown address"
-            val requesterDevice = describeRequester(headers["user-agent"])
-            return requestPairApproval(socket, listener, runId, requesterDevice, requesterAddress)
+            val userAgent = headers["user-agent"].orEmpty()
+            val requesterDevice = describeRequester(userAgent)
+            val trustedToken = headers["x-trusted-browser"].orEmpty()
+            if (trustedBrowsers.valid(trustedToken, userAgent)) {
+                val token = createSession()
+                return respond(socket.getOutputStream(), 200, "OK",
+                    JSONObject(mapOf("token" to token, "trusted" to true)).toString(),
+                    "application/json; charset=utf-8")
+            }
+            return requestPairApproval(socket, listener, runId, requesterDevice, requesterAddress, userAgent)
         }
         if (method == "GET" && path == "/api/limits") {
             // Same-origin GET fetches commonly omit Origin. The paired token still
@@ -356,8 +405,217 @@ class LocalLinkServer(
     }
 
     private fun isAuthorized(token: String): Boolean {
-        val expected = sessionToken.toByteArray(StandardCharsets.UTF_8)
-        return expected.isNotEmpty() && MessageDigest.isEqual(expected, token.toByteArray(StandardCharsets.UTF_8))
+        if (token.isEmpty()) return false
+        val candidate = token.toByteArray(StandardCharsets.UTF_8)
+        return authorizedSessions.any { saved ->
+            MessageDigest.isEqual(saved.toByteArray(StandardCharsets.UTF_8), candidate)
+        }
+    }
+
+    @Synchronized
+    private fun createSession(): String {
+        val newToken = Base64.encodeToString(ByteArray(32).also(SecureRandom()::nextBytes),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        if (authorizedSessions.size >= 16) authorizedSessions.clear()
+        authorizedSessions.add(newToken)
+        sessionToken = newToken
+        return newToken
+    }
+
+    /** Used only by the TV owner's remote, never exposed as a browser endpoint. */
+    @Synchronized
+    fun forgetTrustedBrowsers() {
+        trustedBrowsers.forgetAll()
+        authorizedSessions.clear()
+        sessionToken = ""
+        previewGrants.clear()
+        releasePendingApproval()
+        publishPairingState(message = "Saved browser access was revoked. New connections require approval.")
+    }
+
+    fun trustedBrowserCount(): Int = trustedBrowsers.count()
+
+    private fun handleFileManagerRequest(
+        socket: Socket,
+        input: BufferedInputStream,
+        method: String,
+        path: String,
+        target: String,
+        headers: Map<String, String>,
+        listener: ServerSocket,
+        runId: Long,
+    ) {
+        val output = socket.getOutputStream()
+        val token = headers["x-pairing-token"].orEmpty()
+        if (path in setOf("/api/files/media", "/api/files/download") && method in setOf("GET", "HEAD")) {
+            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "Open this file from the TV file manager")
+            return streamPreview(socket, method, target, headers["range"], listener, runId, path == "/api/files/download")
+        }
+        if (method == "GET") {
+            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "Open the file manager from this TV's local network")
+            if (!isAuthorized(token)) return respond(output, 401, "Unauthorized", "Request approval on the TV before managing files")
+            val query = try { parseQuery(target.substringAfter('?', "")) } catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid folder path") }
+            val body = try {
+                when (path) {
+                    "/api/files/roots" -> fileManager.rootsJson()
+                    "/api/files/list" -> fileManager.listJson(query["root"].orEmpty(), query["path"].orEmpty())
+                    "/api/files/preview-ticket" -> {
+                        val root = query["root"].orEmpty()
+                        val relative = query["path"].orEmpty()
+                        val name = query["name"].orEmpty()
+                        fileManager.previewFile(root, relative, name)
+                        val ticket = issuePreviewTicket(root, relative, name, socket.inetAddress.hostAddress.orEmpty(), false)
+                        JSONObject(mapOf("url" to "/api/files/media?ticket=$ticket")).toString()
+                    }
+                    "/api/files/download-ticket" -> {
+                        val root = query["root"].orEmpty()
+                        val relative = query["path"].orEmpty()
+                        val name = query["name"].orEmpty()
+                        fileManager.downloadFile(root, relative, name)
+                        val ticket = issuePreviewTicket(root, relative, name, socket.inetAddress.hostAddress.orEmpty(), true)
+                        JSONObject(mapOf("url" to "/api/files/download?ticket=$ticket")).toString()
+                    }
+                    else -> return respond(output, 404, "Not Found", "Not found")
+                }
+            } catch (error: Exception) {
+                return respond(output, 400, "Bad Request", error.message ?: "Could not read this location")
+            }
+            return respond(output, 200, "OK", body, "application/json; charset=utf-8")
+        }
+        if (method != "POST") return respond(output, 405, "Method Not Allowed", "Use GET or POST")
+        if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(output, 403, "Forbidden", "Open the file manager from this TV's local network")
+        if (!isAuthorized(token)) return respond(output, 401, "Unauthorized", "Request approval on the TV before managing files")
+        if (headers["transfer-encoding"] != null) return respond(output, 400, "Bad Request", "Chunked requests are not supported")
+        if (path == "/api/files/upload") {
+            val length = headers["content-length"]?.toLongOrNull() ?: return respond(output, 411, "Length Required", "File size is required")
+            if (length !in 1..NetworkFileManager.MAX_FILE_BYTES) return respond(output, 413, "Payload Too Large", "Files must be between 1 byte and 8 GiB")
+            if (!headers["content-type"].orEmpty().lowercase(Locale.ROOT).startsWith("application/octet-stream")) return respond(output, 415, "Unsupported Media Type", "Upload as a binary file")
+            val query = try { parseQuery(target.substringAfter('?', "")) } catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid destination") }
+            return try {
+                fileManager.upload(query["root"].orEmpty(), query["path"].orEmpty(), query["name"].orEmpty(), length, input) {
+                    isCurrent(listener, runId) && isAuthorized(token)
+                }
+                respond(output, 201, "Created", "File added")
+            } catch (error: Exception) {
+                val status = when (error) {
+                    is NetworkFileManager.FileExistsException -> 409 to "Conflict"
+                    is NetworkFileManager.InsufficientSpaceException -> 507 to "Insufficient Storage"
+                    else -> 400 to "Bad Request"
+                }
+                respond(output, status.first, status.second, error.message ?: "Upload failed")
+            }
+        }
+        val bodyLength = headers["content-length"]?.toIntOrNull() ?: return respond(output, 411, "Length Required", "Request size required")
+        if (bodyLength !in 1..4_096) return respond(output, 413, "Payload Too Large", "Request is too large")
+        val bytes = ByteArray(bodyLength)
+        var offset = 0
+        while (offset < bodyLength) {
+            val count = input.read(bytes, offset, bodyLength - offset)
+            if (count < 0) return respond(output, 400, "Bad Request", "Incomplete request")
+            offset += count
+        }
+        val json = try { JSONObject(String(bytes, StandardCharsets.UTF_8)) }
+        catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid request") }
+        return try {
+            when (path) {
+                "/api/files/create" -> fileManager.createFolder(json.optString("root"), json.optString("path"), json.optString("name"))
+                "/api/files/delete" -> fileManager.delete(json.optString("root"), json.optString("path"), json.optString("name"))
+                else -> return respond(output, 404, "Not Found", "Not found")
+            }
+            respond(output, 200, "OK", "Done")
+        } catch (error: Exception) {
+            val status = if (error is NetworkFileManager.FileExistsException) 409 to "Conflict" else 400 to "Bad Request"
+            respond(output, status.first, status.second, error.message ?: "Could not update this location")
+        }
+    }
+
+    /** A scoped, short-lived URL allows native browser video/image tags without sharing the pairing token. */
+    private fun issuePreviewTicket(root: String, path: String, name: String, peer: String, download: Boolean): String {
+        val now = System.currentTimeMillis()
+        previewGrants.entries.removeIf { it.value.expiresAt < now }
+        if (previewGrants.size >= 32) previewGrants.clear()
+        val ticket = Base64.encodeToString(ByteArray(32).also(SecureRandom()::nextBytes),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        previewGrants[ticket] = PreviewGrant(root, path, name, peer, now + (if (download) 15L * 60L * 1000L else 4L * 60L * 60L * 1000L), download)
+        return ticket
+    }
+
+    private fun streamPreview(
+        socket: Socket,
+        method: String,
+        target: String,
+        rangeHeader: String?,
+        listener: ServerSocket,
+        runId: Long,
+        download: Boolean,
+    ) {
+        val output = socket.getOutputStream()
+        val ticket = try { parseQuery(target.substringAfter('?', ""))["ticket"].orEmpty() }
+            catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid preview link") }
+        val grant = previewGrants[ticket]
+        val now = System.currentTimeMillis()
+        if (grant == null || grant.download != download || grant.expiresAt < now || grant.peer != socket.inetAddress.hostAddress) {
+            return respond(output, 401, "Unauthorized", "Preview expired. Reopen this file in the file manager.")
+        }
+        val media = try {
+            if (download) NetworkFileManager.PreviewFile(
+                fileManager.downloadFile(grant.root, grant.path, grant.name), "application/octet-stream"
+            ) else fileManager.previewFile(grant.root, grant.path, grant.name)
+        } catch (_: Exception) { return respond(output, 404, "Not Found", "The requested file is no longer available.") }
+        try {
+            RandomAccessFile(media.file, "r").use { file ->
+                val fileSize = file.length()
+                if (download && fileSize == 0L && rangeHeader == null) {
+                    output.write(("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n" +
+                        "Content-Length: 0\r\nContent-Disposition: attachment; filename=\"empty-file\"\r\n" +
+                        "Connection: close\r\nCache-Control: no-store\r\n\r\n").toByteArray(StandardCharsets.US_ASCII))
+                    output.flush()
+                    return
+                }
+                val window = PreviewByteRanges.parse(rangeHeader, fileSize)
+                if (window == null) {
+                    val response = "HTTP/1.1 416 Range Not Satisfiable\r\n" +
+                        "Content-Range: bytes */$fileSize\r\nContent-Length: 0\r\n" +
+                        "Accept-Ranges: bytes\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n"
+                    output.write(response.toByteArray(StandardCharsets.US_ASCII))
+                    output.flush()
+                    return
+                }
+                val partial = rangeHeader != null
+                val response = "HTTP/1.1 ${if (partial) "206 Partial Content" else "200 OK"}\r\n" +
+                    "Content-Type: ${media.mimeType}\r\n" +
+                    "Content-Length: ${window.length}\r\n" +
+                    "Accept-Ranges: bytes\r\n" +
+                    (if (partial) "Content-Range: bytes ${window.first}-${window.last}/$fileSize\r\n" else "") +
+                    (if (download) {
+                        val fallback = grant.name.map { c -> if (c.code in 32..126 && c != '"' && c != '\\') c else '_' }.joinToString("").take(120)
+                        val encoded = java.net.URLEncoder.encode(grant.name, "UTF-8").replace("+", "%20")
+                        "Content-Disposition: attachment; filename=\"$fallback\"; filename*=UTF-8''$encoded\r\n"
+                    } else "") +
+                    "Connection: close\r\nCache-Control: no-store\r\n" +
+                    "Referrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\r\n"
+                output.write(response.toByteArray(StandardCharsets.US_ASCII))
+                if (method != "HEAD") {
+                    file.seek(window.first)
+                    val buffer = ByteArray(64 * 1024)
+                    var remaining = window.length
+                    while (remaining > 0L && isCurrent(listener, runId) && previewGrants[ticket] === grant) {
+                        val count = file.read(buffer, 0, minOf(remaining, buffer.size.toLong()).toInt())
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        remaining -= count
+                    }
+                }
+                output.flush()
+            }
+        } catch (_: IOException) {
+            // Browsers frequently cancel or replace range requests while seeking.
+        }
+    }
+
+    private fun parseQuery(query: String): Map<String, String> = query.split('&').filter(String::isNotEmpty).associate { item ->
+        java.net.URLDecoder.decode(item.substringBefore('='), "UTF-8") to
+            java.net.URLDecoder.decode(item.substringAfter('=', ""), "UTF-8")
     }
 
     private fun effectiveUploadLimit(kind: UploadKind): Long {
@@ -497,6 +755,7 @@ class LocalLinkServer(
         runId: Long,
         requesterDevice: String,
         requesterAddress: String,
+        userAgent: String,
     ) {
         val output = socket.getOutputStream()
         val pending = synchronized(this) {
@@ -514,7 +773,7 @@ class LocalLinkServer(
                 return
             }
             lastApprovalRequestAtMs = now
-            PendingApproval(UUID.randomUUID().toString(), requesterDevice, requesterAddress).also {
+            PendingApproval(UUID.randomUUID().toString(), requesterDevice, requesterAddress, userAgent).also {
                 pendingApproval = it
                 approvalSocket = socket
                 publishPairingState(message = null)
@@ -534,10 +793,14 @@ class LocalLinkServer(
             when {
                 pending.decision == ApprovalDecision.ALLOWED && isCurrent(listener, runId) -> {
                     if (pendingApproval === pending) pendingApproval = null
-                    val bytes = ByteArray(32).also(SecureRandom()::nextBytes)
-                    sessionToken = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+                    val token = createSession()
+                    val data = JSONObject().put("token", token)
+                    if (pending.trustBrowser && pending.userAgent.isNotBlank()) {
+                        data.put("trustedToken", trustedBrowsers.create(pending.userAgent))
+                        data.put("trusted", true)
+                    }
                     publishPairingState(message = null)
-                    Triple(200, "OK", JSONObject(mapOf("token" to sessionToken)).toString())
+                    Triple(200, "OK", data.toString())
                 }
                 pending.decision == ApprovalDecision.DENIED -> {
                     Triple(403, "Forbidden", "Pairing was denied on the TV")
@@ -566,8 +829,9 @@ class LocalLinkServer(
     }
 
     @Synchronized
-    fun approvePairingRequest(id: String) {
+    fun approvePairingRequest(id: String, trustBrowser: Boolean = false) {
         val pending = pendingApproval?.takeIf { it.id == id && it.decision == ApprovalDecision.PENDING } ?: return
+        pending.trustBrowser = trustBrowser
         pending.decision = ApprovalDecision.ALLOWED
         pendingApproval = null
         publishPairingState(message = null)
@@ -608,6 +872,7 @@ class LocalLinkServer(
         mutableState.value = HandoffState(
             address = address,
             isRunning = !stopped.get(),
+            isHttps = secureConnection,
             message = message,
             pendingApprovalId = pending?.id,
             requesterDevice = pending?.requesterDevice,
@@ -618,7 +883,7 @@ class LocalLinkServer(
     private fun isSameOrigin(origin: String?, localAddress: InetAddress): Boolean {
         if (origin == null) return false
         val uri = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
-        return uri.scheme == "http" && uri.host == localAddress.hostAddress && uri.port == HANDOFF_PORT
+        return uri.scheme == (if (secureConnection) "https" else "http") && uri.host == localAddress.hostAddress && uri.port == HANDOFF_PORT
     }
 
     private fun isAllowedPeer(peer: InetAddress): Boolean = peer is Inet4Address && peer.isSiteLocalAddress && sharesSubnet(peer)
@@ -674,7 +939,7 @@ class LocalLinkServer(
             "Connection: close\r\n" +
             "Cache-Control: no-store\r\n" +
             "X-Content-Type-Options: nosniff\r\n" +
-            "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'\r\n\r\n"
+            "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; img-src 'self'; media-src 'self'; form-action 'self'; base-uri 'none'\r\n\r\n"
         output.write(headers.toByteArray(StandardCharsets.US_ASCII))
         output.write(bytes)
         output.flush()
@@ -732,7 +997,7 @@ class LocalLinkServer(
             @media(max-width:380px){body{padding-left:10px;padding-right:10px}main{padding:14px;border-radius:14px}.choice{padding:12px}.mode-options{max-width:none}.url-row{grid-template-columns:minmax(0,1fr) auto}.url-row input{grid-column:1/-1;grid-row:1}.url-row button{width:100%}}
             @media(min-width:800px){body{display:grid;align-items:center}main{padding:30px}}
             </style>
-            <main><h1>Send to your TV</h1>
+            <main><h1>Send to your TV</h1><a class="file-manager-link" style="display:block;margin:-8px 0 16px;color:#b9c8d9" href="/files">Open File Manager</a>
             <section class="choice"><strong>Video</strong><fieldset class="mode"><legend>Video source</legend><div class="mode-options" role="group" aria-label="Video input mode" data-mode-group="videoMode"><button class="mode-button" type="button" data-mode="url" aria-pressed="true">URL</button><button class="mode-button" type="button" data-mode="file" aria-pressed="false">File</button></div></fieldset><div id="videoUrlMode"><label for="video">Video URL</label><div class="url-row"><input id="video" type="url" autocomplete="url" maxlength="4096" placeholder="https://example.com/video.mp4"><button type="button" data-clear-url="video">Clear</button><button type="button" data-paste-url="video">Paste</button></div><button id="videoHistoryToggle" class="history-toggle" type="button" aria-expanded="false" aria-controls="videoHistory">Recent links</button><div id="videoHistory" class="history-list" aria-live="polite" hidden></div></div><div id="videoFileMode" hidden><label for="videoFile">Video file</label><input id="videoFile" class="file-input" type="file" accept=".mp4,.m4v,.mov,.3gp,.mkv,.webm,.ts,.m2ts,.mpg,.mpeg" disabled><button class="dropzone" type="button" data-dropzone="video" aria-controls="videoFile"><strong>Tap to choose a video</strong><small>or drop an MP4, MOV, MKV, WebM, TS, MPG, or MPEG file</small></button><div class="file-actions"><small id="videoFileName">No video selected</small><button class="file-clear" type="button" data-clear-file="video">Clear</button></div></div><small id="videoLimit"></small></section>
             <button id="subtitleToggle" type="button" aria-expanded="false" aria-controls="subtitleSection">Add subtitle</button>
             <section id="subtitleSection" class="choice" hidden aria-labelledby="subtitleHeading"><strong id="subtitleHeading">Subtitle</strong><fieldset class="mode"><legend>Subtitle source</legend><div class="mode-options" role="group" aria-label="Subtitle input mode" data-mode-group="subtitleMode"><button class="mode-button" type="button" data-mode="url" aria-pressed="true" disabled>URL</button><button class="mode-button" type="button" data-mode="file" aria-pressed="false" disabled>File</button></div></fieldset><div id="subtitleUrlMode"><label for="subtitle">Subtitle URL</label><div class="url-row"><input id="subtitle" type="url" maxlength="4096" placeholder="https://example.com/subtitles.srt" disabled><button type="button" data-clear-url="subtitle" disabled>Clear</button><button type="button" data-paste-url="subtitle" disabled>Paste</button></div><strong class="history-heading">Recent subtitle links</strong><div id="subtitleHistory" class="history-list" aria-live="polite"></div></div><div id="subtitleFileMode" hidden><label for="subtitleFile">Subtitle file</label><input id="subtitleFile" class="file-input" type="file" accept=".srt,.vtt" disabled><button class="dropzone" type="button" data-dropzone="subtitle" aria-controls="subtitleFile"><strong>Tap to choose a subtitle</strong><small>or drop an SRT or WebVTT file</small></button><div class="file-actions"><small id="subtitleFileName">No subtitle selected</small><button class="file-clear" type="button" data-clear-file="subtitle">Clear</button></div></div><small>SRT or WebVTT · Max 8 MiB</small></section>
@@ -777,7 +1042,10 @@ class LocalLinkServer(
             document.querySelector('#clearUrlHistory').addEventListener('click',()=>{saveUrlHistory([]);renderUrlHistory();status.textContent='Recent URL history cleared from this browser.'});
             function fmt(n){return n>=1024**3?(n/1024**3).toFixed(1)+' GiB':Math.floor(n/1024**2)+' MiB'}
             function setTransferVisible(visible){document.querySelector('#cancel').hidden=!visible;document.querySelector('#progress').hidden=!visible}
-            async function pair(){if(!pairingToken){status.textContent='Waiting for approval on the TV…';const res=await fetch('/api/pair',{method:'POST',cache:'no-store'});if(!res.ok)throw Error(await res.text());pairingToken=(await res.json()).token}if(!limitsLoaded){const lr=await fetch('/api/limits',{headers:{'X-Pairing-Token':pairingToken},cache:'no-store'});if(!lr.ok)throw Error(await lr.text());limits=await lr.json();limitsLoaded=true;document.querySelector('#videoLimit').textContent='TV upload limit: '+fmt(limits.videoBytes);document.querySelector('#videoLimit').hidden=false}}
+            const trustKey='tv-player.trusted-browser.v1';
+            function savedBrowser(){try{return localStorage.getItem(trustKey)||''}catch(_){return ''}}
+            function saveBrowser(value){try{if(value)localStorage.setItem(trustKey,value);else localStorage.removeItem(trustKey)}catch(_){}}
+            async function pair(){if(!pairingToken){const saved=savedBrowser();status.textContent=saved?'Reconnecting trusted browser…':'Waiting for approval on the TV…';const res=await fetch('/api/pair',{method:'POST',headers:saved?{'X-Trusted-Browser':saved}:{},cache:'no-store'});if(!res.ok)throw Error(await res.text());const data=await res.json();pairingToken=data.token;if(data.trustedToken)saveBrowser(data.trustedToken);else if(saved&&!data.trusted)saveBrowser('')}if(!limitsLoaded){const lr=await fetch('/api/limits',{headers:{'X-Pairing-Token':pairingToken},cache:'no-store'});if(!lr.ok)throw Error(await lr.text());limits=await lr.json();limitsLoaded=true;document.querySelector('#videoLimit').textContent='TV upload limit: '+fmt(limits.videoBytes);document.querySelector('#videoLimit').hidden=false}}
             function postFile(file,path,limit){return new Promise((resolve,reject)=>{if(file.size>limit){reject(Error('File is larger than the current TV limit ('+fmt(limit)+').'));return}setTransferVisible(true);const xhr=new XMLHttpRequest();activeRequest=xhr;xhr.open('POST',path);xhr.setRequestHeader('X-Pairing-Token',pairingToken);xhr.setRequestHeader('Content-Type','application/octet-stream');xhr.setRequestHeader('X-Upload-Filename',encodeURIComponent(file.name));xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.floor(e.loaded/e.total*100);document.querySelector('#progress').value=p;status.textContent='Uploading '+file.name+' · '+p+'%'}};xhr.onload=()=>{activeRequest=null;if(xhr.status>=200&&xhr.status<300)resolve();else reject(Error(xhr.responseText||'Upload failed'))};xhr.onerror=()=>{activeRequest=null;reject(Error('Upload interrupted. Check the network and try again.'))};xhr.onabort=()=>{activeRequest=null;reject(Error('Upload cancelled.'))};xhr.send(file)})}
             async function cancelStaged(){if(pairingToken)await fetch('/api/cancel-upload',{method:'POST',headers:{'X-Pairing-Token':pairingToken},cache:'no-store'}).catch(()=>{})}
             async function submitSend(){if(formBusy)return;const videoMode=selectedMode('videoMode'),subtitleMode=selectedMode('subtitleMode'),videoUrl=videoMode==='url'?document.querySelector('#video').value.trim():'',videoFile=videoMode==='file'?document.querySelector('#videoFile').files[0]:null,subtitleUrl=subtitleMode==='url'?document.querySelector('#subtitle').value.trim():'',subtitleFile=subtitleMode==='file'?document.querySelector('#subtitleFile').files[0]:null;if(videoMode==='url'&&!videoUrl){status.textContent='Enter a video URL.';return}if(videoMode==='file'&&!videoFile){status.textContent='Choose a video file.';return}if(subtitleMode==='file'&&!subtitleFile){status.textContent='Choose a subtitle file or switch to URL mode to omit the subtitle.';return}if(subtitleFile&&subtitleFile.size>limits.subtitleBytes){status.textContent='Subtitle files are limited to 8 MiB.';return}setFormBusy(true);document.querySelector('#progress').value=0;try{await pair();if(videoFile)await postFile(videoFile,'/api/upload/video',limits.videoBytes);if(subtitleFile)await postFile(subtitleFile,'/api/upload/subtitle',limits.subtitleBytes);const res=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':pairingToken},body:JSON.stringify({videoUrl:videoUrl,subtitleUrl:subtitleUrl,uploadedVideo:Boolean(videoFile),uploadedSubtitle:Boolean(subtitleFile)})});if(res.status===401){pairingToken=null;limitsLoaded=false;throw Error('TV session ended. Send again and approve the new connection on the TV.')}if(!res.ok)throw Error(await res.text());rememberUrl('video',videoUrl);rememberUrl('subtitle',subtitleUrl);status.textContent=await res.text();document.querySelector('#videoFile').value='';document.querySelector('#subtitleFile').value=''}catch(e){await cancelStaged();status.textContent=e.message||'Could not reach the TV. Check that both devices are on the same network.'}finally{setFormBusy(false);activeRequest=null;setTransferVisible(false)}}
