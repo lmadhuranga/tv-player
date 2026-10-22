@@ -898,3 +898,12 @@ Verification record:
 
 - [x] `git diff --check` and integrated branch `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 16 executed, 39 up-to-date); embedded File Manager JavaScript passed `node --check`.
 - [ ] TV visual and remote runtime behavior remain pending; no TV contact or installation was performed.
+
+## Milestone 95: `95-usb-subtitle-actions`
+
+Removed the “Play without subtitles” and “Back to USB folders” actions from the USB subtitle-choice screen. Subtitle selection and “Play video” remain available, and remote Back continues to return to the USB browser. Initial focus now targets the selected subtitle, the first subtitle when none is preselected, or “Play video” when no subtitles are available.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (39 actionable tasks; 4 executed, 35 up-to-date).
+- [ ] TV remote focus behavior pending runtime verification; no TV contact or installation performed.

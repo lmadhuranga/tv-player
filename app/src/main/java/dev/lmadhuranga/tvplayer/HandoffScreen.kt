@@ -69,7 +69,16 @@ fun HandoffScreen(
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val denyRequester = remember { FocusRequester() }
+    val backRequester = remember { FocusRequester() }
     var confirmForget by remember { mutableStateOf(false) }
+
+    // Back is the default TV-remote action on entering the QR/Send to TV screen.
+    // Do not steal focus while a connection-approval or revoke-trust dialog is open.
+    androidx.compose.runtime.LaunchedEffect(state.pendingApprovalId, confirmForget) {
+        if (state.pendingApprovalId == null && !confirmForget) {
+            backRequester.requestFocus()
+        }
+    }
 
     androidx.compose.runtime.LaunchedEffect(state.pendingApprovalId) {
         onApprovalPending(state.pendingApprovalId != null)
@@ -201,7 +210,7 @@ fun HandoffScreen(
                 Spacer(Modifier.height(18.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
-                    AppButton(onClick = onBack) { Text("Back") }
+                    AppButton(onClick = onBack, modifier = Modifier.focusRequester(backRequester)) { Text("Back") }
                 }
                 Spacer(Modifier.height(8.dp))
                 AppButton(onClick = { confirmForget = true }) {
