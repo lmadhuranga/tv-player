@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `26-darker-qr-page` (source implementation; local build/lint recorded below; no install or TV interaction for this milestone)
-- Current branch: `26-darker-qr-page`
-- Planning baseline: `be2f7cc`; milestones 2–19 are committed sequentially on local branches (full mapping below).
+- Implemented through milestone: `27-remote-pair-approval` (source implementation and local build/lint recorded below; no install or TV interaction for this milestone)
+- Current branch: `27-remote-pair-approval`
+- Planning baseline: `be2f7cc`; milestones 2–26 are committed sequentially on local branches; milestone 27 is in progress (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
 ## Decisions recorded
@@ -17,7 +17,7 @@
 - Remote navigation and reliable focus behavior are core requirements.
 - Recent history is local and privacy-conscious, with clear-history and deliberate handling of signed URL replacement/resume.
 - Feature work proceeds in numbered branches stacked from the last accepted commit; commit each feature before proceeding. No pushes, repository creation, or merge without an explicit request.
-- The app UI, settings, errors, documentation, and examples are English-only; subtitle content may use any language/Unicode supported by playback.
+- The app UI, settings, errors, documentation, and examples are English-only; subtitle content may use any language/Unicode supported by playback. Phone access now requires explicit TV remote approval before the browser receives a session token.
 - The user authorized the milestone 13 debug build/lint/install without launch. For milestone 14, only local build/lint is authorized; the updated APK remains local. Player tests and runtime behavior remain unverified.
 
 ## Numbered branches and commits
@@ -49,7 +49,8 @@
 | 23 | `23-phone-input-mode` | branch HEAD (`git rev-parse 23-phone-input-mode`) |
 | 24 | `24-phone-url-history` | branch HEAD (`git rev-parse 24-phone-url-history`) |
 | 25 | `25-phone-mode-buttons` | `81b5509` |
-| 26 | `26-darker-qr-page` | pending commit |
+| 26 | `26-darker-qr-page` | `3ad257b` |
+| 27 | `27-remote-pair-approval` | pending commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -99,7 +100,7 @@ Status: source implemented and reviewed; URL parsing and playback behavior are u
 
 ## Milestone 6: `6-lan-link-handoff`
 
-Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, generates a fresh 256-bit pairing code per session, and accepts only bounded JSON link submissions. Requests are limited to a 12 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links. (A manual title field was added later, then removed in milestone 17.) The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
+Added a small HTTP endpoint that lives only while the handoff screen is foregrounded. It serves a responsive link form and QR code, uses a same-origin browser pairing exchange for a fresh 256-bit session token, and accepts only bounded JSON link submissions. Requests are limited to a 12 KiB body, 16 KiB of headers, and 4,096-character HTTP(S) video/subtitle links. (A manual title field was added later, then removed in milestone 17.) The receiver requires a same-origin request and a constant-time pairing-token match, rejects non-local IPv4 peers and cross-subnet peers, and validates subtitle extensions. The endpoint receives links only; the TV's Media3 player fetches the media. The QR carries the pairing token only in a URL fragment; the page consumes it and removes it from browser history before sending the token in a request header. The full video and subtitle URLs are never logged by this code.
 
 Status: source implemented and reviewed; request handling, LAN interface selection, QR usability, browser compatibility, and lifecycle shutdown remain unverified.
 
@@ -164,14 +165,9 @@ Verification record:
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; the lint report has no errors and 22 warnings.
 - No emulator/device commands were run for milestone 14. The prior milestone 13 APK remains installed on BRAVIA VU3; this updated APK has not been installed or launched. Fullscreen layout, system bars, remote focus, timer, Back behavior, media key handling, menus, and playback remain unverified at runtime.
 
-## Milestone 15: `15-four-digit-pairing`
+## Milestone 15: `15-four-digit-pairing` (superseded in milestone 27)
 
-Replaced the long code shown on the TV with a uniformly random, exactly four-digit PIN, preserving leading zeroes. The phone page exchanges the PIN once at same-origin `POST /api/pair` for a fresh 256-bit session token; the page retains that token only in memory and sends it in the existing `/api/play` header. PINs expire after five minutes, the TV can generate a new PIN, and the server invalidates PIN and session token when stopped or restarted. Five wrong guesses rotate the PIN and enforce a 30-second server-side cooldown. Same-origin and same-subnet checks remain in effect, and responses are marked `no-store`; no pairing secrets or full media URLs are logged.
-
-Verification record:
-
-- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36`; Gradle reported `BUILD SUCCESSFUL` with no errors. A nullable-host warning in the LAN address selector was corrected during implementation; the final build emitted no Kotlin compiler warnings.
-- `git diff --check` passed. No tests, emulator/device commands, TV actions, or phone-browser LAN requests were run. The updated APK remains local and has not been installed or launched. PIN expiry, cooldown, one-time exchange, QR behavior, and server lifecycle remain unverified at runtime.
+This milestone introduced the earlier browser pairing exchange. Milestone 27 replaces that interaction with on-TV remote approval; the current acceptance criteria and runtime checks are documented there.
 
 ## Milestone 16: `16-dark-buttons-white-focus`
 
@@ -184,19 +180,19 @@ Verification record:
 
 ## Milestone 17: `17-subtitle-file-upload-filename-and-hidden-skip`
 
-The app now opens directly to the phone-send QR/PIN screen, and Home no longer contains “Add Video URL” or “Open player”; browser handoff starts submitted links immediately, even when history is enabled. Added an Android document picker in the full-screen player's settings route. SRT/WebVTT files are copied to the app's private subtitle cache, validated using the existing bounded parser, and attached to the active Media3 item; cancellation/replacement cleanup and safe errors preserve video playback. This is a TV-side picker only: the phone/laptop handoff still accepts subtitle URLs, not file uploads. Removed the manual title field from the TV and handoff forms. The player header/history label now derives from the decoded final URL path segment, ignoring query strings, with host/“Video” fallbacks; the header truncates long filenames on one line with an ellipsis. With controls hidden, Left/Right seek by 30 seconds; visible-control navigation remains unchanged. A bottom timeline remains visible while controls are hidden, with dark gray played progress and light gray buffered progress.
+The app now opens directly to the phone-send QR handoff screen, and Home no longer contains “Add Video URL” or “Open player”; browser handoff starts submitted links immediately, even when history is enabled. Added an Android document picker in the full-screen player's settings route. SRT/WebVTT files are copied to the app's private subtitle cache, validated using the existing bounded parser, and attached to the active Media3 item; cancellation/replacement cleanup and safe errors preserve video playback. This is a TV-side picker only: the phone/laptop handoff still accepts subtitle URLs, not file uploads. Removed the manual title field from the TV and handoff forms. The player header/history label now derives from the decoded final URL path segment, ignoring query strings, with host/“Video” fallbacks; the header truncates long filenames on one line with an ellipsis. With controls hidden, Left/Right seek by 30 seconds; visible-control navigation remains unchanged. A bottom timeline remains visible while controls are hidden, with dark gray played progress and light gray buffered progress.
 
 Verification record:
 
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
 - The first sandboxed Gradle invocation stopped before configuration because Gradle could not create its local lock service socket (`Operation not permitted`); the same command passed with the required local build permission.
-- After adding the timeline, filename ellipsis, direct browser-handoff playback, and default QR/PIN startup, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
+- After adding the timeline, filename ellipsis, direct browser-handoff playback, and default QR handoff startup, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed on JDK `17.0.17`, Gradle `8.13`, SDK `36` (`BUILD SUCCESSFUL`, 48 tasks).
 - `git diff --check` passed. Before install, ADB identified `192.168.8.100:5555` as manufacturer Sony, model BRAVIA VU3, API 34. `adb install -r app/build/outputs/apk/debug/app-debug.apk` returned `Success`; `pm path` and `dumpsys package` confirmed `dev.lmadhuranga.tvplayer`, version `0.1.0`, minSdk 26, targetSdk 36.
 - `adb shell am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting: Intent { cmp=dev.lmadhuranga.tvplayer/.MainActivity }`. No D-pad input, screenshot, visible UI inspection, playback, or feature QA was performed. Picker, subtitle rendering/cleanup, title display, seek, handoff, visual, and playback runtime behavior remain unverified.
 
 ## Milestone 18: `18-player-back-handoff-screen`
 
-When the player exits through Back, the app returns to the phone-send handoff route instead of Home. The existing handoff screen continues to own its current QR, displayed phone URL, short PIN and foreground-only server. “Go to Player” is shown and initially focused only while current media is available; when no media is loaded the action is hidden and Settings receives initial focus. Leaving the handoff route still disposes its server and pairing session; returning creates a fresh session through the existing lifecycle. Browser submissions continue to start playback immediately.
+When the player exits through Back, the app returns to the phone-send handoff route instead of Home. The existing handoff screen continues to own its current QR, displayed phone URL, remote approval prompt and foreground-only server. “Go to Player” is shown and initially focused only while current media is available; when no media is loaded the action is hidden and Settings receives initial focus. Leaving the handoff route still disposes its server and pairing session; returning creates a fresh session through the existing lifecycle. Browser submissions continue to start playback immediately.
 
 Verification record:
 
@@ -216,7 +212,7 @@ Verification record:
 
 ## Milestone 20: `20-phone-video-subtitle-upload`
 
-The paired phone page keeps video URL and optional subtitle URL submission and adds the alternative of uploading a video and/or SRT/WebVTT subtitle file. The browser sends each file as a raw authenticated octet-stream request with `Content-Length`; Android copies it in 64 KiB chunks directly to app-private cache (no full-file heap buffer and no media proxy). The page receives an authenticated effective limit calculated from the 8 GiB video/8 MiB subtitle caps and current usable cache after retaining a 512 MiB reserve. The server rechecks the size before writing and free cache while streaming. Header, request, same-origin, same-subnet, PIN/session token bounds and checks remain active; filenames are sanitized and media extensions/container signatures are checked.
+The paired phone page keeps video URL and optional subtitle URL submission and adds the alternative of uploading a video and/or SRT/WebVTT subtitle file. The browser sends each file as a raw authenticated octet-stream request with `Content-Length`; Android copies it in 64 KiB chunks directly to app-private cache (no full-file heap buffer and no media proxy). The page receives an authenticated effective limit calculated from the 8 GiB video/8 MiB subtitle caps and current usable cache after retaining a 512 MiB reserve. The server rechecks the size before writing and free cache while streaming. Header, request, same-origin, same-subnet, session-token bounds and checks remain active; filenames are sanitized and media extensions/container signatures are checked.
 
 Only one staged file of each kind is kept for a paired session. Cancel or failed uploads remove the incomplete/staged files; a successful `/api/play` atomically transfers files to an app-private playback directory. The playback controller owns the files, keeps their paths out of history, imports uploaded subtitles to its existing parsed/cache path, and removes the uploads on replacement, player Back, app stop/release, playback completion, or media error. App start removes playback-upload leftovers from a previous process. Phone-page URL and upload choices are mutually exclusive per media kind, with upload progress, cancel, and status/error messaging. URL-only traffic still sends a small JSON request and the TV fetches its media directly.
 
@@ -228,7 +224,7 @@ Verification record:
 
 ## Current execution boundary
 
-Milestones 2–24 are committed on separate local branches, stacked sequentially. The milestone 25 APK includes the preceding source and has been installed and launched on the approved BRAVIA; the Activity remained top-resumed. Phone-browser controls are being checked separately; media playback/history restoration, upload, subtitle rendering, D-pad, and buffering behavior remain unverified. Optional Seedr discovery remains deferred.
+Milestones 2–26 are committed on separate local branches, stacked sequentially. The milestone 25 APK includes the preceding source and has been installed and launched on the approved BRAVIA; the Activity remained top-resumed. Phone-browser controls are being checked separately; media playback/history restoration, upload, subtitle rendering, D-pad, and buffering behavior remain unverified. Optional Seedr discovery remains deferred.
 
 ## Milestone 21: `21-limits-origin-fix`
 
@@ -280,7 +276,7 @@ Verification record:
 
 - `git diff --check` and the embedded page JavaScript `node --check` passed.
 - With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks).
-- The debug APK was installed with `adb install -r` on the verified Sony BRAVIA VU3 (Android API 34); `am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting`, the process remained alive, and `dumpsys activity activities` showed `MainActivity` top-resumed. The handoff page and QR became available after initial startup. A fresh PIN was generated for the lead's separate browser check.
+- The debug APK was installed with `adb install -r` on the verified Sony BRAVIA VU3 (Android API 34); `am start -n dev.lmadhuranga.tvplayer/.MainActivity` returned `Starting`, the process remained alive, and `dumpsys activity activities` showed `MainActivity` top-resumed. The handoff page and QR became available after initial startup. The then-current short-code flow was exercised in a separate browser check.
 - The lead's separate browser check reported successful URL/URL submission, loaded limits and video/subtitle history buttons, unlocked controls, and no JavaScript errors. The TV fetched the synthetic 10-second silent WAV and SRT fixtures (both HTTP 200). The player showed the WAV filename, 0:10 duration, CC On, and no visible error; the captured image was at the end of the silent audio sample, so audible playback and subtitle cue rendering were not confirmed. Back returned to Handoff with QR/URL. Settings showed 1 minute initially; after selecting 2 minutes, closing/reopening Settings retained 2 minutes, and 1 minute was restored. The position-history toggle remained Off after an accidental toggle was immediately reverted. The new mode buttons still need explicit URL/File switching checks; no video image/codec playback was tested.
 
 ## Milestone 26: `26-darker-qr-page`
@@ -291,3 +287,12 @@ Verification record:
 
 - `git diff --check` passed. With JDK 17, Gradle 8.13, and SDK 36, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks).
 - No TV install, launch, screenshot, or live phone-camera scan was performed for the darker QR change. Visual appearance and scanner compatibility should be checked on-device.
+
+## Milestone 27: `27-remote-pair-approval`
+
+Replaced the phone page's short-code form and QR fragment with a direct handoff URL. A same-origin `POST /api/pair` now waits up to 60 seconds for an explicit TV remote decision. The TV prompt identifies the browser family from a conservative User-Agent mapping and shows its peer IP; Deny is initially focused and Allow is reachable with D-pad navigation. If Settings was already open, it closes so the approval prompt remains visible; after a decision the normal handoff actions are available again. Allow creates a fresh 256-bit session token only after the remote decision; subsequent limits, URL submission, uploads, and play requests keep using the existing token and strict Origin/subnet checks. Deny, Back dismissal, timeout, or server stop wake the pending request with a clear HTTP failure and clear the prompt. One pending request is permitted at a time, with a short retry cooldown to prevent repeated prompts. The server remains foreground-only, and no trusted-browser state is persisted.
+
+Verification record:
+
+- Local debug build/lint, embedded JavaScript syntax check, and `git diff --check` results are recorded after execution below.
+- A narrow Python source assertion checked that the old QR fragment/header/state are absent, `/api/pair` has no code header, and the TV Allow action is wired to the approval method. No TV install, launch, or navigation was performed for this milestone. Remote focus, prompt visuals, phone browser behavior, and runtime allow/deny/timeout flows remain unverified on-device.

@@ -1,7 +1,6 @@
 package dev.lmadhuranga.tvplayer
 
 import android.graphics.Bitmap
-import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,13 +17,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,9 +37,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
+import androidx.compose.ui.window.Dialog
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import kotlinx.coroutines.delay
 
 private val QrLightBackground = Color(0xFFD6D6D6)
 private val QrLightBackgroundArgb = android.graphics.Color.rgb(214, 214, 214)
@@ -57,18 +53,16 @@ fun HandoffScreen(
     onBack: () -> Unit,
     onGoToPlayer: () -> Unit,
     onOpenSettings: () -> Unit,
+    onApprovalPending: (Boolean) -> Unit,
 ) {
     val latestCallback by rememberUpdatedState(onVideoSubmitted)
     val server = remember { LocalLinkServer(cacheDirectory) { latestCallback(it) } }
     val state by server.state.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
-    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    val denyRequester = remember { FocusRequester() }
 
-    LaunchedEffect(state.pairingExpiresAtMs, state.pairingAvailableAtMs) {
-        while (state.isRunning) {
-            now = SystemClock.elapsedRealtime()
-            delay(1_000)
-        }
+    androidx.compose.runtime.LaunchedEffect(state.pendingApprovalId) {
+        onApprovalPending(state.pendingApprovalId != null)
     }
 
     DisposableEffect(server, lifecycleOwner) {
@@ -105,30 +99,13 @@ fun HandoffScreen(
                 Spacer(Modifier.height(18.dp))
                 Text("Use your phone to add a video", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(14.dp))
-                Text("Scan the QR code to send a direct video or subtitle link, or upload files from your phone. URL media is fetched by the TV.", color = Muted, fontSize = 18.sp)
+                Text("Scan the QR code to open the send page. When you send a video, approve the connection here with your TV remote. URL media is fetched by the TV.", color = Muted, fontSize = 18.sp)
                 Spacer(Modifier.height(20.dp))
                 state.address?.let { address ->
                     Text("Open on your phone", color = Muted, fontSize = 16.sp)
                     Text("http://$address:8765", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(12.dp))
-                    Text("PAIRING CODE", color = Muted, fontSize = 13.sp, letterSpacing = 2.sp)
-                    Text(state.pairingCode.ifBlank { "----" }, color = Teal, fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
-                    val cooldownSeconds = ((state.pairingAvailableAtMs - now).coerceAtLeast(0L) / 1_000L)
-                    if (cooldownSeconds > 0) {
-                        Text("New code ready in ${cooldownSeconds}s", color = Muted, fontSize = 14.sp)
-                    } else if (state.pairingCode.isNotBlank()) {
-                        val remainingSeconds = ((state.pairingExpiresAtMs - now).coerceAtLeast(0L) / 1_000L)
-                        Text(
-                            if (remainingSeconds == 0L) "Code expired. Generate a new code."
-                            else "Expires in ${remainingSeconds / 60}:${(remainingSeconds % 60).toString().padStart(2, '0')}",
-                            color = Muted,
-                            fontSize = 14.sp,
-                        )
-                    } else {
-                        Text("Code used. Generate a new code to pair another browser.", color = Muted, fontSize = 14.sp)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    AppButton(onClick = server::regeneratePin, enabled = cooldownSeconds == 0L) { Text("Generate new code") }
+                    Spacer(Modifier.height(16.dp))
+                    Text("Send from your phone, then approve the request on this TV.", color = Muted, fontSize = 15.sp)
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(26.dp))
@@ -162,6 +139,38 @@ fun HandoffScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(if (state.isRunning) "Preparing QR code…" else "QR code unavailable", color = Ink, fontSize = 17.sp)
+                    }
+                }
+            }
+        }
+    }
+
+    state.pendingApprovalId?.let { approvalId ->
+        Dialog(onDismissRequest = { server.denyPairingRequest(approvalId) }) {
+            androidx.compose.runtime.LaunchedEffect(approvalId) { denyRequester.requestFocus() }
+            Surface(
+                modifier = Modifier.width(700.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = SurfaceDefaults.colors(containerColor = Color(0xFF18263A)),
+            ) {
+                Column(
+                    modifier = Modifier.padding(36.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Text("APPROVE PHONE CONNECTION?", color = Teal, fontSize = 15.sp, letterSpacing = 2.sp)
+                    Text(
+                        "${state.requesterDevice ?: "A browser"} at ${state.requesterAddress ?: "an unknown address"} wants to connect and send media.",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text("Only allow devices you recognize on your local network.", color = Muted, fontSize = 17.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AppButton(
+                            onClick = { server.denyPairingRequest(approvalId) },
+                            modifier = Modifier.focusRequester(denyRequester),
+                        ) { Text("Deny") }
+                        AppButton(onClick = { server.approvePairingRequest(approvalId) }) { Text("Allow") }
                     }
                 }
             }

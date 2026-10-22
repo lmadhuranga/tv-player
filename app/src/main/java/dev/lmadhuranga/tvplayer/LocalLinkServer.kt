@@ -2,7 +2,6 @@ package dev.lmadhuranga.tvplayer
 
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.util.Base64
 import org.json.JSONObject
 import java.io.BufferedInputStream
@@ -28,6 +27,8 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,13 +43,13 @@ data class SubmittedVideo(
 
 data class HandoffState(
     val address: String? = null,
-    val pairingCode: String = "",
     val isRunning: Boolean = false,
     val message: String? = null,
-    val pairingExpiresAtMs: Long = 0L,
-    val pairingAvailableAtMs: Long = 0L,
+    val pendingApprovalId: String? = null,
+    val requesterDevice: String? = null,
+    val requesterAddress: String? = null,
 ) {
-    val pageUrl: String? get() = address?.let { "http://$it:$HANDOFF_PORT/#pin=$pairingCode" }
+    val pageUrl: String? get() = address?.let { "http://$it:$HANDOFF_PORT/" }
 }
 
 private const val HANDOFF_PORT = 8765
@@ -58,9 +59,8 @@ private const val MAX_VIDEO_UPLOAD_BYTES = 8L * 1024 * 1024 * 1024
 private const val MAX_SUBTITLE_UPLOAD_BYTES = 8L * 1024 * 1024
 private const val CACHE_RESERVE_BYTES = 512L * 1024 * 1024
 private const val UPLOAD_READ_TIMEOUT_MS = 120_000
-private const val PIN_LIFETIME_MS = 5 * 60 * 1000L
-private const val PIN_COOLDOWN_MS = 30 * 1000L
-private const val MAX_PIN_FAILURES = 5
+private const val APPROVAL_TIMEOUT_SECONDS = 60L
+private const val APPROVAL_RETRY_COOLDOWN_MS = 3_000L
 
 /** Foreground-only paired handoff. Link requests stay small; optional files stream to private cache. */
 class LocalLinkServer(
@@ -74,11 +74,10 @@ class LocalLinkServer(
     private val generation = AtomicLong(0L)
     @Volatile private var server: ServerSocket? = null
     @Volatile private var activeSocket: Socket? = null
-    @Volatile private var pairingCode: String = ""
+    @Volatile private var approvalRequestInProgress = false
     @Volatile private var sessionToken: String = ""
-    @Volatile private var pairingExpiresAtMs: Long = 0L
-    @Volatile private var pairingAvailableAtMs: Long = 0L
-    private var failedPinAttempts = 0
+    private var pendingApproval: PendingApproval? = null
+    private var lastApprovalRequestAtMs = 0L
     private val uploadDirectory = File(cacheDirectory, "handoff-uploads").apply { mkdirs() }
     private val playbackUploadDirectory = File(cacheDirectory, "playback-uploads").apply { mkdirs() }
     private val uploadLock = Any()
@@ -87,6 +86,15 @@ class LocalLinkServer(
 
     private enum class UploadKind { VIDEO, SUBTITLE }
     private data class StagedUpload(val file: File, val name: String, val token: String)
+    private enum class ApprovalDecision { PENDING, ALLOWED, DENIED, STOPPED }
+    private class PendingApproval(
+        val id: String,
+        val requesterDevice: String,
+        val requesterAddress: String,
+        @Volatile var decision: ApprovalDecision = ApprovalDecision.PENDING,
+    ) {
+        val completed = CountDownLatch(1)
+    }
 
     @Synchronized
     fun start() {
@@ -111,7 +119,7 @@ class LocalLinkServer(
             }
             socket = listener
             server = listener
-            rotatePin(lanAddress)
+            publishPairingState(address = lanAddress)
             Thread({ acceptLoop(listener, runId) }, "tv-player-link-server").apply { isDaemon = true; start() }
         } catch (_: BindException) {
             failStart(socket, "Port $HANDOFF_PORT is already in use by another app. Close that app and retry link handoff.")
@@ -130,10 +138,9 @@ class LocalLinkServer(
         server = null
         stopped.set(true)
         generation.incrementAndGet()
-        pairingCode = ""
+        approvalRequestInProgress = false
         sessionToken = ""
-        pairingExpiresAtMs = 0L
-        pairingAvailableAtMs = 0L
+        releasePendingApproval()
         mutableState.value = HandoffState(message = message)
     }
 
@@ -141,11 +148,10 @@ class LocalLinkServer(
     fun stop() {
         if (stopped.getAndSet(true)) return
         generation.incrementAndGet()
-        pairingCode = ""
         sessionToken = ""
-        pairingExpiresAtMs = 0L
-        pairingAvailableAtMs = 0L
-        try { activeSocket?.close() } catch (_: Exception) { }
+        val wasAwaitingApproval = approvalRequestInProgress
+        releasePendingApproval()
+        if (!wasAwaitingApproval) try { activeSocket?.close() } catch (_: Exception) { }
         activeSocket = null
         val current = server
         server = null
@@ -193,8 +199,9 @@ class LocalLinkServer(
         val failedGeneration = generation.incrementAndGet()
         server = null
         activeSocket = null
-        pairingCode = ""
+        approvalRequestInProgress = false
         sessionToken = ""
+        releasePendingApproval()
         try { listener.close() } catch (_: Exception) { }
         mainHandler.post {
             if (stopped.get() && generation.get() == failedGeneration) {
@@ -229,8 +236,9 @@ class LocalLinkServer(
         if (method == "GET" && path == "/") return respond(socket.getOutputStream(), 200, "OK", LINK_ENTRY_PAGE, "text/html; charset=utf-8")
         if (method == "POST" && path == "/api/pair") {
             if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
-            val pin = headers["x-pairing-pin"].orEmpty()
-            return exchangePin(socket, listener, runId, pin)
+            val requesterAddress = socket.inetAddress.hostAddress ?: "Unknown address"
+            val requesterDevice = describeRequester(headers["user-agent"])
+            return requestPairApproval(socket, listener, runId, requesterDevice, requesterAddress)
         }
         if (method == "GET" && path == "/api/limits") {
             // Same-origin GET fetches commonly omit Origin. The paired token still
@@ -238,7 +246,7 @@ class LocalLinkServer(
             if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) {
                 return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
             }
-            if (!isAuthorized(headers["x-pairing-token"].orEmpty())) return respond(socket.getOutputStream(), 401, "Unauthorized", "Pair this browser with the code shown on the TV")
+            if (!isAuthorized(headers["x-pairing-token"].orEmpty())) return respond(socket.getOutputStream(), 401, "Unauthorized", "Request approval on the TV before sending media")
             return respond(socket.getOutputStream(), 200, "OK", JSONObject(mapOf(
                 "videoBytes" to effectiveUploadLimit(UploadKind.VIDEO),
                 "subtitleBytes" to effectiveUploadLimit(UploadKind.SUBTITLE),
@@ -248,7 +256,7 @@ class LocalLinkServer(
         if (!isSameOrigin(headers["origin"], socket.localAddress)) return respond(socket.getOutputStream(), 403, "Forbidden", "Open the link page on this TV's local network")
         val requestToken = headers["x-pairing-token"].orEmpty()
         if (!isAuthorized(requestToken)) {
-            return respond(socket.getOutputStream(), 401, "Unauthorized", "Pair this browser with the code shown on the TV")
+            return respond(socket.getOutputStream(), 401, "Unauthorized", "Request approval on the TV before sending media")
         }
         if (path == "/api/cancel-upload") {
             discardStagedUploads(requestToken)
@@ -449,60 +457,125 @@ class LocalLinkServer(
 
     private fun formatBytes(bytes: Long): String = if (bytes >= 1024L * 1024 * 1024) "${bytes / (1024L * 1024 * 1024)} GiB" else "${bytes / (1024L * 1024)} MiB"
 
-    @Synchronized
-    private fun exchangePin(socket: Socket, listener: ServerSocket, runId: Long, pin: String) {
-        val now = SystemClock.elapsedRealtime()
+    private fun requestPairApproval(
+        socket: Socket,
+        listener: ServerSocket,
+        runId: Long,
+        requesterDevice: String,
+        requesterAddress: String,
+    ) {
         val output = socket.getOutputStream()
-        if (!isCurrent(listener, runId)) return respond(output, 410, "Gone", "The TV pairing session has ended")
-        if (now < pairingAvailableAtMs) return respond(output, 429, "Too Many Requests", "Wait briefly before trying a new code")
-        if (pairingCode.isEmpty()) {
-            return respond(output, 409, "Conflict", "This code was already used. Generate a new code on the TV to pair another browser")
-        }
-        if (now >= pairingExpiresAtMs) {
-            rotatePin(mutableState.value.address)
-            return respond(output, 410, "Gone", "This code expired. Use the new code shown on the TV")
-        }
-        if (pin.length != 4 || pin.any { !it.isDigit() } || !MessageDigest.isEqual(
-                pairingCode.toByteArray(StandardCharsets.US_ASCII), pin.toByteArray(StandardCharsets.US_ASCII)
-            )) {
-            failedPinAttempts++
-            if (failedPinAttempts >= MAX_PIN_FAILURES) {
-                pairingAvailableAtMs = now + PIN_COOLDOWN_MS
-                rotatePin(mutableState.value.address, preserveCooldown = true)
+        val pending = synchronized(this) {
+            if (!isCurrent(listener, runId)) {
+                respond(output, 410, "Gone", "The TV handoff session has ended")
+                return
             }
-            return respond(output, 401, "Unauthorized", "That code is not correct")
+            if (pendingApproval != null) {
+                respond(output, 409, "Conflict", "A phone is already waiting for approval on the TV")
+                return
+            }
+            val now = System.nanoTime() / 1_000_000L
+            if (now - lastApprovalRequestAtMs < APPROVAL_RETRY_COOLDOWN_MS) {
+                respond(output, 429, "Too Many Requests", "Wait briefly before requesting TV approval again")
+                return
+            }
+            lastApprovalRequestAtMs = now
+            PendingApproval(UUID.randomUUID().toString(), requesterDevice, requesterAddress).also {
+                pendingApproval = it
+                approvalRequestInProgress = true
+                publishPairingState(message = null)
+            }
         }
-        pairingCode = "" // The short PIN is one-use; subsequent submissions require the exchanged token.
-        failedPinAttempts = 0
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        sessionToken = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-        publishPairingState()
-        respond(output, 200, "OK", JSONObject(mapOf("token" to sessionToken)).toString(), "application/json; charset=utf-8")
+
+        val completedInTime = try {
+            pending.completed.await(APPROVAL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
+        val response = synchronized(this) {
+            // Start the retry window when this request completes as well, so
+            // requests already queued in the socket backlog cannot raise a second prompt.
+            lastApprovalRequestAtMs = System.nanoTime() / 1_000_000L
+            when {
+                pending.decision == ApprovalDecision.ALLOWED && isCurrent(listener, runId) -> {
+                    if (pendingApproval === pending) pendingApproval = null
+                    val bytes = ByteArray(32).also(SecureRandom()::nextBytes)
+                    sessionToken = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+                    publishPairingState(message = null)
+                    Triple(200, "OK", JSONObject(mapOf("token" to sessionToken)).toString())
+                }
+                pending.decision == ApprovalDecision.DENIED -> {
+                    Triple(403, "Forbidden", "Pairing was denied on the TV")
+                }
+                pending.decision == ApprovalDecision.STOPPED || !isCurrent(listener, runId) -> {
+                    Triple(410, "Gone", "The TV handoff stopped before approval was completed")
+                }
+                !completedInTime -> {
+                    if (pendingApproval === pending) {
+                        pendingApproval = null
+                        publishPairingState(message = "Phone approval timed out. The phone can request again.")
+                    }
+                    Triple(408, "Request Timeout", "TV approval timed out. Ask the TV owner to try again")
+                }
+                else -> Triple(410, "Gone", "The TV handoff stopped before approval was completed")
+            }
+        }
+        try {
+            respond(output, response.first, response.second, response.third,
+                if (response.first == 200) "application/json; charset=utf-8" else "text/plain; charset=utf-8")
+        } finally {
+            synchronized(this) { approvalRequestInProgress = false }
+        }
     }
 
     @Synchronized
-    fun regeneratePin() {
-        if (stopped.get()) return
-        rotatePin(mutableState.value.address)
+    fun approvePairingRequest(id: String) {
+        val pending = pendingApproval?.takeIf { it.id == id && it.decision == ApprovalDecision.PENDING } ?: return
+        pending.decision = ApprovalDecision.ALLOWED
+        pendingApproval = null
+        publishPairingState(message = null)
+        pending.completed.countDown()
     }
 
-    private fun rotatePin(address: String?, preserveCooldown: Boolean = false) {
-        pairingCode = SecureRandom().nextInt(10_000).toString().padStart(4, '0')
-        pairingExpiresAtMs = SystemClock.elapsedRealtime() + PIN_LIFETIME_MS
-        sessionToken = ""
-        failedPinAttempts = 0
-        if (!preserveCooldown) pairingAvailableAtMs = 0L
-        publishPairingState(address)
+    @Synchronized
+    fun denyPairingRequest(id: String) {
+        val pending = pendingApproval?.takeIf { it.id == id && it.decision == ApprovalDecision.PENDING } ?: return
+        pending.decision = ApprovalDecision.DENIED
+        pendingApproval = null
+        publishPairingState(message = "Phone connection was denied on the TV.")
+        pending.completed.countDown()
     }
 
-    private fun publishPairingState(address: String? = mutableState.value.address) {
+    private fun releasePendingApproval() {
+        pendingApproval?.let { pending ->
+            pendingApproval = null
+            pending.decision = ApprovalDecision.STOPPED
+            pending.completed.countDown()
+        }
+    }
+
+    private fun describeRequester(userAgent: String?): String {
+        val agent = userAgent.orEmpty().lowercase(Locale.ROOT)
+        return when {
+            "edg/" in agent -> "Microsoft Edge"
+            "firefox/" in agent -> "Firefox"
+            "chrome/" in agent && "edg/" !in agent -> "Chrome"
+            "safari/" in agent && "chrome/" !in agent -> "Safari"
+            "android" in agent -> "Android browser"
+            else -> "Phone or computer browser"
+        }
+    }
+
+    private fun publishPairingState(address: String? = mutableState.value.address, message: String? = mutableState.value.message) {
+        val pending = pendingApproval
         mutableState.value = HandoffState(
             address = address,
-            pairingCode = pairingCode,
             isRunning = !stopped.get(),
-            pairingExpiresAtMs = pairingExpiresAtMs,
-            pairingAvailableAtMs = pairingAvailableAtMs,
+            message = message,
+            pendingApprovalId = pending?.id,
+            requesterDevice = pending?.requesterDevice,
+            requesterAddress = pending?.requesterAddress,
         )
     }
 
@@ -576,15 +649,13 @@ class LocalLinkServer(
             <!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1">
             <meta charset="utf-8"><title>TV Player</title>
             <style>body{font:18px system-ui;max-width:680px;margin:2rem auto;padding:0 1rem;background:#07111f;color:#fff}label{display:block;margin:1rem 0 .35rem}input{box-sizing:border-box;width:100%;padding:.85rem;border-radius:.6rem;border:1px solid #6b829d;font:inherit}input[type=file]{padding:.5rem}.mode{border:0;padding:0;margin:.5rem 0}.mode legend{font-size:.9rem;color:#b9c8d9}.mode-options{display:flex;gap:.6rem}.mode-button{margin:.3rem 0;padding:.55rem 1rem;border:2px solid #8190a3;border-radius:.6rem;background:#18263a;color:#fff;font:inherit;font-weight:700;cursor:pointer}.mode-button[aria-pressed="true"]{background:#fff;border-color:#fff;color:#111}.mode-button:focus-visible{outline:3px solid #67c8ff;outline-offset:3px}.mode-button:disabled{opacity:.55;cursor:default}button{margin-top:1.2rem;padding:.8rem 1.2rem;border:0;border-radius:.6rem;background:#fff;color:#111;font:inherit;font-weight:700}.history-list{display:grid;gap:.4rem;margin-top:.5rem}.history-list button{width:100%;margin:0;text-align:left;overflow-wrap:anywhere}small{color:#b9c8d9}.choice{margin:.35rem 0 1rem;padding:.75rem;border:1px solid #34465c;border-radius:.6rem}#status{min-height:2rem;white-space:pre-wrap}progress{width:100%;height:1rem}</style>
-            <h1>Send a video to your TV</h1><p>Choose a direct video URL or upload a video file. The TV downloads URL media directly; uploaded files are sent to temporary TV storage and removed after playback. Successful URLs are kept only in this browser for 24 hours; signed links may expire sooner. Clear history to remove them earlier.</p>
-            <label for="code">4-digit TV pairing code</label><input id="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="one-time-code" required>
+            <h1>Send a video to your TV</h1><p>Choose a direct video URL or upload a video file. The TV downloads URL media directly; uploaded files are sent to temporary TV storage and removed after playback. When you send, approve the connection on the TV with its remote. Successful URLs are kept only in this browser for 24 hours; signed links may expire sooner. Clear history to remove them earlier.</p>
             <section class="choice"><strong>Video</strong><fieldset class="mode"><legend>Send video by</legend><div class="mode-options" role="group" aria-label="Video input mode" data-mode-group="videoMode"><button class="mode-button" type="button" data-mode="url" aria-pressed="true">URL</button><button class="mode-button" type="button" data-mode="file" aria-pressed="false">File</button></div></fieldset><div id="videoUrlMode"><label for="video">Video URL</label><input id="video" type="url" autocomplete="url" maxlength="4096" placeholder="https://example.com/video.mp4"><div><strong>Recent video URLs (24 hours)</strong><div id="videoHistory" class="history-list" aria-live="polite"></div></div></div><div id="videoFileMode" hidden><label for="videoFile">Video file</label><input id="videoFile" type="file" accept=".mp4,.m4v,.mov,.3gp,.mkv,.webm,.ts,.m2ts,.mpg,.mpeg" disabled></div><small id="videoLimit">Pair with the TV to check its current upload limit.</small></section>
             <section class="choice"><strong>Subtitle (optional)</strong><fieldset class="mode"><legend>Send subtitle by</legend><div class="mode-options" role="group" aria-label="Subtitle input mode" data-mode-group="subtitleMode"><button class="mode-button" type="button" data-mode="url" aria-pressed="true">URL</button><button class="mode-button" type="button" data-mode="file" aria-pressed="false">File</button></div></fieldset><div id="subtitleUrlMode"><label for="subtitle">Subtitle URL (SRT or WebVTT)</label><input id="subtitle" type="url" maxlength="4096" placeholder="https://example.com/subtitles.srt"><div><strong>Recent subtitle URLs (24 hours)</strong><div id="subtitleHistory" class="history-list" aria-live="polite"></div></div></div><div id="subtitleFileMode" hidden><label for="subtitleFile">Subtitle file</label><input id="subtitleFile" type="file" accept=".srt,.vtt" disabled></div><small>Subtitle files are limited to 8 MiB and must be SRT or WebVTT.</small></section>
             <button id="clearUrlHistory" type="button">Clear recent URL history</button><br>
             <button id="send">Send to TV</button> <button id="cancel" type="button">Cancel upload</button><progress id="progress" max="100" value="0"></progress><p id="status" role="status"></p>
             <script>
-            const params=new URLSearchParams(location.hash.slice(1));const pin=params.get('pin');history.replaceState(null,'',location.pathname);
-            if(pin&&/^[0-9]{4}$/.test(pin))document.querySelector('#code').value=pin;
+            history.replaceState(null,'',location.pathname);
             let pairingToken=null;let activeRequest=null;let limitsLoaded=false;let limits={videoBytes:0,subtitleBytes:8*1024*1024};
             let formBusy=false;
             const status=document.querySelector('#status');
@@ -604,10 +675,10 @@ class LocalLinkServer(
             renderUrlHistory();
             document.querySelector('#clearUrlHistory').addEventListener('click',()=>{saveUrlHistory([]);renderUrlHistory();status.textContent='Recent URL history cleared from this browser.'});
             function fmt(n){return n>=1024**3?(n/1024**3).toFixed(1)+' GiB':Math.floor(n/1024**2)+' MiB'}
-            async function pair(){if(!pairingToken){const res=await fetch('/api/pair',{method:'POST',cache:'no-store',headers:{'X-Pairing-Pin':document.querySelector('#code').value}});if(!res.ok)throw Error(await res.text());pairingToken=(await res.json()).token}if(!limitsLoaded){const lr=await fetch('/api/limits',{headers:{'X-Pairing-Token':pairingToken},cache:'no-store'});if(!lr.ok)throw Error(await lr.text());limits=await lr.json();limitsLoaded=true;document.querySelector('#videoLimit').textContent='Current TV limit: '+fmt(limits.videoBytes)+' (up to 8 GiB, keeping 512 MiB free). The limit can change with TV storage.'}}
+            async function pair(){if(!pairingToken){status.textContent='Waiting for approval on the TV…';const res=await fetch('/api/pair',{method:'POST',cache:'no-store'});if(!res.ok)throw Error(await res.text());pairingToken=(await res.json()).token}if(!limitsLoaded){const lr=await fetch('/api/limits',{headers:{'X-Pairing-Token':pairingToken},cache:'no-store'});if(!lr.ok)throw Error(await lr.text());limits=await lr.json();limitsLoaded=true;document.querySelector('#videoLimit').textContent='Current TV limit: '+fmt(limits.videoBytes)+' (up to 8 GiB, keeping 512 MiB free). The limit can change with TV storage.'}}
             function postFile(file,path,limit){return new Promise((resolve,reject)=>{if(file.size>limit){reject(Error('File is larger than the current TV limit ('+fmt(limit)+').'));return}const xhr=new XMLHttpRequest();activeRequest=xhr;xhr.open('POST',path);xhr.setRequestHeader('X-Pairing-Token',pairingToken);xhr.setRequestHeader('Content-Type','application/octet-stream');xhr.setRequestHeader('X-Upload-Filename',encodeURIComponent(file.name));xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.floor(e.loaded/e.total*100);document.querySelector('#progress').value=p;status.textContent='Uploading '+file.name+' · '+p+'%'}};xhr.onload=()=>{activeRequest=null;if(xhr.status>=200&&xhr.status<300)resolve();else reject(Error(xhr.responseText||'Upload failed'))};xhr.onerror=()=>{activeRequest=null;reject(Error('Upload interrupted. Check the network and try again.'))};xhr.onabort=()=>{activeRequest=null;reject(Error('Upload cancelled.'))};xhr.send(file)})}
             async function cancelStaged(){if(pairingToken)await fetch('/api/cancel-upload',{method:'POST',headers:{'X-Pairing-Token':pairingToken},cache:'no-store'}).catch(()=>{})}
-            document.querySelector('#send').onclick=async()=>{const videoMode=selectedMode('videoMode'),subtitleMode=selectedMode('subtitleMode'),videoUrl=videoMode==='url'?document.querySelector('#video').value.trim():'',videoFile=videoMode==='file'?document.querySelector('#videoFile').files[0]:null,subtitleUrl=subtitleMode==='url'?document.querySelector('#subtitle').value.trim():'',subtitleFile=subtitleMode==='file'?document.querySelector('#subtitleFile').files[0]:null;if(videoMode==='url'&&!videoUrl){status.textContent='Enter a video URL.';return}if(videoMode==='file'&&!videoFile){status.textContent='Choose a video file.';return}if(subtitleMode==='file'&&!subtitleFile){status.textContent='Choose a subtitle file or switch to URL mode to omit the subtitle.';return}if(subtitleFile&&subtitleFile.size>limits.subtitleBytes){status.textContent='Subtitle files are limited to 8 MiB.';return}setFormBusy(true);document.querySelector('#progress').value=0;try{await pair();if(videoFile)await postFile(videoFile,'/api/upload/video',limits.videoBytes);if(subtitleFile)await postFile(subtitleFile,'/api/upload/subtitle',limits.subtitleBytes);const res=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':pairingToken},body:JSON.stringify({videoUrl:videoUrl,subtitleUrl:subtitleUrl,uploadedVideo:Boolean(videoFile),uploadedSubtitle:Boolean(subtitleFile)})});if(res.status===401){pairingToken=null;limitsLoaded=false;document.querySelector('#code').value='';throw Error('TV session ended. Enter the new 4-digit code shown on the TV, then send again.')}if(!res.ok)throw Error(await res.text());rememberUrl('video',videoUrl);rememberUrl('subtitle',subtitleUrl);status.textContent=await res.text();document.querySelector('#videoFile').value='';document.querySelector('#subtitleFile').value=''}catch(e){await cancelStaged();status.textContent=e.message||'Could not reach the TV. Check that both devices are on the same network.'}finally{setFormBusy(false);activeRequest=null}};
+            document.querySelector('#send').onclick=async()=>{const videoMode=selectedMode('videoMode'),subtitleMode=selectedMode('subtitleMode'),videoUrl=videoMode==='url'?document.querySelector('#video').value.trim():'',videoFile=videoMode==='file'?document.querySelector('#videoFile').files[0]:null,subtitleUrl=subtitleMode==='url'?document.querySelector('#subtitle').value.trim():'',subtitleFile=subtitleMode==='file'?document.querySelector('#subtitleFile').files[0]:null;if(videoMode==='url'&&!videoUrl){status.textContent='Enter a video URL.';return}if(videoMode==='file'&&!videoFile){status.textContent='Choose a video file.';return}if(subtitleMode==='file'&&!subtitleFile){status.textContent='Choose a subtitle file or switch to URL mode to omit the subtitle.';return}if(subtitleFile&&subtitleFile.size>limits.subtitleBytes){status.textContent='Subtitle files are limited to 8 MiB.';return}setFormBusy(true);document.querySelector('#progress').value=0;try{await pair();if(videoFile)await postFile(videoFile,'/api/upload/video',limits.videoBytes);if(subtitleFile)await postFile(subtitleFile,'/api/upload/subtitle',limits.subtitleBytes);const res=await fetch('/api/play',{method:'POST',headers:{'Content-Type':'application/json','X-Pairing-Token':pairingToken},body:JSON.stringify({videoUrl:videoUrl,subtitleUrl:subtitleUrl,uploadedVideo:Boolean(videoFile),uploadedSubtitle:Boolean(subtitleFile)})});if(res.status===401){pairingToken=null;limitsLoaded=false;throw Error('TV session ended. Send again and approve the new connection on the TV.')}if(!res.ok)throw Error(await res.text());rememberUrl('video',videoUrl);rememberUrl('subtitle',subtitleUrl);status.textContent=await res.text();document.querySelector('#videoFile').value='';document.querySelector('#subtitleFile').value=''}catch(e){await cancelStaged();status.textContent=e.message||'Could not reach the TV. Check that both devices are on the same network.'}finally{setFormBusy(false);activeRequest=null}};
             document.querySelector('#cancel').onclick=async()=>{if(activeRequest)activeRequest.abort();await cancelStaged();document.querySelector('#videoFile').value='';document.querySelector('#subtitleFile').value='';status.textContent='Temporary uploads cancelled and cleared.'};
             </script></html>
         """.trimIndent()

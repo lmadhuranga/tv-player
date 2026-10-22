@@ -161,6 +161,7 @@ private fun TVPlayerApp(
             onBack = { route = AppRoute.HOME },
             onGoToPlayer = { route = AppRoute.PLAYER },
             onOpenSettings = { settingsOpen = true },
+            onApprovalPending = { pending -> if (pending) settingsOpen = false },
         )
 
         AppRoute.PLAYER -> FullscreenPlayerScreen(playback = playback, window = window, onChooseSubtitleFile = {
