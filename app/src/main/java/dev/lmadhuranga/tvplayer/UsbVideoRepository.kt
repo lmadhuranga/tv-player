@@ -58,7 +58,7 @@ enum class SubtitleMatchStatus { MATCHED_BASENAME, ONLY_SUBTITLE, NONE, AMBIGUOU
 /** Reads only the current directory on a mounted removable volume; it never caches stale file URIs. */
 class UsbVideoRepository(private val context: Context) {
     /** Legacy MediaStore fallback for devices where direct folder access is unavailable. */
-    suspend fun listIndexedVideos(): List<UsbIndexedVideo> = withContext(Dispatchers.IO) {
+    suspend fun listIndexedVideos(showHiddenFiles: Boolean = false): List<UsbIndexedVideo> = withContext(Dispatchers.IO) {
         val storageManager = context.getSystemService(StorageManager::class.java)
         val mountedUsbIds = storageManager.storageVolumes
             .filter { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }
@@ -87,19 +87,19 @@ class UsbVideoRepository(private val context: Context) {
                 }
             }
         }
-        videos.filterNot { it.name.startsWith('.') }
+        videos.filter { isUsbNameVisible(it.name, showHiddenFiles) }
     }
 
-    suspend fun listRoots(): List<UsbRoot> = withContext(Dispatchers.IO) {
+    suspend fun listRoots(showHiddenFiles: Boolean = false): List<UsbRoot> = withContext(Dispatchers.IO) {
         context.getSystemService(StorageManager::class.java).storageVolumes
             .filter { it.isRemovable && it.state == Environment.MEDIA_MOUNTED }
-            .mapNotNull { volume -> volume.toRoot() }
+            .mapNotNull { volume -> volume.toRoot(showHiddenFiles) }
             .filter { it.directory.isDirectory && it.directory.canRead() }
             .distinctBy { it.directory.canonicalPath }
             .sortedBy { it.name.lowercase(Locale.ROOT) }
     }
 
-    suspend fun listEntries(root: UsbRoot, directory: File): List<UsbEntry> = withContext(Dispatchers.IO) {
+    suspend fun listEntries(root: UsbRoot, directory: File, showHiddenFiles: Boolean = false): List<UsbEntry> = withContext(Dispatchers.IO) {
         val safeDirectory = directory.canonicalFile
         val safeRoot = root.directory.canonicalFile
         require(safeDirectory.path == safeRoot.path || safeDirectory.path.startsWith(safeRoot.path + File.separator)) {
@@ -109,10 +109,10 @@ class UsbVideoRepository(private val context: Context) {
         (safeDirectory.listFiles() ?: throw IllegalStateException("Could not read the contents of this USB folder."))
             .asSequence()
             .filter { it.isDirectory || it.isFile }
-            .filterNot { it.name.startsWith('.') }
+            .filter { isUsbNameVisible(it.name, showHiddenFiles) }
             .map { file ->
                 val isDirectory = file.isDirectory
-                val childCounts = if (isDirectory) file.childCounts() else null
+                val childCounts = if (isDirectory) file.childCounts(showHiddenFiles) else null
                 UsbEntry(
                     file.name,
                     file,
@@ -126,15 +126,17 @@ class UsbVideoRepository(private val context: Context) {
             .toList()
     }
 
-    suspend fun selection(video: UsbEntry): UsbVideoSelection = withContext(Dispatchers.IO) {
+    suspend fun selection(video: UsbEntry, showHiddenFiles: Boolean = false): UsbVideoSelection = withContext(Dispatchers.IO) {
         require(!video.isDirectory && video.file.isFile && video.file.canRead()) { "This USB video is no longer available." }
         val siblings = video.file.parentFile?.listFiles().orEmpty()
         val subtitles = siblings.asSequence()
-            .filter { it.isFile && !it.name.startsWith('.') && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
+            .filter { it.isFile && isUsbNameVisible(it.name, showHiddenFiles) && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
             .map { UsbEntry(it.name, it, false, fileSizeBytes(it)) }
             .sortedBy { it.name.lowercase(Locale.ROOT) }
             .toList()
-        val match = SubtitleMatcher.match(video.name, subtitles.map { it.name })
+        // Dot-prefixed sidecars remain manually selectable, but are excluded from
+        // automatic inference (for example macOS AppleDouble `._name.srt` files).
+        val match = SubtitleMatcher.match(video.name, subtitles.filterNot { it.name.startsWith('.') }.map { it.name })
         val selected = when (match.status) {
             SubtitleMatchStatus.MATCHED_BASENAME, SubtitleMatchStatus.ONLY_SUBTITLE -> subtitles.firstOrNull { it.name == match.filename }
             SubtitleMatchStatus.NONE, SubtitleMatchStatus.AMBIGUOUS -> null
@@ -142,22 +144,21 @@ class UsbVideoRepository(private val context: Context) {
         UsbVideoSelection(video, subtitles, selected, match.status)
     }
 
-    private fun StorageVolume.toRoot(): UsbRoot? {
+    private fun StorageVolume.toRoot(showHiddenFiles: Boolean): UsbRoot? {
         val directory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             runCatching { this.directory }.getOrNull()
         } else {
             uuid?.let { File("/storage", it) }
         } ?: return null
-        val childCounts = directory.childCounts()
+        val childCounts = directory.childCounts(showHiddenFiles)
         return UsbRoot(directory.name.ifBlank { getDescription(context) }, directory, childCounts?.first, childCounts?.second)
     }
 
     /** Counts immediate visible folders and regular files. Null means the directory could not be read. */
-    private fun File.childCounts(): Pair<Int, Int>? {
+    private fun File.childCounts(showHiddenFiles: Boolean): Pair<Int, Int>? {
         if (!isDirectory || !canRead()) return null
         val children = listFiles() ?: return null
-        return children.count { !it.name.startsWith('.') && it.isDirectory } to
-            children.count { !it.name.startsWith('.') && it.isFile }
+        return countVisibleUsbChildren(children.asIterable(), showHiddenFiles)
     }
 
     private fun Cursor.toIndexedVideo(collection: Uri, hasRelativePath: Boolean): UsbIndexedVideo {
@@ -183,6 +184,13 @@ class UsbVideoRepository(private val context: Context) {
 }
 
 data class SubtitleMatch(val filename: String?, val status: SubtitleMatchStatus)
+
+internal fun isUsbNameVisible(name: String, showHiddenFiles: Boolean): Boolean =
+    showHiddenFiles || !name.startsWith('.')
+
+internal fun countVisibleUsbChildren(children: Iterable<File>, showHiddenFiles: Boolean): Pair<Int, Int> =
+    children.count { isUsbNameVisible(it.name, showHiddenFiles) && it.isDirectory } to
+        children.count { isUsbNameVisible(it.name, showHiddenFiles) && it.isFile }
 
 /** Deterministic sidecar choice: exact basename wins; otherwise a single file is safe to infer. */
 object SubtitleMatcher {

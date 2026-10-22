@@ -133,6 +133,9 @@ private fun TVPlayerApp(
     val maximumBufferMinutes by playerSettingsRepository.maximumBufferMinutes.collectAsState(
         initial = PlayerSettingsRepository.DEFAULT_BUFFER_MINUTES,
     )
+    val showHiddenFiles by playerSettingsRepository.showHiddenFiles.collectAsState(
+        initial = PlayerSettingsRepository.DEFAULT_SHOW_HIDDEN_FILES,
+    )
     val appScope = rememberCoroutineScope()
     val context = LocalContext.current
     var usbRoots by remember { mutableStateOf<List<UsbRoot>>(emptyList()) }
@@ -149,7 +152,7 @@ private fun TVPlayerApp(
         usbLoading = true
         usbError = null
         appScope.launch {
-            runCatching { usbVideoRepository.listRoots() }
+            runCatching { usbVideoRepository.listRoots(showHiddenFiles) }
                 .onSuccess { roots ->
                     usbRoots = roots
                     usbRoot = null
@@ -169,7 +172,7 @@ private fun TVPlayerApp(
         usbLoading = true
         usbError = null
         appScope.launch {
-            runCatching { usbVideoRepository.listIndexedVideos() }
+            runCatching { usbVideoRepository.listIndexedVideos(showHiddenFiles) }
                 .onSuccess { videos ->
                     usbIndexedVideos = videos
                     usbError = if (videos.isEmpty()) "No indexed USB videos were found. Folder and subtitle browsing needs full storage access." else "Showing indexed videos. Enable full storage access to browse folders and subtitles."
@@ -182,7 +185,7 @@ private fun TVPlayerApp(
         usbLoading = true
         usbError = null
         appScope.launch {
-            runCatching { usbVideoRepository.listEntries(root, directory) }
+            runCatching { usbVideoRepository.listEntries(root, directory, showHiddenFiles) }
                 .onSuccess { entries ->
                     usbRoot = root
                     usbDirectory = directory
@@ -245,6 +248,46 @@ private fun TVPlayerApp(
                     allFilesSettingsLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
                 }
         } else browseUsb()
+    }
+    var previousShowHiddenFiles by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(showHiddenFiles) {
+        val previous = previousShowHiddenFiles
+        previousShowHiddenFiles = showHiddenFiles
+        if (previous == null || previous == showHiddenFiles || route != AppRoute.USB_BROWSER) return@LaunchedEffect
+
+        val currentRoot = usbRoot
+        val currentDirectory = usbDirectory
+        usbLoading = true
+        usbError = null
+        runCatching { usbVideoRepository.listRoots(showHiddenFiles) }
+            .onSuccess { roots ->
+                usbRoots = roots
+                if (currentRoot != null && currentDirectory != null) {
+                    val refreshedRoot = roots.firstOrNull {
+                        it.directory.canonicalFile == currentRoot.directory.canonicalFile
+                    }
+                    if (refreshedRoot == null) {
+                        usbRoot = null
+                        usbDirectory = null
+                        usbEntries = emptyList()
+                        usbError = "The USB drive is no longer available. Reconnect it and scan again."
+                    } else {
+                        runCatching { usbVideoRepository.listEntries(refreshedRoot, currentDirectory, showHiddenFiles) }
+                            .onSuccess { entries ->
+                                usbRoot = refreshedRoot
+                                usbDirectory = currentDirectory
+                                usbEntries = entries
+                            }
+                            .onFailure { error -> usbError = error.message ?: "Could not refresh this USB folder." }
+                    }
+                }
+            }
+            .onFailure { error -> usbError = error.message ?: "Could not refresh USB storage." }
+        if (usbIndexedVideos.isNotEmpty()) {
+            runCatching { usbVideoRepository.listIndexedVideos(showHiddenFiles) }
+                .onSuccess { usbIndexedVideos = it }
+        }
+        usbLoading = false
     }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playback.loadSubtitleFile(uri)
@@ -333,7 +376,7 @@ private fun TVPlayerApp(
                 usbReturnFocusPath = entry.file.path
                 usbLoading = true
                 appScope.launch {
-                    runCatching { usbVideoRepository.selection(entry) }
+                    runCatching { usbVideoRepository.selection(entry, showHiddenFiles) }
                         .onSuccess { usbSelection = it; usbLoading = false; route = AppRoute.USB_SUBTITLES }
                         .onFailure { usbLoading = false; usbError = it.message ?: "Could not read the selected USB video." }
                 }
@@ -428,7 +471,7 @@ private fun TVPlayerApp(
                         usbLoading = true
                         usbError = null
                         appScope.launch {
-                            runCatching { usbVideoRepository.listRoots() }
+                            runCatching { usbVideoRepository.listRoots(showHiddenFiles) }
                                 .onSuccess { roots ->
                                     usbRoots = roots
                                     val mountedRoot = roots.firstOrNull { it.directory.canonicalFile == currentRoot.directory.canonicalFile }
@@ -448,7 +491,7 @@ private fun TVPlayerApp(
                         }
                     } else {
                         appScope.launch {
-                            runCatching { usbVideoRepository.listRoots() }
+                            runCatching { usbVideoRepository.listRoots(showHiddenFiles) }
                                 .onSuccess { roots ->
                                     usbRoots = roots
                                     if (roots.isEmpty() && usbIndexedVideos.isNotEmpty()) {
@@ -472,12 +515,14 @@ private fun TVPlayerApp(
             focusRequester = settingsCloseRequester,
             rememberPositions = rememberPositions,
             maximumBufferMinutes = maximumBufferMinutes,
+            showHiddenFiles = showHiddenFiles,
             entries = recentEntries,
             onToggleRemember = { appScope.launch { historyRepository.setEnabled(!rememberPositions) } },
             onMaximumBufferMinutesChange = { minutes ->
                 playback.setMaximumBufferMinutes(minutes)
                 appScope.launch { playerSettingsRepository.setMaximumBufferMinutes(minutes) }
             },
+            onShowHiddenFilesChange = { show -> appScope.launch { playerSettingsRepository.setShowHiddenFiles(show) } },
             onClearHistory = { appScope.launch { historyRepository.clear() } },
             onDismiss = { settingsOpen = false },
         )
@@ -886,9 +931,11 @@ private fun SettingsScreen(
     focusRequester: FocusRequester,
     rememberPositions: Boolean,
     maximumBufferMinutes: Int,
+    showHiddenFiles: Boolean,
     entries: List<HistoryEntry>,
     onToggleRemember: () -> Unit,
     onMaximumBufferMinutesChange: (Int) -> Unit,
+    onShowHiddenFilesChange: (Boolean) -> Unit,
     onClearHistory: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -907,6 +954,9 @@ private fun SettingsScreen(
                 Text("History can save direct video and subtitle URLs on this device so you can replay them. Links may expire. App data backups may include these saved URLs.", color = Muted, fontSize = 18.sp)
                 AppButton(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
                     Text("Remember positions: ${if (rememberPositions) "On" else "Off"}")
+                }
+                AppButton(onClick = { onShowHiddenFilesChange(!showHiddenFiles) }) {
+                    Text("Show hidden files and folders: ${if (showHiddenFiles) "On" else "Off"}")
                 }
                 Text("MAXIMUM BUFFER", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
                 Text(
