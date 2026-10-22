@@ -51,7 +51,7 @@
 | 25 | `25-phone-mode-buttons` | `81b5509` |
 | 26 | `26-darker-qr-page` | `3ad257b` |
 | 27 | `27-remote-pair-approval` | `08fb00a` |
-| 28 | `28-collapsible-subtitle` | pending commit |
+| 28 | `28-collapsible-subtitle` | `de73547` |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
