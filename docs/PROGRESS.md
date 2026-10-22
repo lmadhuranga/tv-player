@@ -604,3 +604,13 @@ Verification record:
 - Focused source assertions confirmed both track-alpha triplets and that playhead, track heights, and time-label opacity stayed unchanged; `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 59: `59-tv-playback-history`
+
+Playback history now saves direct HTTP(S) video URLs and positions by default, while preserving an explicit opt-out. Rows deduplicate by normalized scheme, host, and path, so refreshed signed queries replace the saved URL without creating duplicate items. Home offers focusable Recently played actions, legacy history remains readable, temporary uploads stay non-replayable, and Settings explains on-device URL retention, link expiry, and app-data backups. Common refused, expired, and missing-link responses direct the user to enter a fresh link and retry.
+
+Verification record:
+
+- Focused source assertions passed for canonical URL identity and hashing, legacy entries without `mediaUrl`, default-on/explicit-off behavior, start and periodic saves, upload URL exclusion, Home replay and identity matching, expiry status copy, and subtitle URL exclusion. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- ADB identified `192.168.8.100:5555` as `product:BRAVIA_VU3 model:BRAVIA_VU3`; the debug APK installed successfully, and `dumpsys activity` reported `dev.lmadhuranga.tvplayer/.MainActivity` as `ResumedActivity`. Playback of a media URL and on-screen D-pad behavior were not exercised.

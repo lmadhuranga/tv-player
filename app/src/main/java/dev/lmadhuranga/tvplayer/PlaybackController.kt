@@ -155,7 +155,8 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         val cleanTitle = titleOverride ?: videoFilenameFromUrl(url)
         val host = if (uploadedVideoFile != null) "Local upload" else Uri.parse(url).host.orEmpty()
         historyEntry = null
-        historyEntry = historyRepository.newEntry(cleanTitle, host)
+        historyEntry = historyRepository.newEntry(cleanTitle, host, url)
+        saveHistoryNow()
         mutableState.value = PlaybackUiState(
             title = cleanTitle,
             hasMedia = true,
@@ -553,8 +554,8 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             .filterIsInstance<HttpDataSource.InvalidResponseCodeException>()
             .firstOrNull()?.responseCode
         return when {
-            status == 401 || status == 403 -> "The link was refused or may have expired. Enter a fresh direct link, then retry."
-            status == 404 -> "The video was not found at that link. Check it or enter another link."
+            status == 401 || status == 403 || status == 410 -> "This direct link was refused or may have expired. Enter a fresh link, then retry."
+            status == 404 -> "This video is missing or its link may have expired. Check the link or enter a fresh one, then retry."
             status != null -> "The video server returned an error (HTTP $status). Check the link or try another source."
             error.errorCodeName.contains("NETWORK", ignoreCase = true) || error.errorCodeName.contains("TIMEOUT", ignoreCase = true) ->
                 "The TV could not reach the video server. Check the network, then retry or enter a fresh link."
@@ -621,7 +622,6 @@ class PlaybackController(context: Context, private val historyRepository: Histor
     private fun saveHistoryNow() {
         val entry = historyEntry ?: return
         val position = player.currentPosition.coerceAtLeast(0L)
-        if (position <= 0L) return
         val duration = player.duration.takeIf { it > 0L } ?: 0L
         lastHistorySaveMs = position
         scope.launch {

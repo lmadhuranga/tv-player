@@ -94,7 +94,7 @@ private fun TVPlayerApp(
     var settingsWasOpen by remember { mutableStateOf(false) }
     val settingsOpenerRequester = remember { FocusRequester() }
     val settingsCloseRequester = remember { FocusRequester() }
-    val rememberPositions by historyRepository.enabled.collectAsState(initial = false)
+    val rememberPositions by historyRepository.enabled.collectAsState(initial = true)
     val recentEntries by historyRepository.entries.collectAsState(initial = emptyList())
     val playbackState by playback.state.collectAsState()
     val maximumBufferMinutes by playerSettingsRepository.maximumBufferMinutes.collectAsState(
@@ -111,8 +111,9 @@ private fun TVPlayerApp(
     }
 
     fun startVideo(url: String, subtitleUrl: String?) {
-        val candidates = recentEntries.filter { it.positionMs > 5_000L }
-        if (rememberPositions && candidates.isNotEmpty()) {
+        val identity = HistoryRepository.mediaIdentity(url)
+        val candidates = recentEntries.filter { it.positionMs > 5_000L && it.mediaUrl?.let { savedUrl -> HistoryRepository.mediaIdentity(savedUrl) } == identity }
+        if (rememberPositions && identity != null && candidates.isNotEmpty()) {
             pendingStart = PendingPlayback(url, subtitleUrl, candidates)
         } else {
             playback.playUrl(url, subtitleUrl)
@@ -129,8 +130,14 @@ private fun TVPlayerApp(
 
     when (route) {
         AppRoute.HOME -> HomeScreen(
+            entries = recentEntries,
             settingsRequester = settingsOpenerRequester,
             onOpenSettings = { settingsOpen = true },
+            onReplay = { entry ->
+                val url = entry.mediaUrl ?: return@HomeScreen
+                playback.playUrl(url, startPositionMs = entry.positionMs.takeIf { it > 5_000L } ?: 0L)
+                route = AppRoute.PLAYER
+            },
         )
 
         AppRoute.ADD_URL -> VideoUrlEntryScreen(
@@ -228,8 +235,10 @@ private data class PendingPlayback(val url: String, val subtitleUrl: String?, va
 
 @Composable
 private fun HomeScreen(
+    entries: List<HistoryEntry>,
     settingsRequester: FocusRequester,
     onOpenSettings: () -> Unit,
+    onReplay: (HistoryEntry) -> Unit,
 ) {
     TVBackground {
         Row(
@@ -270,14 +279,24 @@ private fun HomeScreen(
                 colors = SurfaceDefaults.colors(containerColor = Color(0xFF12243A)),
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(28.dp),
-                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text("READY WHEN YOU ARE", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(14.dp))
-                    Text("Play a direct video link", color = Color.White, fontSize = 23.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text("Enter a video link to get started.", color = Muted, fontSize = 17.sp)
+                    Text("RECENTLY PLAYED", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
+                    Spacer(Modifier.height(10.dp))
+                    val replayable = entries.filter { it.mediaUrl != null }.take(3)
+                    if (replayable.isEmpty()) {
+                        Text("Play a direct video link to see it here.", color = Muted, fontSize = 17.sp)
+                    } else {
+                        replayable.forEach { entry ->
+                            AppButton(onClick = { onReplay(entry) }) {
+                                Column {
+                                    Text(entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }, fontSize = 17.sp)
+                                    Text("${entry.sourceHost} · ${formatTime(entry.positionMs)}", color = Muted, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -307,7 +326,7 @@ private fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text("PRIVACY & HISTORY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
-                Text("Position history stays on this device. Full video and subtitle URLs are never saved.", color = Muted, fontSize = 18.sp)
+                Text("History saves direct video URLs on this device so you can replay them. Links may expire. App data backups may include these saved URLs. Subtitle URLs are never saved.", color = Muted, fontSize = 18.sp)
                 AppButton(onClick = onToggleRemember, modifier = Modifier.focusRequester(focusRequester)) {
                     Text("Remember positions: ${if (rememberPositions) "On" else "Off"}")
                 }
@@ -331,7 +350,7 @@ private fun SettingsScreen(
                     }
                     AppButton(onClick = onClearHistory) { Text("Clear history") }
                 } else {
-                    Text("No saved positions.", color = Muted, fontSize = 17.sp)
+                    Text("No playback history.", color = Muted, fontSize = 17.sp)
                 }
                 AppButton(onClick = onDismiss) { Text("Close") }
             }
