@@ -746,3 +746,14 @@ Verification record:
 - Focused source checks confirmed the single-line ellipsis is applied only to Home's recent-title Text and the Handoff screen source is unchanged. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 12 executed, 38 up-to-date).
 - No TV contact, installation, launch, input, or screenshot was performed.
+
+## Milestone 73: `73-usb-video-browser`
+
+Added a Home “Browse USB videos” action and an in-app TV-remote browser that lists indexed video files only from mounted removable MediaStore volumes. The browser shows each filename, USB folder, and size; selecting a row plays its MediaStore `content://` URI in the existing Media3 player and uses the provider's display name as the player title. The app requests Android's video-read permission at runtime (`READ_MEDIA_VIDEO`, or `READ_EXTERNAL_STORAGE` on older Android); it does not read raw file paths or request all-files access. Home content scrolls when needed so the new action does not push existing controls out of reach.
+
+Verification record:
+
+- `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed successfully (50 actionable tasks; 13 executed, 37 up-to-date; lint reported existing warnings but no errors).
+- The connected device was verified as Sony BRAVIA VU3, Android 14 / API 34, at `192.168.8.100:5555`. `/storage/A230-1BEC` was mounted as a removable FAT volume. The TV does not provide a DocumentsUI picker activity; an initial `OpenDocument` attempt showed “You don't have an app that can do this.” A read-only MediaStore query confirmed videos are indexed under volume `a230-1bec`, so the feature uses a custom MediaStore browser scoped to mounted removable volumes.
+- Installed and launched the debug APK. Home's new button was reachable using the D-pad. The TV granted `READ_MEDIA_VIDEO`; the in-app list populated with the USB's indexed videos and displayed file names, folders, and sizes. Selecting `50.First.Dates.2004.720p.BrRip.x264.YIFY.mp4` opened the existing player. The player showed the selected filename, video dimensions `1280 × 528`, and an advancing playhead (0:36) with the playing control state.
+- Temporary captures: `/private/tmp/tv-player-73-home.png`, `/private/tmp/tv-player-73-browser.png`, and `/private/tmp/tv-player-73-playback-state.png`. The playback capture's video surface is black, so the capture confirms URI opening, media metadata, and advancing playback state but does not independently confirm a visible decoded frame on the TV panel.

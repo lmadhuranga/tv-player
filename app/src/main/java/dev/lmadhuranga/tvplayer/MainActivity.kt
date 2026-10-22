@@ -1,5 +1,8 @@
 package dev.lmadhuranga.tvplayer
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.Window
 import java.util.Locale
@@ -36,6 +39,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,10 +65,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val history = HistoryRepository(applicationContext)
         val playerSettings = PlayerSettingsRepository(applicationContext)
+        val usbVideos = UsbVideoRepository(applicationContext)
         playback = PlaybackController(applicationContext, history)
         setContent {
             MaterialTheme {
-                TVPlayerApp(playback, history, playerSettings, window)
+                TVPlayerApp(playback, history, playerSettings, usbVideos, window)
             }
         }
     }
@@ -80,7 +85,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppRoute { HOME, ADD_URL, HANDOFF, PLAYER }
+private enum class AppRoute { HOME, ADD_URL, HANDOFF, USB_BROWSER, PLAYER }
 
 @Composable
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
@@ -88,6 +93,7 @@ private fun TVPlayerApp(
     playback: PlaybackController,
     historyRepository: HistoryRepository,
     playerSettingsRepository: PlayerSettingsRepository,
+    usbVideoRepository: UsbVideoRepository,
     window: Window,
 ) {
     var route by remember { mutableStateOf(AppRoute.HANDOFF) }
@@ -102,6 +108,45 @@ private fun TVPlayerApp(
         initial = PlayerSettingsRepository.DEFAULT_BUFFER_MINUTES,
     )
     val appScope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var usbVideos by remember { mutableStateOf<List<UsbVideo>>(emptyList()) }
+    var usbLoading by remember { mutableStateOf(false) }
+    var usbError by remember { mutableStateOf<String?>(null) }
+    fun loadUsbVideos() {
+        route = AppRoute.USB_BROWSER
+        usbLoading = true
+        usbError = null
+        appScope.launch {
+            runCatching { usbVideoRepository.listVideos() }
+                .onSuccess { videos ->
+                    usbVideos = videos
+                    usbError = if (videos.isEmpty()) "No indexed videos found on a mounted USB drive." else null
+                }
+                .onFailure { error ->
+                    usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not read videos from USB storage."
+                }
+            usbLoading = false
+        }
+    }
+    val usbPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_VIDEO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    val usbPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) loadUsbVideos() else {
+            route = AppRoute.USB_BROWSER
+            usbError = "Allow video access to browse movies on the TV's USB drive."
+        }
+    }
+    fun browseUsb() {
+        if (context.checkSelfPermission(usbPermission) == PackageManager.PERMISSION_GRANTED) {
+            loadUsbVideos()
+        } else {
+            route = AppRoute.USB_BROWSER
+            usbPermissionLauncher.launch(usbPermission)
+        }
+    }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playback.loadSubtitleFile(uri)
     }
@@ -139,6 +184,7 @@ private fun TVPlayerApp(
         AppRoute.HOME -> HomeScreen(
             entries = recentEntries,
             settingsRequester = settingsOpenerRequester,
+            onBrowseUsb = ::browseUsb,
             onSendToTv = { route = AppRoute.HANDOFF },
             onOpenSettings = { settingsOpen = true },
             onReplay = { entry ->
@@ -152,6 +198,18 @@ private fun TVPlayerApp(
             onStart = { url, subtitleUrl ->
                 startVideo(url, subtitleUrl)
             },
+            onBack = { route = AppRoute.HOME },
+        )
+
+        AppRoute.USB_BROWSER -> UsbVideoBrowserScreen(
+            videos = usbVideos,
+            loading = usbLoading,
+            error = usbError,
+            onSelect = { video ->
+                playback.playDocument(video.uri)
+                route = AppRoute.PLAYER
+            },
+            onRetry = ::browseUsb,
             onBack = { route = AppRoute.HOME },
         )
 
@@ -248,9 +306,80 @@ private fun TVPlayerApp(
 private data class PendingPlayback(val url: String, val subtitleUrl: String?, val entries: List<HistoryEntry>)
 
 @Composable
+private fun UsbVideoBrowserScreen(
+    videos: List<UsbVideo>,
+    loading: Boolean,
+    error: String?,
+    onSelect: (UsbVideo) -> Unit,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val firstVideoRequester = remember { FocusRequester() }
+    TVBackground {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("USB VIDEOS", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
+            Text("Choose a video to play", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(20.dp))
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(24.dp),
+                colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239)),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    when {
+                        loading -> Text("Scanning mounted USB drives…", color = Muted, fontSize = 20.sp)
+                        error != null -> {
+                            Text(error, color = Muted, fontSize = 20.sp)
+                            AppButton(onClick = onRetry, modifier = Modifier.focusRequester(firstVideoRequester)) {
+                                Text("Try again")
+                            }
+                        }
+                        else -> videos.forEachIndexed { index, video ->
+                            AppButton(
+                                onClick = { onSelect(video) },
+                                modifier = if (index == 0) Modifier.focusRequester(firstVideoRequester) else Modifier,
+                            ) {
+                                Column {
+                                    Text(video.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        "${video.folder} · ${formatFileSize(video.sizeBytes)}",
+                                        color = Muted,
+                                        fontSize = 14.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    AppButton(onClick = onBack) { Text("Back to Home") }
+                }
+            }
+        }
+    }
+    LaunchedEffect(loading, error, videos.size) {
+        if (!loading && (error != null || videos.isNotEmpty())) firstVideoRequester.requestFocus()
+    }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    if (bytes < 1_000_000L) return "Size unavailable"
+    val gigabytes = bytes / 1_000_000_000.0
+    return if (gigabytes >= 1) String.format(Locale.US, "%.1f GB", gigabytes)
+    else String.format(Locale.US, "%.0f MB", bytes / 1_000_000.0)
+}
+
+@Composable
 private fun HomeScreen(
     entries: List<HistoryEntry>,
     settingsRequester: FocusRequester,
+    onBrowseUsb: () -> Unit,
     onSendToTv: () -> Unit,
     onOpenSettings: () -> Unit,
     onReplay: (HistoryEntry) -> Unit,
@@ -261,7 +390,7 @@ private fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
             ) {
                 Brand()
@@ -281,6 +410,9 @@ private fun HomeScreen(
                 )
                 Spacer(Modifier.height(34.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AppButton(onClick = onBrowseUsb) {
+                        Text("Browse USB videos", fontSize = 18.sp)
+                    }
                     AppButton(onClick = onSendToTv) {
                         Text("Send to TV", fontSize = 18.sp)
                     }

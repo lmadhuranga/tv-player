@@ -203,6 +203,20 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         playUrl(Uri.fromFile(videoFile).toString(), subtitleUrl, uploadedSubtitleFile = subtitleFile, titleOverride = safeTitle, uploadedVideoFile = videoFile)
     }
 
+    fun playDocument(uri: Uri) {
+        val displayName = runCatching {
+            appContext.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) cursor.getString(0) else null
+                }
+        }.getOrNull()
+            ?.filterNot(Char::isISOControl)
+            ?.take(120)
+            ?.takeIf(String::isNotBlank)
+            ?: "USB video"
+        playUrl(uri.toString(), titleOverride = displayName)
+    }
+
     fun togglePlayPause() {
         if (released) return
         playbackIntent = !(player.isPlaying || player.playWhenReady)

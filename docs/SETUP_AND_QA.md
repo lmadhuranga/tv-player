@@ -44,6 +44,8 @@ The project deliberately does not configure or commit a signing key. Gradle's de
 
 Record each result, device model/software, network conditions, test source/container, and any limitations. Leave checks incomplete until personally run.
 
+- [x] On the BRAVIA VU3 (Android 14), Home's Browse USB videos action was D-pad reachable; granting READ_MEDIA_VIDEO populated the in-app list from mounted volume `a230-1bec`. Selecting `50.First.Dates.2004.720p.BrRip.x264.YIFY.mp4` opened the player, reported 1280 × 528, and advanced to 0:36. The screen capture remained black, so a visible decoded frame was not confirmed; Back/no-drive states were not exercised.
+
 - [x] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions. Lint emitted 22 warnings.
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
 - [ ] Visually confirm the phone-send QR handoff screen is the default; Back to Home and confirm “Add Video URL” and “Open player” are absent.
