@@ -137,6 +137,25 @@ class NetworkFileManagerTest {
         assertRejected { manager.previewFile("usb-fixture", "", "link.mp4") }
     }
 
+    @Test fun downloadAllowsOrdinaryFilesButRejectsTraversalAndHiddenPaths() {
+        val folder = File(root, "Movies").apply { mkdir() }
+        val movie = File(folder, "2026-02-14 13-18-26.mov").apply { writeText("sample") }
+        val notes = File(folder, "notes.txt").apply { writeText("hello") }
+        assertEquals(movie.canonicalFile, manager.downloadFile("usb-fixture", "Movies", movie.name))
+        assertEquals(notes.canonicalFile, manager.downloadFile("usb-fixture", "Movies", "notes.txt"))
+        assertRejected { manager.downloadFile("usb-fixture", "Movies", "../notes.txt") }
+        assertRejected { manager.downloadFile("usb-fixture", "../Movies", "notes.txt") }
+        assertRejected { manager.downloadFile("usb-fixture", "Movies", ".hidden.txt") }
+        assertRejected { manager.downloadFile("usb-fixture", "Movies", "missing.mp4") }
+        assertRejected { manager.downloadFile("usb-fixture", "Movies", "Android") }
+    }
+
+    @Test fun downloadCannotFollowSymbolicLinksOutsideTheDrive() {
+        val outside = File(sandbox, "outside.txt").apply { writeText("private") }
+        Files.createSymbolicLink(File(root, "outside.txt").toPath(), outside.toPath())
+        assertRejected { manager.downloadFile("usb-fixture", "", "outside.txt") }
+    }
+
     private fun assertRejected(action: () -> Unit) {
         try {
             action()
