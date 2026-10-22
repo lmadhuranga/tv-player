@@ -488,6 +488,7 @@ private fun UsbVideoBrowserScreen(
                                 Column {
                                     Text(usbRoot.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(usbRoot.directory.path, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(folderCountsLabel(usbRoot.folderCount, usbRoot.fileCount), color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
@@ -503,7 +504,14 @@ private fun UsbVideoBrowserScreen(
                                 ) {
                                     Column {
                                         Text((if (entry.isDirectory) "📁  " else if (entry.canPlay) "▶  " else "📄  ") + entry.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${entry.typeLabel} · ${formatFileSize(entry.sizeBytes)}", color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            if (entry.isDirectory) folderCountsLabel(entry.folderCount, entry.fileCount)
+                                            else "${entry.typeLabel} · ${formatFileSize(entry.sizeBytes)}",
+                                            color = Muted,
+                                            fontSize = 14.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                     }
                                 }
                             }
@@ -517,6 +525,13 @@ private fun UsbVideoBrowserScreen(
     LaunchedEffect(loading, error, roots.size, entries.size, root) {
         if (!loading) firstEntryRequester.requestFocus()
     }
+}
+
+private fun folderCountsLabel(folderCount: Int?, fileCount: Int?): String {
+    if (folderCount == null || fileCount == null) return "Contents unavailable"
+    val folders = if (folderCount == 1) "folder" else "folders"
+    val files = if (fileCount == 1) "file" else "files"
+    return "$folderCount $folders · $fileCount $files"
 }
 
 @Composable

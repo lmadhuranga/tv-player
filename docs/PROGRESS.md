@@ -791,3 +791,13 @@ Verification record:
 - [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 13 executed, 37 up-to-date). No TV runtime verification was performed.
 - [ ] TV browsing, D-pad focus, playback selection, and empty/read-error states verified manually.
 - No TV contact, installation, or runtime validation is implied.
+
+## Milestone 79: `79-usb-folder-counts`
+
+USB drive and directory rows now show immediate child directory/file counts, including hidden entries, with singular/plural labels. Counts are collected alongside the existing directory listing on IO dispatchers; unreadable directories show “Contents unavailable” instead of a false zero. File rows retain their type and size labels. Counts are not recursive.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 12 executed, 38 up-to-date).
+- [ ] Verify on the TV that counts match mixed folders, singular/plural labels read correctly, and unreadable folders report unavailable counts.
+- No TV contact, installation, or runtime verification was performed.

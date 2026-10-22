@@ -129,3 +129,10 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] Confirm a genuinely empty folder says “This folder is empty” and read failures show an error.
 - [ ] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` results are recorded in `docs/PROGRESS.md`; TV behavior remains pending until manually checked.
 - [x] Milestone 30 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the color change.
+
+### Milestone 79 USB folder counts
+
+- [ ] Browse a USB drive with empty, mixed, hidden, and nested folders; confirm root and folder rows count only immediate child folders/files and include hidden entries.
+- [ ] Confirm singular/plural labels and that folder rows show counts while file rows retain type and size.
+- [ ] Confirm unreadable child directories show “Contents unavailable” rather than zero; counts do not recurse into descendants.
+- [ ] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` results are recorded in `docs/PROGRESS.md`; TV validation remains pending.

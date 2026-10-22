@@ -14,7 +14,12 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class UsbRoot(val name: String, val directory: File)
+data class UsbRoot(
+    val name: String,
+    val directory: File,
+    val folderCount: Int?,
+    val fileCount: Int?,
+)
 
 data class UsbIndexedVideo(val uri: Uri, val name: String, val folder: String, val sizeBytes: Long)
 
@@ -23,6 +28,8 @@ data class UsbEntry(
     val file: File,
     val isDirectory: Boolean,
     val sizeBytes: Long,
+    val folderCount: Int? = null,
+    val fileCount: Int? = null,
 ) {
     val typeLabel: String
         get() = when {
@@ -102,7 +109,18 @@ class UsbVideoRepository(private val context: Context) {
         (safeDirectory.listFiles() ?: throw IllegalStateException("Could not read the contents of this USB folder."))
             .asSequence()
             .filter { it.isDirectory || it.isFile }
-            .map { file -> UsbEntry(file.name, file, file.isDirectory, if (file.isFile) file.length().coerceAtLeast(0L) else 0L) }
+            .map { file ->
+                val isDirectory = file.isDirectory
+                val childCounts = if (isDirectory) file.childCounts() else null
+                UsbEntry(
+                    file.name,
+                    file,
+                    isDirectory,
+                    if (file.isFile) file.length().coerceAtLeast(0L) else 0L,
+                    childCounts?.first,
+                    childCounts?.second,
+                )
+            }
             .sortedWith(compareBy<UsbEntry>({ !it.isDirectory }, { it.name.lowercase(Locale.ROOT) }))
             .toList()
     }
@@ -129,7 +147,15 @@ class UsbVideoRepository(private val context: Context) {
         } else {
             uuid?.let { File("/storage", it) }
         } ?: return null
-        return UsbRoot(directory.name.ifBlank { getDescription(context) }, directory)
+        val childCounts = directory.childCounts()
+        return UsbRoot(directory.name.ifBlank { getDescription(context) }, directory, childCounts?.first, childCounts?.second)
+    }
+
+    /** Counts immediate visible and hidden children only. Null means the directory could not be read. */
+    private fun File.childCounts(): Pair<Int, Int>? {
+        if (!isDirectory || !canRead()) return null
+        val children = listFiles() ?: return null
+        return children.count { it.isDirectory } to children.count { it.isFile }
     }
 
     private fun Cursor.toIndexedVideo(collection: Uri, hasRelativePath: Boolean): UsbIndexedVideo {
