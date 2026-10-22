@@ -95,7 +95,7 @@ class LocalLinkServer(
     private val stagedUploads = mutableMapOf<UploadKind, StagedUpload>()
     private val inFlightUploads = mutableSetOf<File>()
     private val fileManager = NetworkFileManager(appContext)
-    private data class PreviewGrant(val root: String, val path: String, val name: String, val peer: String, val expiresAt: Long)
+    private data class PreviewGrant(val root: String, val path: String, val name: String, val peer: String, val expiresAt: Long, val download: Boolean)
     private val previewGrants = ConcurrentHashMap<String, PreviewGrant>()
 
     private enum class UploadKind { VIDEO, SUBTITLE }
@@ -436,9 +436,9 @@ class LocalLinkServer(
     ) {
         val output = socket.getOutputStream()
         val token = headers["x-pairing-token"].orEmpty()
-        if (path == "/api/files/media" && method in setOf("GET", "HEAD")) {
-            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "This media preview must open from the TV file manager")
-            return streamPreview(socket, method, target, headers["range"], listener, runId)
+        if (path in setOf("/api/files/media", "/api/files/download") && method in setOf("GET", "HEAD")) {
+            if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "Open this file from the TV file manager")
+            return streamPreview(socket, method, target, headers["range"], listener, runId, path == "/api/files/download")
         }
         if (method == "GET") {
             if (headers["origin"]?.let { !isSameOrigin(it, socket.localAddress) } == true) return respond(output, 403, "Forbidden", "Open the file manager from this TV's local network")
@@ -453,8 +453,16 @@ class LocalLinkServer(
                         val relative = query["path"].orEmpty()
                         val name = query["name"].orEmpty()
                         fileManager.previewFile(root, relative, name)
-                        val ticket = issuePreviewTicket(root, relative, name, socket.inetAddress.hostAddress.orEmpty())
+                        val ticket = issuePreviewTicket(root, relative, name, socket.inetAddress.hostAddress.orEmpty(), false)
                         JSONObject(mapOf("url" to "/api/files/media?ticket=$ticket")).toString()
+                    }
+                    "/api/files/download-ticket" -> {
+                        val root = query["root"].orEmpty()
+                        val relative = query["path"].orEmpty()
+                        val name = query["name"].orEmpty()
+                        fileManager.downloadFile(root, relative, name)
+                        val ticket = issuePreviewTicket(root, relative, name, socket.inetAddress.hostAddress.orEmpty(), true)
+                        JSONObject(mapOf("url" to "/api/files/download?ticket=$ticket")).toString()
                     }
                     else -> return respond(output, 404, "Not Found", "Not found")
                 }
@@ -511,13 +519,13 @@ class LocalLinkServer(
     }
 
     /** A scoped, short-lived URL allows native browser video/image tags without sharing the pairing token. */
-    private fun issuePreviewTicket(root: String, path: String, name: String, peer: String): String {
+    private fun issuePreviewTicket(root: String, path: String, name: String, peer: String, download: Boolean): String {
         val now = System.currentTimeMillis()
         previewGrants.entries.removeIf { it.value.expiresAt < now }
         if (previewGrants.size >= 32) previewGrants.clear()
         val ticket = Base64.encodeToString(ByteArray(32).also(SecureRandom()::nextBytes),
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-        previewGrants[ticket] = PreviewGrant(root, path, name, peer, now + 4L * 60L * 60L * 1000L)
+        previewGrants[ticket] = PreviewGrant(root, path, name, peer, now + if (download) 15L * 60L * 1000L else 4L * 60L * 60L * 1000L, download)
         return ticket
     }
 
@@ -528,20 +536,31 @@ class LocalLinkServer(
         rangeHeader: String?,
         listener: ServerSocket,
         runId: Long,
+        download: Boolean,
     ) {
         val output = socket.getOutputStream()
         val ticket = try { parseQuery(target.substringAfter('?', ""))["ticket"].orEmpty() }
             catch (_: Exception) { return respond(output, 400, "Bad Request", "Invalid preview link") }
         val grant = previewGrants[ticket]
         val now = System.currentTimeMillis()
-        if (grant == null || grant.expiresAt < now || grant.peer != socket.inetAddress.hostAddress) {
+        if (grant == null || grant.download != download || grant.expiresAt < now || grant.peer != socket.inetAddress.hostAddress) {
             return respond(output, 401, "Unauthorized", "Preview expired. Reopen this file in the file manager.")
         }
-        val media = try { fileManager.previewFile(grant.root, grant.path, grant.name) }
-            catch (_: Exception) { return respond(output, 404, "Not Found", "The preview file is no longer available.") }
+        val media = try {
+            if (download) NetworkFileManager.PreviewFile(
+                fileManager.downloadFile(grant.root, grant.path, grant.name), "application/octet-stream"
+            ) else fileManager.previewFile(grant.root, grant.path, grant.name)
+        } catch (_: Exception) { return respond(output, 404, "Not Found", "The requested file is no longer available.") }
         try {
             RandomAccessFile(media.file, "r").use { file ->
                 val fileSize = file.length()
+                if (download && fileSize == 0L && rangeHeader == null) {
+                    output.write(("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n" +
+                        "Content-Length: 0\r\nContent-Disposition: attachment; filename=\"empty-file\"\r\n" +
+                        "Connection: close\r\nCache-Control: no-store\r\n\r\n").toByteArray(StandardCharsets.US_ASCII))
+                    output.flush()
+                    return
+                }
                 val window = PreviewByteRanges.parse(rangeHeader, fileSize)
                 if (window == null) {
                     val response = "HTTP/1.1 416 Range Not Satisfiable\r\n" +
@@ -557,6 +576,11 @@ class LocalLinkServer(
                     "Content-Length: ${window.length}\r\n" +
                     "Accept-Ranges: bytes\r\n" +
                     (if (partial) "Content-Range: bytes ${window.first}-${window.last}/$fileSize\r\n" else "") +
+                    (if (download) {
+                        val fallback = grant.name.map { c -> if (c.code in 32..126 && c != '"' && c != '\\') c else '_' }.joinToString("").take(120)
+                        val encoded = java.net.URLEncoder.encode(grant.name, "UTF-8").replace("+", "%20")
+                        "Content-Disposition: attachment; filename=\"$fallback\"; filename*=UTF-8''$encoded\r\n"
+                    } else "") +
                     "Connection: close\r\nCache-Control: no-store\r\n" +
                     "Referrer-Policy: no-referrer\r\nX-Content-Type-Options: nosniff\r\n\r\n"
                 output.write(response.toByteArray(StandardCharsets.US_ASCII))
