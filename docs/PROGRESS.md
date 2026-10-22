@@ -329,3 +329,13 @@ Verification record:
 - With JDK `17.0.17`, Gradle `8.13`, and SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 25 lint warnings, zero errors).
 - Extracted the embedded page and script to `/tmp/tv-player-handoff.html` and `/tmp/tv-player-handoff.js`. `node --check /tmp/tv-player-handoff.js`, assertions that selected/Send/file-picker surfaces are dark with visible focus and disabled styles, and `git diff --check` passed.
 - No TV contact, install, launch, or browser visual preview was performed. The dark color states are source-checked; browser rendering remains for a later preview.
+
+## Milestone 31: `31-video-send-history`
+
+The paired phone form keeps Send to TV disabled until the active video URL has non-whitespace content or a video file is selected. Validity updates as the user edits the URL, chooses a file, switches source modes, and leaves a busy submission; switching modes still clears the inactive source. Recent video links are collapsed behind an accessible “Recent links” button and collapse after selection or video source entry. The existing localStorage history key, 24-hour expiry, bounded entries, safe labels, and subtitle-history behavior remain intact. The global clear control appears when a history section containing entries is visible.
+
+Verification record:
+
+- Extracted the embedded script to `/tmp/tv-player-handoff.js`; `node --check` and 10 focused source assertions passed for initial disabled state, whitespace trimming, active URL/file selection, mode/busy recalculation, accessible collapsed history, collapse after selection/source entry, local TTL storage, and clear-control visibility. `git diff --check` passed.
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date).
+- No TV contact, install, launch, or browser visual preview was performed.
