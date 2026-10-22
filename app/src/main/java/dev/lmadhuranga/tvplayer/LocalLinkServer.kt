@@ -719,6 +719,7 @@ class LocalLinkServer(
                 pending.decision == ApprovalDecision.ALLOWED && isCurrent(listener, runId) -> {
                     if (pendingApproval === pending) pendingApproval = null
                     val bytes = ByteArray(32).also(SecureRandom()::nextBytes)
+                    previewGrants.clear() // Revoke preview links when pairing changes.
                     sessionToken = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
                     publishPairingState(message = null)
                     Triple(200, "OK", JSONObject(mapOf("token" to sessionToken)).toString())
