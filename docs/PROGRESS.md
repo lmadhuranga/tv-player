@@ -502,3 +502,13 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed successfully; `git diff --check` passed.
 - No physical restore test, TV contact, install, launch, or preview was performed.
+
+## Milestone 49: `49-manual-send-after-subtitle`
+
+Recent video and subtitle history selections now fill their URL fields without starting a TV submission. Selecting a recent video leaves the form ready for an optional subtitle, and the status tells the user to press Send to TV when ready. A recent subtitle without a video still directs the user to choose a video first. The explicit Send button remains the only action that invokes the submission flow, preserving pairing, upload validation, and URL/File modes.
+
+Verification record:
+
+- The embedded handoff JavaScript passed `node --check`; focused source assertions confirmed recent-link clicks do not invoke `submitSend`, both recent-link status messages prompt explicit Send, and the Send button remains wired to submission. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- Confirmed the connected ADB target as `BRAVIA_VU3` / `BRAVIA_VU3_4K`, installed `app-debug.apk`, launched `dev.lmadhuranga.tvplayer/.MainActivity`, and verified it is the top resumed activity. The app was left running. No handoff interaction, playback, or subtitle behavior was tested on the TV.
