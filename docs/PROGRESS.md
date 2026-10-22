@@ -351,3 +351,13 @@ Verification record:
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date).
 - `git diff --check` and eight focused assertions passed for the empty-state copy/action, shared button colors, timeline placement, seek focus styling, subdued hidden progress, and retained auto-hide timing.
 - No TV contact, install, launch, or visual preview was performed; remote focus and on-screen positioning remain source-checked only.
+
+## Milestone 33: `33-handoff-input-actions`
+
+Added Clear and Paste actions beside both URL inputs. Paste reads clipboard text only through the browser Clipboard API from the button gesture; when HTTP clipboard access is unavailable or denied, the page focuses the field and explains how to paste manually. Replaced native file controls with touch-friendly, keyboard-operable dark dropzones that open the native picker, validate supported extensions, show the selected filename and size, and support drag-and-drop. Clear resets the underlying file input. URL/File exclusivity, optional collapsed subtitle behavior, upload-size checks, busy locking, and explicit Send-to-TV uploads remain intact.
+
+Verification record:
+
+- Extracted the embedded handoff page and script to `/tmp/tv-player-handoff.html` and `/tmp/tv-player-handoff.js`; `node --check` and 13 focused assertions passed for URL clearing, clipboard fallback guidance, picker and keyboard activation, DataTransfer drop, extension filtering, source validity, upload-size enforcement, and Send-only transfer.
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 12 executed, 36 up-to-date). `git diff --check` passed.
+- No TV contact, install, launch, or browser visual preview was performed.
