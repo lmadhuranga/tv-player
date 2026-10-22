@@ -98,8 +98,8 @@ fun FullscreenPlayerScreen(
     var consumedHiddenSelectKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenLeftKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
-    var longHiddenLeftSeekTriggered by remember { mutableStateOf(false) }
-    var longHiddenRightSeekTriggered by remember { mutableStateOf(false) }
+    var hiddenLeftSeekStage by remember { mutableIntStateOf(0) }
+    var hiddenRightSeekStage by remember { mutableIntStateOf(0) }
     var consumedSkipBackwardKeyUp by remember { mutableStateOf(false) }
     var consumedSkipForwardKeyUp by remember { mutableStateOf(false) }
     var interactionSerial by remember { mutableIntStateOf(0) }
@@ -318,17 +318,19 @@ fun FullscreenPlayerScreen(
                 ) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedHiddenLeftKeyUp = true
-                        if (event.nativeKeyEvent.repeatCount == 0) {
-                            longHiddenLeftSeekTriggered = false
-                        } else if (!longHiddenLeftSeekTriggered) {
-                            playback.seekBy(-60_000L)
-                            longHiddenLeftSeekTriggered = true
+                        val repeatStage = event.nativeKeyEvent.repeatCount.coerceIn(0, 3)
+                        if (repeatStage > hiddenLeftSeekStage) {
+                            val seekDeltas = longArrayOf(60_000L, 180_000L, 300_000L)
+                            for (stage in (hiddenLeftSeekStage + 1)..repeatStage) {
+                                if (state.title != null) playback.seekBy(-seekDeltas[stage - 1])
+                            }
+                            hiddenLeftSeekStage = repeatStage
                         }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenLeftKeyUp) {
                         consumedHiddenLeftKeyUp = false
-                        if (!longHiddenLeftSeekTriggered && state.title != null) playback.seekBy(-30_000L)
-                        longHiddenLeftSeekTriggered = false
+                        if (hiddenLeftSeekStage == 0 && state.title != null) playback.seekBy(-30_000L)
+                        hiddenLeftSeekStage = 0
                         true
                     } else false
                 } else if (event.key == Key.DirectionRight &&
@@ -336,17 +338,19 @@ fun FullscreenPlayerScreen(
                 ) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedHiddenRightKeyUp = true
-                        if (event.nativeKeyEvent.repeatCount == 0) {
-                            longHiddenRightSeekTriggered = false
-                        } else if (!longHiddenRightSeekTriggered) {
-                            playback.seekBy(60_000L)
-                            longHiddenRightSeekTriggered = true
+                        val repeatStage = event.nativeKeyEvent.repeatCount.coerceIn(0, 3)
+                        if (repeatStage > hiddenRightSeekStage) {
+                            val seekDeltas = longArrayOf(60_000L, 180_000L, 300_000L)
+                            for (stage in (hiddenRightSeekStage + 1)..repeatStage) {
+                                if (state.title != null) playback.seekBy(seekDeltas[stage - 1])
+                            }
+                            hiddenRightSeekStage = repeatStage
                         }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenRightKeyUp) {
                         consumedHiddenRightKeyUp = false
-                        if (!longHiddenRightSeekTriggered && state.title != null) playback.seekBy(30_000L)
-                        longHiddenRightSeekTriggered = false
+                        if (hiddenRightSeekStage == 0 && state.title != null) playback.seekBy(30_000L)
+                        hiddenRightSeekStage = 0
                         true
                     } else false
                 } else {

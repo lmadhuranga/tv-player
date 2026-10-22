@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `51-hidden-ok-play-pause` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `51-hidden-ok-play-pause`
+- Implemented through milestone: `52-progressive-arrow-seek` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `52-progressive-arrow-seek`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -532,3 +532,13 @@ Verification record:
 - Focused source assertions passed for select key codes, hidden/loaded gating, initial-KeyDown-only toggling, matching KeyUp consumption, and retained media play/pause handling; `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - No TV contact, install, launch, or preview is authorized or performed.
+
+## Milestone 52: `52-progressive-arrow-seek`
+
+With fullscreen playback controllers hidden, each D-pad Left/Right press begins at the 30-second tap seek, applied on KeyUp only if Android sends no repeat. Android `repeatCount` 1, 2, and 3 advance through 1-minute, 3-minute, and 5-minute seeks respectively; each newly reached stage is applied once, even if an event skips an intermediate repeat count. Counts above 3 are capped, so subsequent OS repeats add no further seek. The matching KeyUp is consumed and resets that direction's stage for the next press. Visible-controller arrow navigation is unchanged.
+
+Verification record:
+
+- Focused source assertions confirmed initial KeyDown does not seek, repeatCount stages map to ±60,000/180,000/300,000 ms at most once, no-repeat KeyUp seeks ±30,000 ms, later repeats are capped, and hidden arrow KeyUp is consumed. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or preview was performed. Remote repeat timing and visible-controller focus behavior remain unverified on a device.
