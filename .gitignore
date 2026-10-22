@@ -22,3 +22,4 @@ local.env
 
 .playwright-mcp/
 .tv.env
+.local-https/
