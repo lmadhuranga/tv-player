@@ -599,7 +599,7 @@ private fun folderCountsLabel(folderCount: Int?, fileCount: Int?): String {
     if (folderCount == null || fileCount == null) return "Contents unavailable"
     val folders = if (folderCount == 1) "folder" else "folders"
     val files = if (fileCount == 1) "file" else "files"
-    return "$folderCount $folders · $fileCount $files"
+    return "$fileCount $files · $folderCount $folders"
 }
 
 @Composable

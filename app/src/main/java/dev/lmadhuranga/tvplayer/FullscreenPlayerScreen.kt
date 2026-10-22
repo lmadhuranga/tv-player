@@ -611,11 +611,11 @@ fun FullscreenPlayerScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (controlsVisible && !optionsOpen) {
                         Text(
-                            formatPlayerTime(state.durationMs),
+                            formatPlayerTime(state.positionMs),
                             color = Color.White.copy(alpha = 0.9f),
                             fontSize = 13.sp,
                             modifier = Modifier.semantics {
-                                contentDescription = "Total duration ${formatPlayerTime(state.durationMs)}"
+                                contentDescription = "Elapsed time ${formatPlayerTime(state.positionMs)}"
                             },
                         )
                         Spacer(Modifier.width(12.dp))
@@ -630,11 +630,11 @@ fun FullscreenPlayerScreen(
                     if (controlsVisible && !optionsOpen) {
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            formatPlayerTime(state.positionMs),
+                            formatPlayerTime(state.durationMs),
                             color = Color.White.copy(alpha = 0.9f),
                             fontSize = 13.sp,
                             modifier = Modifier.semantics {
-                                contentDescription = "Elapsed time ${formatPlayerTime(state.positionMs)}"
+                                contentDescription = "Total duration ${formatPlayerTime(state.durationMs)}"
                             },
                         )
                     }

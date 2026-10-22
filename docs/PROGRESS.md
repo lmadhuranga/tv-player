@@ -854,3 +854,13 @@ Verification record:
 
 - [x] `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (39 actionable tasks; 4 executed, 35 up-to-date).
 - [ ] TV runtime appearance pending manual verification; no TV contact, installation, or runtime validation performed.
+
+## Milestone 85: `85-player-timer-order`
+
+The visible player timeline now shows elapsed playback time on the left and total movie duration on the right, with matching accessibility descriptions. The hidden-controller seek row already used this order and remains unchanged. USB root and folder counts now list files before folders while preserving pluralization and unavailable-count handling.
+
+Verification record:
+
+- [x] `./gradlew :app:assembleDebug --console=plain` passed (39 actionable tasks; 4 executed, 35 up-to-date).
+- [x] `git diff --check` passed.
+- No TV contact, installation, or runtime validation performed.
