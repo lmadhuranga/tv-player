@@ -19,3 +19,4 @@ local.env
 .env
 .env.*
 !.env.example
+.tv.env
