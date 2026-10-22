@@ -634,3 +634,13 @@ Verification record:
 - Focused Python source assertions passed for legacy decoding, validated subtitle URL encode/decode, URL-only persistence, preservation/replacement on same-identity saves, Home and handoff replay arguments, same-identity resume matching, clear-history removal, and the privacy copy. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - ADB discovery found `192.168.8.100:5555` and verified `product:BRAVIA_VU3`, model `BRAVIA VU3`, device `BRAVIA_VU3_4K`, API 34. The debug APK installed successfully, `MainActivity` launched, and `dumpsys activity` reported it as `ResumedActivity`; the app was left open. Uploaded subtitle file replay and subtitle rendering were not exercised.
+
+## Milestone 62: `62-handoff-history-layout`
+
+Each recent handoff item is now rendered as one single-line row. Replayable entries remain AppButtons and preserve the existing replay callback; legacy entries remain informational and remote-focusable. Long titles, sources, and positions truncate with an ellipsis. Settings and Back now sit in a vertically scrollable right-side column under the QR code, while the existing handoff text and QR content remain in scrollable columns. Retry and Go to Player remain alongside the left-side content when available.
+
+Verification record:
+
+- Focused source assertions verified the one-line/truncated row content, replay callback preservation, legacy-row focusability, and relocation of the Settings requester/button to the QR-side column. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- ADB rediscovered `192.168.8.100:5555` and confirmed `product:BRAVIA_VU3`, model `BRAVIA_VU3`, device `BRAVIA_VU3_4K`. The debug APK installed, `am start -W` confirmed `dev.lmadhuranga.tvplayer/.MainActivity`, and `dumpsys activity` reported it as `topResumedActivity`; the app was left open. Remote interaction and visual layout were not separately exercised.

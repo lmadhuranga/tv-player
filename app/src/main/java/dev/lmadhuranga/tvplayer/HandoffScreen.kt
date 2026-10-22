@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +30,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -123,66 +126,69 @@ fun HandoffScreen(
                 } else {
                     handoffEntries.forEach { entry ->
                         val title = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }
+                        val label = "$title · ${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}"
                         if (entry.mediaUrl != null) {
-                            AppButton(onClick = { onReplay(entry) }) {
-                                Column {
-                                    Text(title, fontSize = 17.sp)
-                                    Text(
-                                        "${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}",
-                                        color = Muted,
-                                        fontSize = 13.sp,
-                                    )
-                                }
+                            AppButton(onClick = { onReplay(entry) }, modifier = Modifier.widthIn(max = 620.dp)) {
+                                Text(label, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         } else {
-                            Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                                Text(title, color = Color.White, fontSize = 17.sp)
-                                Text(
-                                    "${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}",
-                                    color = Muted,
-                                    fontSize = 13.sp,
-                                )
-                            }
+                            Text(
+                                label,
+                                color = Muted,
+                                fontSize = 16.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 620.dp).padding(vertical = 8.dp).focusable(),
+                            )
                         }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                Spacer(Modifier.height(26.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (!state.isRunning && state.message != null) {
-                        AppButton(onClick = { server.retry() }) { Text("Retry") }
-                    }
-                    if (hasActiveMedia) {
-                        AppButton(onClick = onGoToPlayer) {
-                            Text("Go to Player")
+                if ((!state.isRunning && state.message != null) || hasActiveMedia) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        if (!state.isRunning && state.message != null) {
+                            AppButton(onClick = { server.retry() }) { Text("Retry") }
+                        }
+                        if (hasActiveMedia) {
+                            AppButton(onClick = onGoToPlayer) {
+                                Text("Go to Player")
+                            }
                         }
                     }
-                    AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
-                    AppButton(onClick = onBack) { Text("Back") }
                 }
             }
             Spacer(Modifier.width(40.dp))
-            val qr = remember(state.pageUrl) { state.pageUrl?.let(::createQrBitmap) }
-            Surface(
-                modifier = Modifier.size(260.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = SurfaceDefaults.colors(containerColor = QrLightBackground),
+            Column(
+                modifier = Modifier.width(300.dp).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
-                if (qr != null) {
-                    Image(
-                        bitmap = qr.asImageBitmap(),
-                        contentDescription = "QR code for the TV link page",
-                        modifier = Modifier.fillMaxSize().padding(18.dp),
-                    )
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxSize().background(QrLightBackground),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(if (state.isRunning) "Preparing QR code…" else "QR code unavailable", color = Ink, fontSize = 17.sp)
+                val qr = remember(state.pageUrl) { state.pageUrl?.let(::createQrBitmap) }
+                Surface(
+                    modifier = Modifier.size(260.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = SurfaceDefaults.colors(containerColor = QrLightBackground),
+                ) {
+                    if (qr != null) {
+                        Image(
+                            bitmap = qr.asImageBitmap(),
+                            contentDescription = "QR code for the TV link page",
+                            modifier = Modifier.fillMaxSize().padding(18.dp),
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize().background(QrLightBackground),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(if (state.isRunning) "Preparing QR code…" else "QR code unavailable", color = Ink, fontSize = 17.sp)
+                        }
                     }
                 }
+                Spacer(Modifier.height(18.dp))
+                AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
+                Spacer(Modifier.height(8.dp))
+                AppButton(onClick = onBack) { Text("Back") }
             }
         }
     }
