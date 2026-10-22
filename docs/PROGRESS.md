@@ -824,3 +824,13 @@ Verification record:
 - [x] `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed (50 actionable tasks; 13 executed, 37 up-to-date).
 - [ ] D-pad focus, row activation, long-folder scrolling, and parent navigation remain pending TV runtime verification.
 - No TV contact, installation, or runtime validation was performed.
+
+## Milestone 82: `82-player-loading-network-speed`
+
+The fullscreen player now shows an animated “Loading...” pill whenever Media3 reports buffering, including while controls are visible. The receive-speed label uses the app UID's `TrafficStats` RX byte counter, samples about once per second, and formats bytes as KB/s or MB/s. Sampling runs only while media is loaded, controls are visible, and the Activity lifecycle is started; it resets to a fresh baseline after hidden/background periods. The header Options gear is removed, while the bottom-row Options entry continues to open settings and restore focus. Added focused unit coverage for throughput calculations, unsupported/reset samples, and byte-based formatting.
+
+Verification record:
+
+- [x] `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 17 executed, 38 up-to-date).
+- [ ] URL, browser-upload, USB buffering states, visible/hidden speed behavior, and bottom Options focus remain pending runtime verification.
+- No TV contact, installation, or runtime validation was performed for this change.

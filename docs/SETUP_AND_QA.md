@@ -143,3 +143,10 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] Use the remote to focus, activate, scroll through a long directory, open a folder, and use the parent row to navigate back. Confirm focus changes only the row background/outline and does not scale or resize text.
 - [ ] Confirm subtitle and unsupported files remain visible in a subdued style and cannot be activated; confirm video rows still open subtitle selection.
 - [x] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` passed as recorded in `docs/PROGRESS.md`; no TV contact, install, or runtime validation was performed.
+
+### Milestone 82 player loading and network speed
+
+- [ ] Play a URL, browser-uploaded video, and USB video; confirm initial preparation and rebuffering show animated “Loading...” while subtitle loading alone does not.
+- [ ] With player controls visible, confirm the top-right receive rate updates about once per second in KB/s or MB/s. Hide controls and confirm both the rate label and sampling stop; background the app and confirm sampling pauses and resumes with a fresh baseline.
+- [ ] Confirm the header has no Options button and the bottom-row Options button still opens settings and restores focus on close.
+- [ ] Run `:app:testDebugUnitTest`, `:app:assembleDebug`, `:app:lintDebug`, and `git diff --check`; physical BRAVIA validation remains separate.

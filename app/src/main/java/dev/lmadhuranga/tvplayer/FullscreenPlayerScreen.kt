@@ -2,6 +2,9 @@ package dev.lmadhuranga.tvplayer
 
 import android.view.Window
 import android.view.WindowManager
+import android.net.TrafficStats
+import android.os.Process
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -33,6 +36,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -75,7 +81,7 @@ import java.util.Locale
 
 private const val CONTROLS_AUTO_HIDE_MS = 4_000L
 
-private enum class OptionsFocusOrigin { HEADER, AUDIO, BOTTOM }
+private enum class OptionsFocusOrigin { AUDIO, BOTTOM }
 private enum class PlayerTransportGlyph { PREVIOUS, PLAY, PAUSE, NEXT }
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
@@ -90,9 +96,15 @@ fun FullscreenPlayerScreen(
     onHome: () -> Unit,
 ) {
     val state by playback.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
     var controlsVisible by remember { mutableStateOf(true) }
+    var lifecycleStarted by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+    }
+    var receiveRate by remember { mutableStateOf<Long?>(null) }
+    var loadingDots by remember { mutableIntStateOf(1) }
     var optionsOpen by remember { mutableStateOf(false) }
-    var optionsFocusOrigin by remember { mutableStateOf(OptionsFocusOrigin.HEADER) }
+    var optionsFocusOrigin by remember { mutableStateOf(OptionsFocusOrigin.BOTTOM) }
     var returningFromOptions by remember { mutableStateOf(false) }
     var consumedDownKeyUp by remember { mutableStateOf(false) }
     var consumedMediaKeyUp by remember { mutableStateOf(false) }
@@ -109,13 +121,53 @@ fun FullscreenPlayerScreen(
     val rootFocus = remember { FocusRequester() }
     val playFocus = remember { FocusRequester() }
     val backFocus = remember { FocusRequester() }
-    val optionsFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
     val bottomOptionsFocus = remember { FocusRequester() }
     val optionsFirstFocus = remember { FocusRequester() }
     val retryFocus = remember { FocusRequester() }
     val newLinkFocus = remember { FocusRequester() }
     val emptyPlayerFocus = remember { FocusRequester() }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME -> lifecycleStarted = true
+                Lifecycle.Event.ON_STOP, Lifecycle.Event.ON_PAUSE -> lifecycleStarted = false
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(state.hasMedia, controlsVisible, optionsOpen, lifecycleStarted) {
+        if (!state.hasMedia || !controlsVisible || optionsOpen || !lifecycleStarted) {
+            receiveRate = null
+            return@LaunchedEffect
+        }
+        var previousBytes = TrafficStats.getUidRxBytes(Process.myUid())
+        var previousTimeMs = SystemClock.elapsedRealtime()
+        receiveRate = if (previousBytes >= 0L) 0L else null
+        while (true) {
+            delay(1_000L)
+            val currentBytes = TrafficStats.getUidRxBytes(Process.myUid())
+            val currentTimeMs = SystemClock.elapsedRealtime()
+            receiveRate = receiveBytesPerSecond(previousBytes, currentBytes, currentTimeMs - previousTimeMs)
+            previousBytes = currentBytes
+            previousTimeMs = currentTimeMs
+        }
+    }
+
+    LaunchedEffect(state.isBuffering) {
+        if (!state.isBuffering) {
+            loadingDots = 1
+            return@LaunchedEffect
+        }
+        while (true) {
+            loadingDots = loadingDots % 3 + 1
+            delay(400L)
+        }
+    }
 
     DisposableEffect(window) {
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -166,7 +218,7 @@ fun FullscreenPlayerScreen(
                 controlsVisible = true
                 interactionSerial++
                 withFrameNanos { }
-                optionsFocus.requestFocus()
+                bottomOptionsFocus.requestFocus()
             }
         }
     }
@@ -176,7 +228,6 @@ fun FullscreenPlayerScreen(
             optionsFirstFocus.requestFocus()
         } else if (returningFromOptions) {
             when (optionsFocusOrigin) {
-                OptionsFocusOrigin.HEADER -> optionsFocus.requestFocus()
                 OptionsFocusOrigin.AUDIO -> audioFocus.requestFocus()
                 OptionsFocusOrigin.BOTTOM -> bottomOptionsFocus.requestFocus()
             }
@@ -189,7 +240,7 @@ fun FullscreenPlayerScreen(
             if (controlsVisible) {
                 when {
                     state.error != null -> if (state.canRetry) retryFocus.requestFocus() else newLinkFocus.requestFocus()
-                    state.subtitleError != null -> optionsFocus.requestFocus()
+                    state.subtitleError != null -> bottomOptionsFocus.requestFocus()
                     state.title != null -> playFocus.requestFocus()
                     else -> emptyPlayerFocus.requestFocus()
                 }
@@ -448,9 +499,9 @@ fun FullscreenPlayerScreen(
             }
         }
 
-        if (state.isBuffering && !controlsVisible) {
+        if (state.isBuffering) {
             StatusPill(
-                text = "Buffering · buffered to ${formatPlayerTime(state.bufferedPositionMs)}",
+                text = "Loading${".".repeat(loadingDots)}  ·  ${formatPlayerTime(state.bufferedPositionMs)} buffered",
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -527,10 +578,14 @@ fun FullscreenPlayerScreen(
                             fontSize = 15.sp,
                         )
                     }
-                    PlayerCircleButton(
-                        onClick = { interacted { openOptions(OptionsFocusOrigin.HEADER) } },
-                        modifier = Modifier.focusRequester(optionsFocus).semantics { contentDescription = "Player options" },
-                    ) { Text("⚙", fontSize = 22.sp) }
+                    receiveRate?.let { rate ->
+                        Text(
+                            "↓ ${formatReceiveRate(rate)}",
+                            color = Color.White.copy(alpha = 0.86f),
+                            fontSize = 15.sp,
+                            modifier = Modifier.semantics { contentDescription = "Download speed ${formatReceiveRate(rate)}" },
+                        )
+                    }
                 }
             }
 
