@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `53-remove-slow-speed-options` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `53-remove-slow-speed-options`
+- Implemented through milestone: `55-two-minute-arrow-hold` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `55-two-minute-arrow-hold`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -561,3 +561,13 @@ Verification record:
 
 - `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - No TV contact, install, launch, or playback verification was performed.
+
+## Milestone 55: `55-two-minute-arrow-hold`
+
+With fullscreen controllers hidden, D-pad Left/Right taps still seek 30 seconds on KeyUp when the key press has no repeats. The first repeated KeyDown for a held direction seeks exactly two minutes in that direction; all later repeats are ignored. The matching KeyUp is consumed and resets hold state for the next press. Visible-controller arrow navigation remains unchanged.
+
+Verification record:
+
+- Focused source assertions confirmed ±120,000 ms occurs only on the first repeated KeyDown, further repeats are ignored, no-repeat KeyUp seeks exactly ±30,000 ms, hold state resets on KeyUp, and the existing hidden-controls gate preserves visible navigation; `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or preview was performed. Remote repeat timing and visible-controller focus behavior remain unverified on a device.

@@ -98,8 +98,8 @@ fun FullscreenPlayerScreen(
     var consumedHiddenSelectKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenLeftKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
-    var hiddenLeftSeekStage by remember { mutableIntStateOf(0) }
-    var hiddenRightSeekStage by remember { mutableIntStateOf(0) }
+    var hiddenLeftHoldSeeked by remember { mutableStateOf(false) }
+    var hiddenRightHoldSeeked by remember { mutableStateOf(false) }
     var consumedSkipBackwardKeyUp by remember { mutableStateOf(false) }
     var consumedSkipForwardKeyUp by remember { mutableStateOf(false) }
     var interactionSerial by remember { mutableIntStateOf(0) }
@@ -318,19 +318,15 @@ fun FullscreenPlayerScreen(
                 ) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedHiddenLeftKeyUp = true
-                        val repeatStage = event.nativeKeyEvent.repeatCount.coerceIn(0, 3)
-                        if (repeatStage > hiddenLeftSeekStage) {
-                            val seekDeltas = longArrayOf(60_000L, 180_000L, 300_000L)
-                            for (stage in (hiddenLeftSeekStage + 1)..repeatStage) {
-                                if (state.title != null) playback.seekBy(-seekDeltas[stage - 1])
-                            }
-                            hiddenLeftSeekStage = repeatStage
+                        if (event.nativeKeyEvent.repeatCount > 0 && !hiddenLeftHoldSeeked) {
+                            if (state.title != null) playback.seekBy(-120_000L)
+                            hiddenLeftHoldSeeked = true
                         }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenLeftKeyUp) {
                         consumedHiddenLeftKeyUp = false
-                        if (hiddenLeftSeekStage == 0 && state.title != null) playback.seekBy(-30_000L)
-                        hiddenLeftSeekStage = 0
+                        if (!hiddenLeftHoldSeeked && state.title != null) playback.seekBy(-30_000L)
+                        hiddenLeftHoldSeeked = false
                         true
                     } else false
                 } else if (event.key == Key.DirectionRight &&
@@ -338,19 +334,15 @@ fun FullscreenPlayerScreen(
                 ) {
                     if (event.type == KeyEventType.KeyDown) {
                         consumedHiddenRightKeyUp = true
-                        val repeatStage = event.nativeKeyEvent.repeatCount.coerceIn(0, 3)
-                        if (repeatStage > hiddenRightSeekStage) {
-                            val seekDeltas = longArrayOf(60_000L, 180_000L, 300_000L)
-                            for (stage in (hiddenRightSeekStage + 1)..repeatStage) {
-                                if (state.title != null) playback.seekBy(seekDeltas[stage - 1])
-                            }
-                            hiddenRightSeekStage = repeatStage
+                        if (event.nativeKeyEvent.repeatCount > 0 && !hiddenRightHoldSeeked) {
+                            if (state.title != null) playback.seekBy(120_000L)
+                            hiddenRightHoldSeeked = true
                         }
                         true
                     } else if (event.type == KeyEventType.KeyUp && consumedHiddenRightKeyUp) {
                         consumedHiddenRightKeyUp = false
-                        if (hiddenRightSeekStage == 0 && state.title != null) playback.seekBy(30_000L)
-                        hiddenRightSeekStage = 0
+                        if (!hiddenRightHoldSeeked && state.title != null) playback.seekBy(30_000L)
+                        hiddenRightHoldSeeked = false
                         true
                     } else false
                 } else {
