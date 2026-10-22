@@ -321,14 +321,23 @@ fun FullscreenPlayerScreen(
         }
 
         if (!controlsVisible && state.title != null) {
-            HiddenPlaybackProgress(
-                positionMs = state.positionMs,
-                bufferedPositionMs = state.bufferedPositionMs,
-                durationMs = state.durationMs,
+            Row(
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(start = 58.dp, end = 58.dp, bottom = 6.dp),
-            )
+                    .padding(start = 58.dp, end = 58.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.88f), fontSize = 13.sp)
+                Spacer(Modifier.width(12.dp))
+                HiddenPlaybackProgress(
+                    positionMs = state.positionMs,
+                    bufferedPositionMs = state.bufferedPositionMs,
+                    durationMs = state.durationMs,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.88f), fontSize = 13.sp)
+            }
         }
 
         if (state.error != null) {

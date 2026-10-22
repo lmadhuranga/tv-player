@@ -411,3 +411,12 @@ Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date). `git diff --check` and focused source assertions confirmed the circular control styling, timeline above the control row, visible ±10-second seek wiring, hidden-control ±30-second seeking, and retained options and subtitle/audio actions.
 - No TV contact, install, launch, or preview was performed. Layout, button focus colors, and remote navigation need visual device verification.
+
+## Milestone 39: `39-hidden-progress-time-labels`
+
+Kept the visible fullscreen timeline above the controller row and added elapsed and total time labels around the minimal progress bar while controls are hidden. The hidden timeline retains its bottom placement and side inset, with compact text styling and no buttons.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date). `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.
