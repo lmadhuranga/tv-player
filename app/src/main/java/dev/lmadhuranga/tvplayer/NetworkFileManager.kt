@@ -80,6 +80,34 @@ internal class NetworkFileManager(
             }).toString()
     }
 
+    data class PreviewFile(val file: File, val mimeType: String)
+
+    /** Read-only preview, always resolved afresh beneath a permitted storage root. */
+    fun previewFile(rootId: String, relativePath: String, name: String): PreviewFile {
+        val parent = resolveDirectory(rootId, relativePath)
+        validateName(name)
+        val root = resolveRoot(rootId)
+        val file = safeChild(root, parent, name) ?: throw IOException("This file is not available.")
+        if (!file.isFile || !file.canRead()) throw IOException("The selected file cannot be read.")
+        val type = when (file.extension.lowercase(Locale.ROOT)) {
+            "mp4", "m4v" -> "video/mp4"
+            "mov" -> "video/quicktime"
+            "webm" -> "video/webm"
+            "mkv" -> "video/x-matroska"
+            "avi" -> "video/x-msvideo"
+            "ts", "m2ts" -> "video/mp2t"
+            "mpg", "mpeg" -> "video/mpeg"
+            "3gp" -> "video/3gpp"
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "gif" -> "image/gif"
+            "webp" -> "image/webp"
+            "bmp" -> "image/bmp"
+            else -> throw IOException("Preview supports video and image files only.")
+        }
+        return PreviewFile(file, type)
+    }
+
     fun createFolder(rootId: String, relativePath: String, name: String) {
         val parent = resolveDirectory(rootId, relativePath)
         requireWritable(resolveRoot(rootId), parent)
