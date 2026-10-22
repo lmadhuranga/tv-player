@@ -182,3 +182,28 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - Verify Range seeking works for browser media preview and that a second browser cannot reuse the download ticket from a different IP.
 - Verify interrupted downloads leave no altered file on the TV (downloads are read-only) and that USB disconnection reports an error.
 - Check large downloads against TV memory/storage constraints and report any TV lifecycle interruptions.
+
+
+## Contextual file actions (branch 89)
+
+The phone/computer web File Manager now offers contextual actions when a file, folder or storage root is selected.
+
+- **Single-click or tap a file tile:** select it and show relevant actions below the toolbar.
+- **Right-click on a tile or folder in the Storage sidebar:** open the action menu at the pointer.
+- **Three-dot (⋮) button:** open the same menu on any tile or sidebar folder, including touch devices.
+- **Touch and hold a tile:** open its context menu after a short press.
+- **Shift+F10 or the Context Menu key:** open actions for the currently selected item.
+- **Double-click or keyboard-activate a video:** open its browser preview/player; an image opens the preview.
+- **Double-click or keyboard-activate a folder:** browse inside it.
+
+| Selection | Available actions |
+| --- | --- |
+| Video | Play video, Download file, Delete file |
+| Image | Preview image, Download file, Delete file |
+| Other file | Download file, Delete file |
+| Folder | Open folder, New folder inside, Upload here, Delete folder |
+| Storage root | Open drive, New folder, Upload here |
+
+Delete is disabled on read-only storage. Nonempty folders cannot be deleted; this restriction is enforced by the server, not just the UI. Folder downloads as ZIP archives are **not included** in this branch; ordinary individual file downloads are supported.
+
+**Manual QA required on the Sony BRAVIA and computer/phone browser:** verify menu placement near screen edges; mouse right-click; long-press; ⋮ buttons; selection toolbar in grid/list views; Escape/menu dismissal; playback/preview; download; upload into a chosen nested folder; deleting an empty folder and a file after confirmation; no delete for populated folders; read-only drive behavior; keyboard Shift+F10. Build/run using `bash scripts/tv.sh deploy` from branch `89-file-context-actions`. No hardware run is claimed here.
