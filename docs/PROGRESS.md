@@ -664,3 +664,13 @@ Verification record:
 - Focused source checks confirmed total duration precedes the progress bar, elapsed time follows it, the accessibility descriptions match each displayed value, and seek/progress wiring and hidden-controls labels are unchanged. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 65: `65-center-pause-icon-and-handoff-back`
+
+Added a centered pause indicator over the fullscreen video while loaded media is paused and not buffering or in an error state. The indicator uses the existing pause glyph, has a “Video paused” accessibility description, and does not take remote focus. On the QR/handoff page, Settings and Back now sit in one row with Back immediately to the right of Settings. Existing callbacks and the Settings focus requester are retained.
+
+Verification record:
+
+- Focused source checks confirmed centered placement and paused-state gating, retained semantic description, side-by-side button order, and preserved callbacks and focus requester.
+- `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- No TV contact, install, launch, or preview was performed.

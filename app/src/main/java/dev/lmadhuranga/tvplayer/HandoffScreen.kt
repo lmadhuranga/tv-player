@@ -182,9 +182,10 @@ fun HandoffScreen(
                     }
                 }
                 Spacer(Modifier.height(18.dp))
-                AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
-                Spacer(Modifier.height(8.dp))
-                AppButton(onClick = onBack) { Text("Back") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppButton(onClick = onOpenSettings, modifier = Modifier.focusRequester(settingsRequester)) { Text("Settings") }
+                    AppButton(onClick = onBack) { Text("Back") }
+                }
             }
         }
     }

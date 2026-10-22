@@ -367,6 +367,19 @@ fun FullscreenPlayerScreen(
             onRelease = { view -> view.player = null },
         )
 
+        if (state.title != null && !state.isPlaying && !state.isBuffering && state.error == null) {
+            Surface(
+                modifier = Modifier.align(Alignment.Center).size(88.dp)
+                    .semantics { contentDescription = "Video paused" },
+                shape = CircleShape,
+                colors = SurfaceDefaults.colors(containerColor = Color(0x99000000)),
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    PlayerTransportIcon(PlayerTransportGlyph.PAUSE)
+                }
+            }
+        }
+
         if (state.title == null) {
             Column(
                 modifier = Modifier.align(Alignment.Center).padding(horizontal = 40.dp),
