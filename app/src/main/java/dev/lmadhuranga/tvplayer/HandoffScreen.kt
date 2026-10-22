@@ -100,21 +100,17 @@ fun HandoffScreen(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text("SEND A LINK TO YOUR TV", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
-                Spacer(Modifier.height(18.dp))
-                Text("Use your phone to add a video", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+                Text("SEND TO TV", color = Teal, fontSize = 15.sp, letterSpacing = 3.sp)
                 Spacer(Modifier.height(14.dp))
-                Text("Scan the QR code to open the send page. When you send a video, approve the connection here with your TV remote. URL media is fetched by the TV.", color = Muted, fontSize = 18.sp)
-                Spacer(Modifier.height(20.dp))
+                Text("Scan to open the send page.", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(16.dp))
                 state.address?.let { address ->
-                    Text("Open on your phone", color = Muted, fontSize = 16.sp)
+                    Text("Or open:", color = Muted, fontSize = 16.sp)
                     Text("http://$address:8765", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(16.dp))
-                    Text("Send from your phone, then approve the request on this TV.", color = Muted, fontSize = 15.sp)
                 }
                 state.message?.let { Text(it, color = Color(0xFFFFB4A9), fontSize = 17.sp) }
                 Spacer(Modifier.height(18.dp))
-                Text("RECENTLY PLAYED", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
+                Text("RECENT", color = Teal, fontSize = 14.sp, letterSpacing = 2.sp)
                 val handoffEntries = remember(recentEntries) {
                     recentEntries.distinctBy { entry ->
                         entry.mediaUrl?.let { HistoryRepository.mediaIdentity(it) }
@@ -122,7 +118,7 @@ fun HandoffScreen(
                     }.take(3)
                 }
                 if (handoffEntries.isEmpty()) {
-                    Text("Play a video to see it here.", color = Muted, fontSize = 16.sp)
+                    Text("No videos yet.", color = Muted, fontSize = 16.sp)
                 } else {
                     handoffEntries.forEach { entry ->
                         val title = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }

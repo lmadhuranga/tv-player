@@ -644,3 +644,13 @@ Verification record:
 - Focused source assertions verified the one-line/truncated row content, replay callback preservation, legacy-row focusability, and relocation of the Settings requester/button to the QR-side column. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - ADB rediscovered `192.168.8.100:5555` and confirmed `product:BRAVIA_VU3`, model `BRAVIA_VU3`, device `BRAVIA_VU3_4K`. The debug APK installed, `am start -W` confirmed `dev.lmadhuranga.tvplayer/.MainActivity`, and `dumpsys activity` reported it as `topResumedActivity`; the app was left open. Remote interaction and visual layout were not separately exercised.
+
+## Milestone 63: `63-simplify-qr-page-copy`
+
+Reduced the QR/handoff page's static copy to “SEND TO TV,” a short scan instruction, and a direct `http://IP:8765` fallback labeled “Or open.” Recent history now uses the concise “RECENT” heading and “No videos yet” empty state. Dynamic server messages, QR, pending approval dialog, recent rows, Settings/Back, and layout/focus behavior remain in place.
+
+Verification record:
+
+- Focused source checks verified concise labels, the dynamic IP:8765 URL, server messages, recent items, approval dialog, Settings and Back controls, and unchanged row/focus structure. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, or preview was performed.
