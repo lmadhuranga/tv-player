@@ -801,3 +801,13 @@ Verification record:
 - [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 12 executed, 38 up-to-date).
 - [ ] Verify on the TV that counts match mixed folders, singular/plural labels read correctly, and unreadable folders report unavailable counts.
 - No TV contact, installation, or runtime verification was performed.
+
+## Milestone 80: `80-hide-unavailable-file-size`
+
+USB file rows now omit the size and its separator when size metadata is unavailable. Indexed MediaStore rows preserve missing or negative size values as unknown, while readable direct files retain real sizes, including zero-byte files. Known sub-megabyte sizes display in bytes or kilobytes. Folder and file counts and row type labels are unchanged.
+
+Verification record:
+
+- [x] `git diff --check` and `./gradlew :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 50 actionable tasks, 12 executed, 38 up-to-date).
+- [ ] TV runtime verification not performed.
+- No TV contact, installation, or runtime validation is implied.

@@ -21,13 +21,13 @@ data class UsbRoot(
     val fileCount: Int?,
 )
 
-data class UsbIndexedVideo(val uri: Uri, val name: String, val folder: String, val sizeBytes: Long)
+data class UsbIndexedVideo(val uri: Uri, val name: String, val folder: String, val sizeBytes: Long?)
 
 data class UsbEntry(
     val name: String,
     val file: File,
     val isDirectory: Boolean,
-    val sizeBytes: Long,
+    val sizeBytes: Long?,
     val folderCount: Int? = null,
     val fileCount: Int? = null,
 ) {
@@ -116,7 +116,7 @@ class UsbVideoRepository(private val context: Context) {
                     file.name,
                     file,
                     isDirectory,
-                    if (file.isFile) file.length().coerceAtLeast(0L) else 0L,
+                    fileSizeBytes(file),
                     childCounts?.first,
                     childCounts?.second,
                 )
@@ -130,7 +130,7 @@ class UsbVideoRepository(private val context: Context) {
         val siblings = video.file.parentFile?.listFiles().orEmpty()
         val subtitles = siblings.asSequence()
             .filter { it.isFile && isSupportedMedia(it.extension, SUBTITLE_EXTENSIONS) }
-            .map { UsbEntry(it.name, it, false, it.length().coerceAtLeast(0L)) }
+            .map { UsbEntry(it.name, it, false, fileSizeBytes(it)) }
             .sortedBy { it.name.lowercase(Locale.ROOT) }
             .toList()
         val match = SubtitleMatcher.match(video.name, subtitles.map { it.name })
@@ -165,9 +165,12 @@ class UsbVideoRepository(private val context: Context) {
         val rawPath = getString(getColumnIndexOrThrow(pathColumn)).orEmpty()
         val folder = if (hasRelativePath) rawPath.trim('/').ifBlank { "USB root" } else rawPath.substringBeforeLast('/', "USB root")
         val sizeIndex = getColumnIndex(MediaStore.Video.Media.SIZE)
-        val size = if (sizeIndex >= 0) getLong(sizeIndex).coerceAtLeast(0L) else 0L
+        val size = if (sizeIndex >= 0 && !isNull(sizeIndex)) getLong(sizeIndex).takeIf { it >= 0L } else null
         return UsbIndexedVideo(ContentUris.withAppendedId(collection, id), name, folder, size)
     }
+
+    private fun fileSizeBytes(file: File): Long? =
+        if (file.isFile && file.canRead()) file.length().takeIf { it >= 0L } else null
 
     private fun isSupportedMedia(extension: String, extensions: Set<String>): Boolean =
         extension.lowercase(Locale.ROOT) in extensions

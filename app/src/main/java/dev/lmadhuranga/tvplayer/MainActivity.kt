@@ -478,7 +478,7 @@ private fun UsbVideoBrowserScreen(
                                 AppButton(onClick = { onIndexedVideo(video) }) {
                                     Column {
                                         Text(video.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text("${video.folder} · ${formatFileSize(video.sizeBytes)}", color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(video.sizeBytes?.let { "${video.folder} · ${formatFileSize(it)}" } ?: video.folder, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                             }
@@ -506,7 +506,7 @@ private fun UsbVideoBrowserScreen(
                                         Text((if (entry.isDirectory) "📁  " else if (entry.canPlay) "▶  " else "📄  ") + entry.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(
                                             if (entry.isDirectory) folderCountsLabel(entry.folderCount, entry.fileCount)
-                                            else "${entry.typeLabel} · ${formatFileSize(entry.sizeBytes)}",
+                                            else entry.sizeBytes?.let { "${entry.typeLabel} · ${formatFileSize(it)}" } ?: entry.typeLabel,
                                             color = Muted,
                                             fontSize = 14.sp,
                                             maxLines = 1,
@@ -575,7 +575,8 @@ private fun UsbSubtitleChoiceScreen(
 }
 
 private fun formatFileSize(bytes: Long): String {
-    if (bytes < 1_000_000L) return "Size unavailable"
+    if (bytes < 1_000L) return "$bytes B"
+    if (bytes < 1_000_000L) return String.format(Locale.US, "%.0f KB", bytes / 1_000.0)
     val gigabytes = bytes / 1_000_000_000.0
     return if (gigabytes >= 1) String.format(Locale.US, "%.1f GB", gigabytes)
     else String.format(Locale.US, "%.0f MB", bytes / 1_000_000.0)
