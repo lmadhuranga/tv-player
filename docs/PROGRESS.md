@@ -5,7 +5,7 @@
 - Date: 2026-10-22
 - Implemented through milestone: `27-remote-pair-approval` (source implementation and local build/lint recorded below; no install or TV interaction for this milestone)
 - Current branch: `27-remote-pair-approval`
-- Planning baseline: `be2f7cc`; milestones 2–26 are committed sequentially on local branches; milestone 27 is in progress (full mapping below).
+- Planning baseline: `be2f7cc`; milestones 2–27 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
 ## Decisions recorded
@@ -50,7 +50,7 @@
 | 24 | `24-phone-url-history` | branch HEAD (`git rev-parse 24-phone-url-history`) |
 | 25 | `25-phone-mode-buttons` | `81b5509` |
 | 26 | `26-darker-qr-page` | `3ad257b` |
-| 27 | `27-remote-pair-approval` | pending commit |
+| 27 | `27-remote-pair-approval` | `b9a21b5` |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
