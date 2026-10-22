@@ -37,6 +37,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -310,7 +311,12 @@ private fun HomeScreen(
                         replayable.forEach { entry ->
                             AppButton(onClick = { onReplay(entry) }) {
                                 Column {
-                                    Text(entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }, fontSize = 17.sp)
+                                    Text(
+                                        entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } },
+                                        fontSize = 17.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                     Text("${entry.sourceHost} · ${formatTime(entry.positionMs)}", color = Muted, fontSize = 13.sp)
                                 }
                             }
