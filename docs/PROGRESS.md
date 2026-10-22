@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `55-two-minute-arrow-hold` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `55-two-minute-arrow-hold`
+- Implemented through milestone: `56-fullscreen-progress-time-labels` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `56-fullscreen-progress-time-labels`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -57,6 +57,7 @@
 | 31 | `31-video-send-history` | `0a0d95c` |
 | 32 | `32-fullscreen-dark-timeline` | `bd145b5` |
 | 35 | `35-icon-player-controls` | branch HEAD (`git rev-parse 35-icon-player-controls`) |
+| 56 | `56-fullscreen-progress-time-labels` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -571,3 +572,13 @@ Verification record:
 - Focused source assertions confirmed ±120,000 ms occurs only on the first repeated KeyDown, further repeats are ignored, no-repeat KeyUp seeks exactly ±30,000 ms, hold state resets on KeyUp, and the existing hidden-controls gate preserves visible navigation; `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or preview was performed. Remote repeat timing and visible-controller focus behavior remain unverified on a device.
+
+## Milestone 56: `56-fullscreen-progress-time-labels`
+
+Reduced the visible-controls progress tracks from 2dp to 1dp and the hidden-controls strip from 5dp to 2.5dp, while retaining the 12dp visible seek/focus target and the hidden strip's current placement. Visible controls now continuously show elapsed time on the left and total duration on the right; both labels and the played track use 90% opacity. Base and buffered tracks stay visible at lower opacity. Hidden controls keep the minimal progress strip without persistent time labels; continuous visible labels replace the prior transient time-label display.
+
+Verification record:
+
+- Focused source assertions confirmed persistent labels are gated only by visible controls/options, hidden-control presentation retains no persistent labels, visible seek target remains 12dp, and track heights and opacity match the request. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed successfully.
+- No TV contact, install, launch, or preview was performed.
