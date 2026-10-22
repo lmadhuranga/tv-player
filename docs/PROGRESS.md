@@ -416,6 +416,16 @@ Verification record:
 - `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, or preview was performed.
 
+## Milestone 67: `67-space-qr-recent-rows`
+
+Added 8dp of vertical space between consecutive QR/handoff recent entries, applying equally to replay buttons and legacy informational rows. Recent-row text size, the fixed focused scale, existing color highlight, and replay behavior remain unchanged.
+
+Verification record:
+
+- Focused source checks confirmed the row gap is applied between every consecutive entry, including legacy entries, while the replay scale, text size, focus colors, and replay callback remain unchanged.
+- `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, or preview was performed.
+
 ## Milestone 38: `38-seedr-player-controls`
 
 Reshaped the fullscreen controller around the supplied Seedr Android TV reference: circular dark controls turn white when focused, with a circular back/settings header, a thin timeline and elapsed/total labels directly above the controls, subtitle/audio buttons at left, centered transport buttons, and an options button at right. Visible skip buttons seek by 10 seconds and expose matching accessible labels. D-pad Left/Right while controls are hidden still seeks by 30 seconds; timeline focus still seeks by 10 seconds. Playback speed remains available in Player Options, and the existing auto-hide, title, subtitle/audio, buffering, and error behavior remain wired.

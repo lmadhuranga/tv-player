@@ -121,7 +121,8 @@ fun HandoffScreen(
                 if (handoffEntries.isEmpty()) {
                     Text("No videos yet.", color = Muted, fontSize = 16.sp)
                 } else {
-                    handoffEntries.forEach { entry ->
+                    handoffEntries.forEachIndexed { index, entry ->
+                        if (index > 0) Spacer(Modifier.height(8.dp))
                         val title = entry.title.ifBlank { entry.sourceHost.ifBlank { "Video" } }
                         val label = "$title · ${entry.sourceHost.ifBlank { "Unknown source" }} · ${formatHandoffTime(entry.positionMs)}"
                         if (entry.mediaUrl != null) {
