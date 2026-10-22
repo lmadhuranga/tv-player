@@ -44,6 +44,8 @@ The project deliberately does not configure or commit a signing key. Gradle's de
 
 Record each result, device model/software, network conditions, test source/container, and any limitations. Leave checks incomplete until personally run.
 
+- [x] On the BRAVIA VU3 (Android 14), Home's Browse USB videos action was D-pad reachable; granting READ_MEDIA_VIDEO populated the in-app list from mounted volume `a230-1bec`. Selecting `50.First.Dates.2004.720p.BrRip.x264.YIFY.mp4` opened the player, reported 1280 × 528, and advanced to 0:36. The screen capture remained black, so a visible decoded frame was not confirmed; Back/no-drive states were not exercised.
+
 - [x] Debug assemble and lint complete without errors; record Gradle/JDK/SDK versions. Lint emitted 22 warnings.
 - [ ] Confirm package ID, min SDK 26, target SDK 36, landscape layout, Leanback launcher entry, and TV banner.
 - [ ] Visually confirm the phone-send QR handoff screen is the default; Back to Home and confirm “Add Video URL” and “Open player” are absent.
@@ -103,4 +105,27 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [x] Milestone 29 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the layout change.
 
 - [ ] Verify on a phone/desktop browser that selected URL/File controls and Send stay dark blue/teal with readable white text, the keyboard focus ring remains clear, and disabled controls remain legible. Confirm no bright white button surface appears in the browser.
+
+### Milestone 76 USB folders and subtitles
+
+- [ ] On Android 11+, grant TV Player “Allow access to manage all files” in Android Settings, then browse each mounted removable USB volume and nested folders. Confirm Back moves up one folder and the drive root returns to the drive list.
+- [ ] Select USB videos with a matching SRT/WebVTT basename, with one unrelated subtitle, with multiple unrelated subtitles, and with duplicate basename subtitles. Confirm exact single basename match wins, a sole supported subtitle is selected, and ambiguous cases remain unselected until the user chooses manually.
+- [ ] Select a sibling subtitle manually, start playback, and verify the video continues if the sidecar is removed or unreadable. Confirm removing the USB produces a readable error and does not persist a stale path.
+- [ ] Revoke all-files access and confirm the app offers the explicit Settings route and preserves the indexed MediaStore video fallback. The fallback does not browse folders or discover sidecar subtitles.
+- [ ] On Android 10, confirm the app explains that direct folder browsing is unavailable and offers indexed-video playback where permitted. On older supported versions, verify READ_EXTERNAL_STORAGE and mounted-volume traversal.
+- [x] Milestone 76 `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed locally. Lint warns that Google Play restricts `MANAGE_EXTERNAL_STORAGE`; no TV installation, launch, or runtime validation was performed.
+
+### Milestone 77 playback keep-awake
+
+- [ ] During URL, USB/document, and local-file playback, wait past the TV's Ambient Mode timeout and confirm video remains visible. Confirm initial loading and network rebuffering also keep the TV awake.
+- [ ] Pause, allow media to end, trigger a playback/stall error, leave the player, and background the app; confirm each path releases the keep-screen-on behavior and normal TV sleep resumes.
+- [ ] `FLAG_KEEP_SCREEN_ON` state follows active playback intent and terminal playback status; fullscreen disposal clears it as a defensive lifecycle cleanup.
+- [x] `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed locally. Lint reports 28 warnings and 0 errors, including the existing `MANAGE_EXTERNAL_STORAGE` policy warning. No TV runtime verification was performed.
+
+### Milestone 78 USB file explorer listing
+
+- [ ] Browse a mixed USB folder and confirm files, hidden entries, and folders appear, with folders first and type/size labels.
+- [ ] Confirm folders navigate, videos open the existing subtitle choice screen, and subtitle/unsupported file rows cannot start playback.
+- [ ] Confirm a genuinely empty folder says “This folder is empty” and read failures show an error.
+- [ ] `git diff --check`, `:app:assembleDebug`, and `:app:lintDebug` results are recorded in `docs/PROGRESS.md`; TV behavior remains pending until manually checked.
 - [x] Milestone 30 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the color change.

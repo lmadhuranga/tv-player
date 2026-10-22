@@ -8,6 +8,7 @@ datastore = "1.2.1"
 activity-compose = "1.12.3"
 lifecycle = "2.9.4"
 zxing = "3.5.3"
+junit = "4.13.2"
 
 [libraries]
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
@@ -24,6 +25,7 @@ androidx-media3-dash = { module = "androidx.media3:media3-exoplayer-dash", versi
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

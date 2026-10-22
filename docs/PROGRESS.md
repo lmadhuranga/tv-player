@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `72-home-recent-title-ellipsis` (local checks recorded below; no TV validation)
-- Current branch: `72-home-recent-title-ellipsis`
+- Implemented through milestone: `78-usb-all-folder-files` (local checks recorded below; no TV validation)
+- Current branch: `78-usb-all-folder-files`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -62,6 +62,8 @@
 | 58 | `58-half-progress-opacity` | pending local commit |
 | 71 | `71-outline-paused-indicator` | branch HEAD (`git rev-parse 71-outline-paused-indicator`) |
 | 72 | `72-home-recent-title-ellipsis` | pending local commit |
+| 77 | `77-playback-keep-awake` | branch HEAD (`git rev-parse 77-playback-keep-awake`) |
+| 78 | `78-usb-all-folder-files` | pending local commit |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -746,3 +748,46 @@ Verification record:
 - Focused source checks confirmed the single-line ellipsis is applied only to Home's recent-title Text and the Handoff screen source is unchanged. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 12 executed, 38 up-to-date).
 - No TV contact, installation, launch, input, or screenshot was performed.
+
+## Milestone 73: `73-usb-video-browser`
+
+Added a Home “Browse USB videos” action and an in-app TV-remote browser that lists indexed video files only from mounted removable MediaStore volumes. The browser shows each filename, USB folder, and size; selecting a row plays its MediaStore `content://` URI in the existing Media3 player and uses the provider's display name as the player title. The app requests Android's video-read permission at runtime (`READ_MEDIA_VIDEO`, or `READ_EXTERNAL_STORAGE` on older Android); it does not read raw file paths or request all-files access. Home content scrolls when needed so the new action does not push existing controls out of reach.
+
+Verification record:
+
+- `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed successfully (50 actionable tasks; 13 executed, 37 up-to-date; lint reported existing warnings but no errors).
+- The connected device was verified as Sony BRAVIA VU3, Android 14 / API 34, at `192.168.8.100:5555`. `/storage/A230-1BEC` was mounted as a removable FAT volume. The TV does not provide a DocumentsUI picker activity; an initial `OpenDocument` attempt showed “You don't have an app that can do this.” A read-only MediaStore query confirmed videos are indexed under volume `a230-1bec`, so the feature uses a custom MediaStore browser scoped to mounted removable volumes.
+- Installed and launched the debug APK. Home's new button was reachable using the D-pad. The TV granted `READ_MEDIA_VIDEO`; the in-app list populated with the USB's indexed videos and displayed file names, folders, and sizes. Selecting `50.First.Dates.2004.720p.BrRip.x264.YIFY.mp4` opened the existing player. The player showed the selected filename, video dimensions `1280 × 528`, and an advancing playhead (0:36) with the playing control state.
+- Temporary captures: `/private/tmp/tv-player-73-home.png`, `/private/tmp/tv-player-73-browser.png`, and `/private/tmp/tv-player-73-playback-state.png`. The playback capture's video surface is black, so the capture confirms URI opening, media metadata, and advancing playback state but does not independently confirm a visible decoded frame on the TV panel.
+
+## Milestone 76: `76-usb-folders-subtitles`
+
+Expanded the USB browser from a flat MediaStore list to mounted removable-volume and folder navigation. Android 11+ uses `StorageManager` volume roots and direct file paths after the user enables the app's all-files access setting, allowing sibling subtitle discovery where the TV has no document picker. Videos show a same-folder subtitle choice: a unique case-insensitive basename match is preselected; if there is no basename match, only a sole SRT/WebVTT file is preselected. Multiple candidates are left unselected and require the user to choose. Selected USB videos play through the existing Media3 path, while sidecars are copied into the private subtitle cache without modifying/deleting the USB file. The prior indexed MediaStore video path remains as an explicit fallback when broad access is unavailable; it does not provide folder or subtitle browsing.
+
+Verification record:
+
+- Added unit coverage for basename precedence, sole-subtitle fallback, ambiguous folders, duplicate basename matches, and ignored extensions.
+- Android documentation confirms `MANAGE_EXTERNAL_STORAGE` grants shared-storage paths and USB OTG roots and requires a system Settings route; this app checks the grant rather than assuming manifest declaration is sufficient.
+- `git diff --check` passed. `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (55 actionable tasks; 14 executed, 41 up-to-date). All five subtitle-matcher tests passed. Lint reports Android's expected `ScopedStorage` warning for `MANAGE_EXTERNAL_STORAGE` because Google Play restricts this permission; other SDK XML and pre-existing NDK metadata warnings remain.
+- No device contact, install, launch, input, or runtime validation was performed for this milestone.
+
+## Milestone 77: `77-playback-keep-awake`
+
+The player now sets Android's `FLAG_KEEP_SCREEN_ON` while a media source has an active play intent and Media3 has not ended or failed. This covers URL, USB/document, and local-file playback, including startup and buffering. Pausing, playback errors/stalls, ending, leaving the player, or stopping the activity clears the flag; disposal of the fullscreen player also clears it defensively. Android TV platform guidance identifies this flag as the supported way to prevent Ambient Mode during active video playback.
+
+Verification record:
+
+- Cause evidence: neither the activity nor player view previously set `FLAG_KEEP_SCREEN_ON` / `keepScreenOn`; Android's TV guidance says an activity without this flag enters Ambient Mode after inactivity.
+- Added unit coverage for intended playback during buffering and flag release after pause, end, playback error, or missing media.
+- `git diff --check` and `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed. Lint reports 28 existing warnings and 0 errors, including the known Google Play restriction warning for `MANAGE_EXTERNAL_STORAGE`.
+- No TV contact, installation, or runtime verification was performed.
+
+## Milestone 78: `78-usb-all-folder-files`
+
+USB folders now display every regular file and directory, including hidden entries, with folders sorted first. Folder and supported-video rows remain actionable; subtitle and unsupported-file rows show their type and size but cannot start playback. Subtitles remain available from the existing video selection flow. A truly empty folder has a dedicated message, and an enumeration failure is reported as a read error.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (50 actionable tasks; 13 executed, 37 up-to-date). No TV runtime verification was performed.
+- [ ] TV browsing, D-pad focus, playback selection, and empty/read-error states verified manually.
+- No TV contact, installation, or runtime validation is implied.

@@ -14,14 +14,13 @@ fun AppButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    scale: ButtonScale = ButtonDefaults.scale(),
     content: @Composable RowScope.() -> Unit,
 ) {
     TvButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
-        scale = scale,
+        scale = ButtonScale.None,
         colors = ButtonDefaults.colors(
             containerColor = Color(0xFF202020),
             contentColor = Color.White,

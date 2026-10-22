@@ -61,5 +61,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.zxing.core)
 
+    testImplementation(libs.junit)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

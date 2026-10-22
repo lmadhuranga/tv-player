@@ -1,6 +1,7 @@
 package dev.lmadhuranga.tvplayer
 
 import android.view.Window
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -24,6 +25,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,6 +67,7 @@ import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Button as TvButton
 import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.ButtonScale
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
@@ -120,8 +123,17 @@ fun FullscreenPlayerScreen(
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
         onDispose {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             controller.show(WindowInsetsCompat.Type.systemBars())
             WindowCompat.setDecorFitsSystemWindows(window, true)
+        }
+    }
+
+    SideEffect {
+        if (state.shouldKeepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
@@ -691,6 +703,7 @@ private fun PlayerCircleButton(
         onClick = onClick,
         modifier = modifier.size(diameter),
         enabled = enabled,
+        scale = ButtonScale.None,
         shape = ButtonDefaults.shape(
             shape = CircleShape,
             focusedShape = CircleShape,
@@ -793,7 +806,7 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
         Box(Modifier.fillMaxWidth(buffered).height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(2.dp)))
         Box(Modifier.fillMaxWidth(progress).height(1.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.45f), RoundedCornerShape(2.dp)))
         Box(Modifier.fillMaxWidth(progress).height(12.dp), contentAlignment = Alignment.CenterEnd) {
-            Box(Modifier.size(if (focused) 12.dp else 8.dp).background(if (focused) Color(0xFF52A6FF) else Color.White, CircleShape))
+            Box(Modifier.size(8.dp).background(if (focused) Color(0xFF52A6FF) else Color.White, CircleShape))
         }
     }
 }
