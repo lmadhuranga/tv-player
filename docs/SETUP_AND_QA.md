@@ -100,3 +100,6 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 
 - [ ] On the phone handoff page, verify the compact dark card at narrow and wide widths, no horizontal overflow, readable focus states, and touch-sized full-width controls. Confirm the subtitle section starts collapsed, URL/File modes and history still work, approval status is visible, and progress/Cancel appear only during file transfers.
 - [x] Milestone 29 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the layout change.
+
+- [ ] Verify on a phone/desktop browser that selected URL/File controls and Send stay dark blue/teal with readable white text, the keyboard focus ring remains clear, and disabled controls remain legible. Confirm no bright white button surface appears in the browser.
+- [x] Milestone 30 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the color change.

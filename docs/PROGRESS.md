@@ -3,9 +3,9 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `29-minimal-phone-page` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `29-minimal-phone-page`
-- Planning baseline: `be2f7cc`; milestones 2–27 are committed sequentially on local branches (full mapping below).
+- Implemented through milestone: `30-browser-dark-theme` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `30-browser-dark-theme`
+- Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
 ## Decisions recorded
@@ -52,7 +52,8 @@
 | 26 | `26-darker-qr-page` | `3ad257b` |
 | 27 | `27-remote-pair-approval` | `08fb00a` |
 | 28 | `28-collapsible-subtitle` | `de73547` |
-| 29 | `29-minimal-phone-page` | branch HEAD (`git rev-parse 29-minimal-phone-page`) |
+| 29 | `29-minimal-phone-page` | `6e3d3fe` |
+| 30 | `30-browser-dark-theme` | branch HEAD (`git rev-parse 30-browser-dark-theme`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -319,3 +320,12 @@ Verification record:
 - With JDK `17.0.17`, Gradle `8.13`, and SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 25 lint warnings, zero errors).
 - Extracted the embedded handoff page and script to `/tmp/tv-player-handoff.html` and `/tmp/tv-player-handoff.js`. `node --check /tmp/tv-player-handoff.js`, assertions for responsive styles, accessible mode groups, collapsed subtitle, and upload-only progress/cancel, and `git diff --check` passed.
 - No TV contact, install, launch, or visual browser preview was performed. The static HTML preview is available for narrow and wide browser inspection; do not submit its form because it is a local file without the TV backend.
+## Milestone 30: `30-browser-dark-theme`
+
+Changed selected URL/File controls and the primary Send button from bright white surfaces to dark blue/teal states with white text. The file-picker button also uses the dark neutral palette. White text has approximately 10.8:1 contrast on the selected mode fill and 12.3:1 on Send. The existing cyan keyboard focus outline, page/card/field colors, disabled treatment, responsive layout, and all browser-form behavior are unchanged.
+
+Verification record:
+
+- With JDK `17.0.17`, Gradle `8.13`, and SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 25 lint warnings, zero errors).
+- Extracted the embedded page and script to `/tmp/tv-player-handoff.html` and `/tmp/tv-player-handoff.js`. `node --check /tmp/tv-player-handoff.js`, assertions that selected/Send/file-picker surfaces are dark with visible focus and disabled styles, and `git diff --check` passed.
+- No TV contact, install, launch, or browser visual preview was performed. The dark color states are source-checked; browser rendering remains for a later preview.

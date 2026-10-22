@@ -660,6 +660,7 @@ class LocalLinkServer(
             input{width:100%;min-width:0;padding:12px;border:1px solid #53647a;border-radius:10px;background:#101c2b;color:#fff;font:inherit}
             input::placeholder{color:#9eacbd;opacity:1}
             input[type=file]{padding:8px;font-size:.9rem}
+            input[type=file]::file-selector-button{min-height:36px;margin-right:8px;padding:6px 10px;border:1px solid #40516a;border-radius:8px;background:#1b293b;color:#fff;font:inherit}
             input:focus-visible,button:focus-visible{outline:3px solid #67c8ff;outline-offset:3px}
             .choice{margin:0 0 12px;padding:14px;border:1px solid #293b51;border-radius:12px;background:#101c2b}
             .mode{margin:8px 0;border:0;padding:0;min-width:0}
@@ -668,7 +669,7 @@ class LocalLinkServer(
             button{min-height:44px;padding:10px 14px;border:1px solid #40516a;border-radius:10px;background:#1b293b;color:#fff;font:inherit;font-weight:650;cursor:pointer;touch-action:manipulation}
             button:disabled{opacity:.55;cursor:default}
             .mode-button{margin:0}
-            .mode-button[aria-pressed="true"],#send{border-color:#fff;background:#fff;color:#111}
+            .mode-button[aria-pressed="true"]{border-color:#3b7886;background:#17434f;color:#fff}
             .history-heading{display:block;margin-top:14px;font-size:.88rem}
             .history-list{display:grid;gap:6px;margin-top:6px}
             .history-list button{width:100%;min-width:0;text-align:left;overflow-wrap:anywhere;font-size:.9rem}
@@ -676,7 +677,8 @@ class LocalLinkServer(
             #videoLimit:empty{display:none}
             #subtitleToggle{width:100%;margin:0 0 12px;background:#1b293b}
             #clearUrlHistory{width:100%;min-height:40px;margin:0 0 12px;border:0;background:transparent;color:#c7d2e0;font-size:.88rem}
-            #send{width:100%;min-height:48px;font-size:1.02rem}
+            #send{width:100%;min-height:48px;border-color:#286777;background:#123947;color:#fff;font-size:1.02rem}
+            #send:hover:not(:disabled){background:#174857}
             #cancel{width:100%;margin-top:10px}
             #progress{display:block;width:100%;height:10px;margin:10px 0 0;accent-color:#d4dbe4}
             #status{min-height:0;margin:10px 0 0;color:#e3e9f1;font-size:.9rem;white-space:pre-wrap;overflow-wrap:anywhere}
