@@ -88,6 +88,8 @@ fun FullscreenPlayerScreen(
 ) {
     val state by playback.state.collectAsState()
     var controlsVisible by remember { mutableStateOf(true) }
+    var seekTimeLabelsVisible by remember { mutableStateOf(false) }
+    var seekTimeLabelSerial by remember { mutableIntStateOf(0) }
     var optionsOpen by remember { mutableStateOf(false) }
     var optionsFocusOrigin by remember { mutableStateOf(OptionsFocusOrigin.HEADER) }
     var returningFromOptions by remember { mutableStateOf(false) }
@@ -165,6 +167,17 @@ fun FullscreenPlayerScreen(
             } else {
                 rootFocus.requestFocus()
             }
+        }
+    }
+
+    LaunchedEffect(seekTimeLabelSerial, controlsVisible, optionsOpen) {
+        if (!controlsVisible || optionsOpen) {
+            seekTimeLabelsVisible = false
+            return@LaunchedEffect
+        }
+        if (seekTimeLabelsVisible) {
+            delay(3_000L)
+            seekTimeLabelsVisible = false
         }
     }
 
@@ -420,6 +433,17 @@ fun FullscreenPlayerScreen(
                 }
                 state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (seekTimeLabelsVisible && controlsVisible && !optionsOpen) {
+                        Text(
+                            formatPlayerTime(state.positionMs),
+                            color = Color.White.copy(alpha = 0.88f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Elapsed time ${formatPlayerTime(state.positionMs)}"
+                            },
+                        )
+                        Spacer(Modifier.width(12.dp))
+                    }
                     PlayerProgress(
                         positionMs = state.positionMs,
                         bufferedPositionMs = state.bufferedPositionMs,
@@ -427,6 +451,17 @@ fun FullscreenPlayerScreen(
                         onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
                         modifier = Modifier.weight(1f),
                     )
+                    if (seekTimeLabelsVisible && controlsVisible && !optionsOpen) {
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            formatPlayerTime(state.durationMs),
+                            color = Color.White.copy(alpha = 0.88f),
+                            fontSize = 13.sp,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Total duration ${formatPlayerTime(state.durationMs)}"
+                            },
+                        )
+                    }
                 }
                 Box(modifier = Modifier.fillMaxWidth().height(64.dp)) {
                     SubtitleAudioControls(
@@ -443,9 +478,17 @@ fun FullscreenPlayerScreen(
                         enabled = state.title != null,
                         playFocus = playFocus,
                         modifier = Modifier.align(Alignment.Center),
-                        onSeekBackward = { interacted { playback.seekBy(-10_000L) } },
+                        onSeekBackward = {
+                            interacted { playback.seekBy(-10_000L) }
+                            seekTimeLabelsVisible = true
+                            seekTimeLabelSerial++
+                        },
                         onTogglePlayback = { interacted(playback::togglePlayPause) },
-                        onSeekForward = { interacted { playback.seekBy(10_000L) } },
+                        onSeekForward = {
+                            interacted { playback.seekBy(10_000L) }
+                            seekTimeLabelsVisible = true
+                            seekTimeLabelSerial++
+                        },
                     )
                     PlayerCircleButton(
                         onClick = { interacted(playback::cycleSpeed) },

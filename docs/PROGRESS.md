@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `44-hide-fullscreen-time-labels` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `44-hide-fullscreen-time-labels`
+- Implemented through milestone: `46-transient-seek-times` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `46-transient-seek-times`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -474,4 +474,13 @@ Reordered the fullscreen transport controls to Previous, −10 seconds, Play/Pau
 Verification record:
 
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date); `git diff --check` passed.
+- No TV contact, install, launch, or preview was performed.
+
+## Milestone 46: `46-transient-seek-times`
+
+The visible ±10-second skip buttons temporarily show elapsed and total time labels beside the fullscreen progress bar. Repeated skips restart the three-second display timer. The labels disappear when the controls hide or Player Options opens; the progress bar keeps its 12dp seeking area, and hidden-control seeking and progress remain unchanged.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed successfully; `git diff --check` passed.
 - No TV contact, install, launch, or preview was performed.
