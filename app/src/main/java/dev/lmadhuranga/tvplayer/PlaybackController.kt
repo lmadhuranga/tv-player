@@ -91,7 +91,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
 
     private val ticker = object : Runnable {
         override fun run() {
-            publishState()
+            publishPlaybackState()
             maybeSaveHistory()
             if (!released) handler.postDelayed(this, 500L)
         }
@@ -206,7 +206,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         if (released) return
         playbackIntent = !(player.isPlaying || player.playWhenReady)
         if (playbackIntent) player.play() else player.pause()
-        publishState()
+        publishPlaybackState()
     }
 
     /** Keep the existing player intact until a new video is selected. */
@@ -245,7 +245,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         if (released) return
         player.pause()
         playbackIntent = false
-        publishState()
+        publishPlaybackState()
         saveHistoryNow()
         if (hasTemporaryUploadSource) {
             player.stop()
@@ -266,7 +266,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         if (released) return
         val duration = player.duration.takeIf { it > 0 } ?: Long.MAX_VALUE
         player.seekTo((player.currentPosition + deltaMs).coerceIn(0L, duration))
-        publishState()
+        publishPlaybackState()
     }
 
     fun retryPlayback() {
@@ -313,7 +313,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         val index = speeds.indexOfFirst { it == current }
         val next = speeds[(index + 1).mod(speeds.size)]
         player.setPlaybackSpeed(next)
-        publishState()
+        publishPlaybackState()
     }
 
     fun toggleSubtitles() {
@@ -438,9 +438,9 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         }
     }
 
-    override fun onIsPlayingChanged(isPlaying: Boolean) = publishState()
+    override fun onIsPlayingChanged(isPlaying: Boolean) = publishPlaybackState()
     override fun onPlaybackStateChanged(playbackState: Int) {
-        publishState()
+        publishPlaybackState()
         if (playbackState == Player.STATE_ENDED && hasTemporaryUploadSource) {
             val uploadedVideoEnded = ownedUploadVideo != null
             clearOwnedUploads()
@@ -496,7 +496,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         )
     }
 
-    private fun publishState() {
+    private fun publishTrackState() {
         if (released) return
         trackOverrides.clear()
         val audioChoices = trackChoices(C.TRACK_TYPE_AUDIO)
@@ -505,20 +505,33 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             group.type == C.TRACK_TYPE_TEXT && (0 until group.length).any(group::isTrackSupported)
         }
         mutableState.value = mutableState.value.copy(
-            isPlaying = player.isPlaying,
-            hasMedia = currentVideoUrl != null,
-            isBuffering = player.playbackState == Player.STATE_BUFFERING && timedOutGeneration != sourceGeneration,
-            positionMs = player.currentPosition.coerceAtLeast(0L),
-            durationMs = player.duration.takeIf { it > 0L } ?: 0L,
-            bufferedPositionMs = player.bufferedPosition.coerceAtLeast(player.currentPosition.coerceAtLeast(0L)),
             audioChoices = audioChoices,
             videoVariantChoices = videoChoices,
             selectedVideoVariantKey = selectedVideoVariantKey,
             subtitlesAvailable = hasEmbeddedText || downloadedSubtitle != null,
             hasExternalSubtitles = downloadedSubtitle != null,
+        )
+    }
+
+    private fun publishPlaybackState() {
+        if (released) return
+        val position = player.currentPosition.coerceAtLeast(0L)
+        mutableState.value = mutableState.value.copy(
+            isPlaying = player.isPlaying,
+            hasMedia = currentVideoUrl != null,
+            isBuffering = player.playbackState == Player.STATE_BUFFERING && timedOutGeneration != sourceGeneration,
+            positionMs = position,
+            durationMs = player.duration.takeIf { it > 0L } ?: 0L,
+            bufferedPositionMs = player.bufferedPosition.coerceAtLeast(position),
             speed = player.playbackParameters.speed,
         )
     }
+
+    private fun publishState() {
+        publishTrackState()
+        publishPlaybackState()
+    }
+
 
     private fun startBufferingTimeout(generation: Long) {
         if (released || !playbackIntent || !player.playWhenReady || bufferingTimeoutJob?.isActive == true) return

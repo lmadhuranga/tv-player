@@ -552,3 +552,12 @@ Verification record:
 - Focused source assertions confirmed the supported speed list and wraparound/fallback behavior; `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed successfully.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 54: `54-reduce-player-ticker-work`
+
+Split playback-state publication into time-varying playback fields and track-menu data. The 500 ms ticker still updates position, duration, buffered position, playing/buffering state, and speed, but no longer scans Media3 track groups or rebuilds audio/video choices and track overrides. Track choices and embedded subtitle availability refresh on Media3 track changes and explicit audio/video selection actions. This removes repeated track traversal from the timer; it does not establish that device playback performance improved.
+
+Verification record:
+
+- `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- No TV contact, install, launch, or playback verification was performed.
