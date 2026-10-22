@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `72-home-recent-title-ellipsis` (local checks recorded below; no TV validation)
-- Current branch: `72-home-recent-title-ellipsis`
+- Implemented through milestone: `77-playback-keep-awake` (local checks recorded below; no TV validation)
+- Current branch: `77-playback-keep-awake`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -62,6 +62,7 @@
 | 58 | `58-half-progress-opacity` | pending local commit |
 | 71 | `71-outline-paused-indicator` | branch HEAD (`git rev-parse 71-outline-paused-indicator`) |
 | 72 | `72-home-recent-title-ellipsis` | pending local commit |
+| 77 | `77-playback-keep-awake` | branch HEAD (`git rev-parse 77-playback-keep-awake`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -768,3 +769,14 @@ Verification record:
 - Android documentation confirms `MANAGE_EXTERNAL_STORAGE` grants shared-storage paths and USB OTG roots and requires a system Settings route; this app checks the grant rather than assuming manifest declaration is sufficient.
 - `git diff --check` passed. `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (55 actionable tasks; 14 executed, 41 up-to-date). All five subtitle-matcher tests passed. Lint reports Android's expected `ScopedStorage` warning for `MANAGE_EXTERNAL_STORAGE` because Google Play restricts this permission; other SDK XML and pre-existing NDK metadata warnings remain.
 - No device contact, install, launch, input, or runtime validation was performed for this milestone.
+
+## Milestone 77: `77-playback-keep-awake`
+
+The player now sets Android's `FLAG_KEEP_SCREEN_ON` while a media source has an active play intent and Media3 has not ended or failed. This covers URL, USB/document, and local-file playback, including startup and buffering. Pausing, playback errors/stalls, ending, leaving the player, or stopping the activity clears the flag; disposal of the fullscreen player also clears it defensively. Android TV platform guidance identifies this flag as the supported way to prevent Ambient Mode during active video playback.
+
+Verification record:
+
+- Cause evidence: neither the activity nor player view previously set `FLAG_KEEP_SCREEN_ON` / `keepScreenOn`; Android's TV guidance says an activity without this flag enters Ambient Mode after inactivity.
+- Added unit coverage for intended playback during buffering and flag release after pause, end, playback error, or missing media.
+- `git diff --check` and `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed. Lint reports 28 existing warnings and 0 errors, including the known Google Play restriction warning for `MANAGE_EXTERNAL_STORAGE`.
+- No TV contact, installation, or runtime verification was performed.

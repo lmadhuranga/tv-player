@@ -30,12 +30,21 @@ import kotlinx.coroutines.delay
 import androidx.media3.ui.AspectRatioFrameLayout
 import kotlin.math.abs
 
+internal fun shouldKeepScreenOn(
+    playbackIntent: Boolean,
+    playWhenReady: Boolean,
+    hasMedia: Boolean,
+    playbackState: Int,
+    hasPlaybackError: Boolean,
+): Boolean = playbackIntent && playWhenReady && hasMedia && playbackState != Player.STATE_ENDED && !hasPlaybackError
+
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 data class PlaybackUiState(
     val title: String? = null,
     val hasMedia: Boolean = false,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
+    val shouldKeepScreenOn: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val bufferedPositionMs: Long = 0L,
@@ -161,6 +170,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         mutableState.value = PlaybackUiState(
             title = cleanTitle,
             hasMedia = true,
+            shouldKeepScreenOn = true,
             subtitlesEnabled = true,
             subtitleLoading = subtitleUrl != null || uploadedSubtitleFile != null || localSubtitleFile != null,
         )
@@ -307,7 +317,18 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         player.prepare()
         player.setPlaybackSpeed(speed)
         player.playWhenReady = playbackIntent
-        mutableState.value = mutableState.value.copy(error = null, canRetry = false, isBuffering = true)
+        mutableState.value = mutableState.value.copy(
+            error = null,
+            canRetry = false,
+            isBuffering = true,
+            shouldKeepScreenOn = shouldKeepScreenOn(
+                playbackIntent = playbackIntent,
+                playWhenReady = player.playWhenReady,
+                hasMedia = currentVideoUrl != null,
+                playbackState = player.playbackState,
+                hasPlaybackError = false,
+            ),
+        )
         val generation = sourceGeneration
         startBufferingTimeout(generation)
     }
@@ -515,6 +536,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         mutableState.value = mutableState.value.copy(
             isPlaying = false,
             isBuffering = false,
+            shouldKeepScreenOn = false,
             error = if (uploadedVideoFailure) "The uploaded video could not be played. Its temporary file was removed; send it again or try another file." else playbackErrorMessage(error),
             canRetry = currentVideoUrl != null,
             hasMedia = currentVideoUrl != null,
@@ -545,6 +567,13 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             isPlaying = player.isPlaying,
             hasMedia = currentVideoUrl != null,
             isBuffering = player.playbackState == Player.STATE_BUFFERING && timedOutGeneration != sourceGeneration,
+            shouldKeepScreenOn = shouldKeepScreenOn(
+                playbackIntent = playbackIntent,
+                playWhenReady = player.playWhenReady,
+                hasMedia = currentVideoUrl != null,
+                playbackState = player.playbackState,
+                hasPlaybackError = mutableState.value.error != null,
+            ),
             positionMs = position,
             durationMs = player.duration.takeIf { it > 0L } ?: 0L,
             bufferedPositionMs = player.bufferedPosition.coerceAtLeast(position),
@@ -566,6 +595,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
                 timedOutGeneration = generation
                 mutableState.value = mutableState.value.copy(
                     isBuffering = false,
+                    shouldKeepScreenOn = false,
                     error = STALL_ERROR,
                     canRetry = currentVideoUrl != null,
                 )

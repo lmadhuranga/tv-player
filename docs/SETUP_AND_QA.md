@@ -114,4 +114,11 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [ ] Revoke all-files access and confirm the app offers the explicit Settings route and preserves the indexed MediaStore video fallback. The fallback does not browse folders or discover sidecar subtitles.
 - [ ] On Android 10, confirm the app explains that direct folder browsing is unavailable and offers indexed-video playback where permitted. On older supported versions, verify READ_EXTERNAL_STORAGE and mounted-volume traversal.
 - [x] Milestone 76 `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed locally. Lint warns that Google Play restricts `MANAGE_EXTERNAL_STORAGE`; no TV installation, launch, or runtime validation was performed.
+
+### Milestone 77 playback keep-awake
+
+- [ ] During URL, USB/document, and local-file playback, wait past the TV's Ambient Mode timeout and confirm video remains visible. Confirm initial loading and network rebuffering also keep the TV awake.
+- [ ] Pause, allow media to end, trigger a playback/stall error, leave the player, and background the app; confirm each path releases the keep-screen-on behavior and normal TV sleep resumes.
+- [ ] `FLAG_KEEP_SCREEN_ON` state follows active playback intent and terminal playback status; fullscreen disposal clears it as a defensive lifecycle cleanup.
+- [x] `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed locally. Lint reports 28 warnings and 0 errors, including the existing `MANAGE_EXTERNAL_STORAGE` policy warning. No TV runtime verification was performed.
 - [x] Milestone 30 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the color change.
