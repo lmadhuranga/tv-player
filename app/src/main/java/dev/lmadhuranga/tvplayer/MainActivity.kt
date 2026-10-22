@@ -552,8 +552,8 @@ private fun UsbExplorerRow(
             ExplorerGlyph(icon, enabled)
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(name, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(metadata, color = if (enabled) Muted else Color(0xFF738091), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(name, color = if (enabled) Color.White else Color(0xFFAAB8C6), fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(metadata, color = if (enabled) Muted else Color(0xFF929EAC), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (trailingChevron) Text("›", color = Muted, fontSize = 26.sp)
         }

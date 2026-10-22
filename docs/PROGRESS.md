@@ -845,3 +845,12 @@ Verification record:
 - [x] `./gradlew :app:assembleDebug --console=plain` passed.
 - [ ] Buffering indicator appearance remains pending TV runtime verification.
 - No TV contact, installation, or runtime verification was performed for this change.
+
+## Milestone 84: `84-explorer-text-contrast`
+
+USB explorer row names now use explicit white text when actionable and readable medium gray when disabled. Metadata keeps its existing muted color for enabled rows and uses a lighter gray for disabled rows, improving legibility over both normal and focused dark row backgrounds. Font sizes, focus highlight, row layout, and actions are unchanged.
+
+Verification record:
+
+- [x] `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (39 actionable tasks; 4 executed, 35 up-to-date).
+- [ ] TV runtime appearance pending manual verification; no TV contact, installation, or runtime validation performed.
