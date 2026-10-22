@@ -61,6 +61,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -456,6 +458,7 @@ private fun UsbVideoBrowserScreen(
     val firstActionableEntry = entries.firstOrNull { it.isDirectory || it.canPlay }
     val listState = rememberLazyListState()
     var consumedParentKeyUp by remember { mutableStateOf(false) }
+    val breadcrumb = if (root != null && directory != null) usbBreadcrumb(root, directory) else "USB drives"
     TVBackground {
         Column(
             modifier = Modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -478,7 +481,15 @@ private fun UsbVideoBrowserScreen(
             verticalArrangement = Arrangement.Center,
         ) {
             Text("USB BROWSE", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
-            Text(directory?.name ?: "Choose a USB drive", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                breadcrumb,
+                color = Color.White,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.StartEllipsis,
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = breadcrumb },
+            )
             Spacer(Modifier.height(20.dp))
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -552,6 +563,15 @@ private fun UsbVideoBrowserScreen(
             firstEntryRequester.requestFocus()
         }
     }
+}
+
+private fun usbBreadcrumb(root: UsbRoot, directory: java.io.File): String {
+    val relativePath = runCatching { directory.canonicalFile.relativeTo(root.directory.canonicalFile).path }
+        .getOrNull()
+        ?.takeUnless { it == ".." || it.startsWith("..${java.io.File.separator}") }
+        .orEmpty()
+    val folders = relativePath.split(java.io.File.separatorChar).filter { it.isNotBlank() && it != "." }
+    return (listOf("USB") + folders).joinToString(" / ")
 }
 
 private enum class ExplorerIcon { DRIVE, PARENT, FOLDER, VIDEO, FILE }
