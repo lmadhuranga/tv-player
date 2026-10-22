@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `48-resume-history-backup` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `48-resume-history-backup`
+- Implemented through milestone: `51-hidden-ok-play-pause` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `51-hidden-ok-play-pause`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -522,3 +522,13 @@ Verification record:
 - Focused source assertions confirmed ±30-second KeyUp actions, ±60-second first-repeat actions, and hidden-key KeyUp consumption; `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - No TV contact, install, launch, or preview was performed. Remote hold timing and visible-controller focus behavior remain unverified on a device.
+
+## Milestone 51: `51-hidden-ok-play-pause`
+
+When fullscreen playback controls are hidden during loaded playback, D-pad Center/OK and Enter/Numpad Enter now toggle play/pause on the initial KeyDown. Repeated KeyDown events do not toggle again, and the matching KeyUp is consumed so a held select press cannot reveal or activate controls. With controls visible, select events continue to normal focus activation. Unloaded playback keeps its prior select behavior, and the media play/pause key is unchanged.
+
+Verification record:
+
+- Focused source assertions passed for select key codes, hidden/loaded gating, initial-KeyDown-only toggling, matching KeyUp consumption, and retained media play/pause handling; `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- No TV contact, install, launch, or preview is authorized or performed.

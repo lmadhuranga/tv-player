@@ -95,6 +95,7 @@ fun FullscreenPlayerScreen(
     var returningFromOptions by remember { mutableStateOf(false) }
     var consumedDownKeyUp by remember { mutableStateOf(false) }
     var consumedMediaKeyUp by remember { mutableStateOf(false) }
+    var consumedHiddenSelectKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenLeftKeyUp by remember { mutableStateOf(false) }
     var consumedHiddenRightKeyUp by remember { mutableStateOf(false) }
     var longHiddenLeftSeekTriggered by remember { mutableStateOf(false) }
@@ -247,7 +248,24 @@ fun FullscreenPlayerScreen(
             .focusProperties { canFocus = !controlsVisible }
             .onPreviewKeyEvent { event ->
                 val nativeKeyCode = event.nativeKeyEvent.keyCode
-                if (nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_REWIND ||
+                if (nativeKeyCode in setOf(
+                        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                        android.view.KeyEvent.KEYCODE_ENTER,
+                        android.view.KeyEvent.KEYCODE_NUMPAD_ENTER,
+                    ) && (consumedHiddenSelectKeyUp || (!controlsVisible && state.title != null))
+                ) {
+                    if (event.type == KeyEventType.KeyDown) {
+                        consumedHiddenSelectKeyUp = true
+                        if (event.nativeKeyEvent.repeatCount == 0) {
+                            interactionSerial++
+                            playback.togglePlayPause()
+                        }
+                        true
+                    } else if (event.type == KeyEventType.KeyUp && consumedHiddenSelectKeyUp) {
+                        consumedHiddenSelectKeyUp = false
+                        true
+                    } else false
+                } else if (nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_REWIND ||
                     nativeKeyCode == android.view.KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD
                 ) {
                     if (event.type == KeyEventType.KeyDown) {
