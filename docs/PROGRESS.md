@@ -714,3 +714,13 @@ Verification record:
 - Focused source checks confirmed the label reads `BuildConfig.VERSION_NAME`, BuildConfig generation is enabled, and version metadata remains unchanged. `git diff --check` passed.
 - `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 70: `70-fix-centered-paused-icon`
+
+The centered pause indicator now sets its Surface content color to white. Its canvas glyph reads `LocalContentColor`, so the explicit value makes the glyph visible over the translucent dark circle. The indicator remains centered and retains its loaded, paused, non-buffering, error-free condition; it remains non-focusable and non-clickable. Hidden progress and time labels are unchanged.
+
+Verification record:
+
+- Focused source assertions confirmed explicit white Surface content color, unchanged center alignment and state condition, no focus/click modifier, and unchanged hidden progress and label order. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, input, or screenshot was performed; device visibility remains unverified.

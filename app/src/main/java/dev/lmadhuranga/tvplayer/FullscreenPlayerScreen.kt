@@ -372,7 +372,10 @@ fun FullscreenPlayerScreen(
                 modifier = Modifier.align(Alignment.Center).size(88.dp)
                     .semantics { contentDescription = "Video paused" },
                 shape = CircleShape,
-                colors = SurfaceDefaults.colors(containerColor = Color(0x99000000)),
+                colors = SurfaceDefaults.colors(
+                    containerColor = Color(0x99000000),
+                    contentColor = Color.White,
+                ),
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     PlayerTransportIcon(PlayerTransportGlyph.PAUSE)
