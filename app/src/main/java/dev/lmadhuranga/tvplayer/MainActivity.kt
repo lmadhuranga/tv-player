@@ -350,7 +350,6 @@ private fun TVPlayerApp(
                 playback.playLocalFile(selection.video.file, subtitle?.file)
                 route = AppRoute.PLAYER
             },
-            onBack = { route = AppRoute.USB_BROWSER },
         )
 
         AppRoute.HANDOFF -> HandoffScreen(
@@ -675,10 +674,11 @@ private fun UsbSubtitleChoiceScreen(
     selection: UsbVideoSelection?,
     loading: Boolean,
     onPlay: (UsbEntry?) -> Unit,
-    onBack: () -> Unit,
 ) {
     var selected by remember(selection) { mutableStateOf(selection?.automaticSubtitle) }
     val firstChoice = remember { FocusRequester() }
+    val firstSubtitle = selection?.subtitles.orEmpty().firstOrNull { it.file == selected?.file }
+        ?: selection?.subtitles.orEmpty().firstOrNull()
     TVBackground {
         Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center) {
             Text("READY TO PLAY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
@@ -689,20 +689,22 @@ private fun UsbSubtitleChoiceScreen(
                     Text("SUBTITLE IN THIS FOLDER", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
                     when {
                         loading -> Text("Checking the video folder…", color = Muted, fontSize = 18.sp)
-                        selection?.subtitleStatus == SubtitleMatchStatus.AMBIGUOUS -> Text("More than one subtitle could fit. Choose one, or play without subtitles.", color = Muted, fontSize = 17.sp)
+                        selection?.subtitleStatus == SubtitleMatchStatus.AMBIGUOUS -> Text("More than one subtitle matches. Choose one to continue.", color = Muted, fontSize = 17.sp)
                         selection?.automaticSubtitle != null -> Text("A subtitle was selected automatically.", color = Muted, fontSize = 17.sp)
                         else -> Text("No subtitle was selected automatically.", color = Muted, fontSize = 17.sp)
                     }
-                    AppButton(onClick = { selected = null }, modifier = Modifier.focusRequester(firstChoice)) {
-                        Text(if (selected == null) "✓  Play without subtitles" else "Play without subtitles")
-                    }
                     selection?.subtitles.orEmpty().forEach { subtitle ->
-                        AppButton(onClick = { selected = subtitle }) {
+                        AppButton(
+                            onClick = { selected = subtitle },
+                            modifier = if (subtitle.file == firstSubtitle?.file) Modifier.focusRequester(firstChoice) else Modifier,
+                        ) {
                             Text((if (selected?.file == subtitle.file) "✓  " else "") + subtitle.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    AppButton(onClick = { onPlay(selected) }, modifier = Modifier) { Text("Play video", fontSize = 18.sp) }
-                    AppButton(onClick = onBack) { Text("Back to USB folders") }
+                    AppButton(
+                        onClick = { onPlay(selected) },
+                        modifier = if (firstSubtitle == null) Modifier.focusRequester(firstChoice) else Modifier,
+                    ) { Text("Play video", fontSize = 18.sp) }
                 }
             }
         }
