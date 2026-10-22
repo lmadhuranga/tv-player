@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `32-fullscreen-dark-timeline` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `32-fullscreen-dark-timeline`
+- Implemented through milestone: `37-auto-send-history` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `37-auto-send-history`
 - Planning baseline: `be2f7cc`; milestones 2–29 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -392,3 +392,13 @@ Verification record:
 - Focused source assertions confirmed the centered transport layout, narrow-width stacking, seek/toggle/speed actions, accessible descriptions, and unchanged timeline placement. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, or visual preview was performed. Runtime focus behavior and visual spacing remain unverified on-device.
+
+## Milestone 37: `37-auto-send-history`
+
+Recent video URL buttons now fill URL mode and call the same guarded Send operation as the manual button. Recent subtitle URLs do the same only when a syntactically valid active HTTP(S) video URL or a selected video file is ready; otherwise they fill the subtitle field and direct the user to choose a video first. The shared submit function checks `formBusy` synchronously, updates status before pairing/upload/play submission, and retains the existing approval, token, origin, and upload paths. History storage and manual Send behavior remain in place.
+
+Verification record:
+
+- Embedded handoff JavaScript passed `node --check`; focused source assertions passed for video history auto-submit, subtitle active-source guard, manual Send wiring, the shared `formBusy` guard, and unchanged 24-hour/20-entry history limits. `git diff --check` passed.
+- `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed with `BUILD SUCCESSFUL`.
+- No TV contact, install, launch, or preview was performed.
