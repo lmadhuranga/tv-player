@@ -105,4 +105,13 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 - [x] Milestone 29 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the layout change.
 
 - [ ] Verify on a phone/desktop browser that selected URL/File controls and Send stay dark blue/teal with readable white text, the keyboard focus ring remains clear, and disabled controls remain legible. Confirm no bright white button surface appears in the browser.
+
+### Milestone 76 USB folders and subtitles
+
+- [ ] On Android 11+, grant TV Player “Allow access to manage all files” in Android Settings, then browse each mounted removable USB volume and nested folders. Confirm Back moves up one folder and the drive root returns to the drive list.
+- [ ] Select USB videos with a matching SRT/WebVTT basename, with one unrelated subtitle, with multiple unrelated subtitles, and with duplicate basename subtitles. Confirm exact single basename match wins, a sole supported subtitle is selected, and ambiguous cases remain unselected until the user chooses manually.
+- [ ] Select a sibling subtitle manually, start playback, and verify the video continues if the sidecar is removed or unreadable. Confirm removing the USB produces a readable error and does not persist a stale path.
+- [ ] Revoke all-files access and confirm the app offers the explicit Settings route and preserves the indexed MediaStore video fallback. The fallback does not browse folders or discover sidecar subtitles.
+- [ ] On Android 10, confirm the app explains that direct folder browsing is unavailable and offers indexed-video playback where permitted. On older supported versions, verify READ_EXTERNAL_STORAGE and mounted-volume traversal.
+- [x] Milestone 76 `git diff --check`, `:app:testDebugUnitTest`, `:app:assembleDebug`, and `:app:lintDebug` passed locally. Lint warns that Google Play restricts `MANAGE_EXTERNAL_STORAGE`; no TV installation, launch, or runtime validation was performed.
 - [x] Milestone 30 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the color change.

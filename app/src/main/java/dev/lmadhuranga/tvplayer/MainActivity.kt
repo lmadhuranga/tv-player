@@ -2,8 +2,12 @@ package dev.lmadhuranga.tvplayer
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Build
+import android.os.Environment
 import android.os.Bundle
+import android.provider.Settings
+import android.net.Uri
 import android.view.Window
 import java.util.Locale
 import androidx.activity.ComponentActivity
@@ -85,7 +89,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class AppRoute { HOME, ADD_URL, HANDOFF, USB_BROWSER, PLAYER }
+private enum class AppRoute { HOME, ADD_URL, HANDOFF, USB_BROWSER, USB_SUBTITLES, PLAYER }
 
 @Composable
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
@@ -109,43 +113,107 @@ private fun TVPlayerApp(
     )
     val appScope = rememberCoroutineScope()
     val context = LocalContext.current
-    var usbVideos by remember { mutableStateOf<List<UsbVideo>>(emptyList()) }
+    var usbRoots by remember { mutableStateOf<List<UsbRoot>>(emptyList()) }
+    var usbRoot by remember { mutableStateOf<UsbRoot?>(null) }
+    var usbDirectory by remember { mutableStateOf<java.io.File?>(null) }
+    var usbEntries by remember { mutableStateOf<List<UsbEntry>>(emptyList()) }
+    var usbIndexedVideos by remember { mutableStateOf<List<UsbIndexedVideo>>(emptyList()) }
+    var usbSelection by remember { mutableStateOf<UsbVideoSelection?>(null) }
     var usbLoading by remember { mutableStateOf(false) }
     var usbError by remember { mutableStateOf<String?>(null) }
-    fun loadUsbVideos() {
+    fun loadUsbRoots() {
         route = AppRoute.USB_BROWSER
         usbLoading = true
         usbError = null
         appScope.launch {
-            runCatching { usbVideoRepository.listVideos() }
-                .onSuccess { videos ->
-                    usbVideos = videos
-                    usbError = if (videos.isEmpty()) "No indexed videos found on a mounted USB drive." else null
+            runCatching { usbVideoRepository.listRoots() }
+                .onSuccess { roots ->
+                    usbRoots = roots
+                    usbRoot = null
+                    usbDirectory = null
+                    usbEntries = emptyList()
+                    usbIndexedVideos = emptyList()
+                    usbError = if (roots.isEmpty()) "No mounted USB drive is available. Connect a drive and try again." else null
                 }
                 .onFailure { error ->
-                    usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not read videos from USB storage."
+                    usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not read USB storage."
                 }
             usbLoading = false
         }
     }
-    val usbPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_VIDEO
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
+    fun loadIndexedUsbVideos() {
+        route = AppRoute.USB_BROWSER
+        usbLoading = true
+        usbError = null
+        appScope.launch {
+            runCatching { usbVideoRepository.listIndexedVideos() }
+                .onSuccess { videos ->
+                    usbIndexedVideos = videos
+                    usbError = if (videos.isEmpty()) "No indexed USB videos were found. Folder and subtitle browsing needs full storage access." else "Showing indexed videos. Enable full storage access to browse folders and subtitles."
+                }
+                .onFailure { error -> usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not read indexed USB videos." }
+            usbLoading = false
+        }
     }
+    fun openUsbDirectory(root: UsbRoot, directory: java.io.File) {
+        usbLoading = true
+        usbError = null
+        appScope.launch {
+            runCatching { usbVideoRepository.listEntries(root, directory) }
+                .onSuccess { entries ->
+                    usbRoot = root
+                    usbDirectory = directory
+                    usbEntries = entries
+                    usbError = if (entries.isEmpty()) "This folder has no supported videos or folders." else null
+                }
+                .onFailure { error ->
+                    usbError = error.message?.takeIf(String::isNotBlank) ?: "Could not read this USB folder."
+                }
+            usbLoading = false
+        }
+    }
+    val usbPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_VIDEO else Manifest.permission.READ_EXTERNAL_STORAGE
     val usbPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) loadUsbVideos() else {
+        if (granted) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) loadIndexedUsbVideos() else loadUsbRoots()
+        } else {
             route = AppRoute.USB_BROWSER
-            usbError = "Allow video access to browse movies on the TV's USB drive."
+            usbError = "Video access was not allowed. Folder and subtitle browsing needs full storage access."
+        }
+    }
+    val allFilesSettingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) loadUsbRoots()
+        else {
+            route = AppRoute.USB_BROWSER
+            usbError = "USB folder browsing needs the storage access setting. Enable it, then try again."
         }
     }
     fun browseUsb() {
-        if (context.checkSelfPermission(usbPermission) == PackageManager.PERMISSION_GRANTED) {
-            loadUsbVideos()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager()) loadUsbRoots() else {
+                route = AppRoute.USB_BROWSER
+                usbError = "Allow TV Player to manage files so it can browse USB folders and subtitle files."
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            route = AppRoute.USB_BROWSER
+            usbError = "Folder browsing on Android 10 is not available on this TV."
+        } else if (context.checkSelfPermission(usbPermission) == PackageManager.PERMISSION_GRANTED) {
+            loadUsbRoots()
         } else {
             route = AppRoute.USB_BROWSER
             usbPermissionLauncher.launch(usbPermission)
         }
+    }
+    fun requestUsbStorageAccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:${context.packageName}")
+            }
+            runCatching { allFilesSettingsLauncher.launch(intent) }
+                .onFailure {
+                    allFilesSettingsLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                }
+        } else browseUsb()
     }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) playback.loadSubtitleFile(uri)
@@ -175,8 +243,18 @@ private fun TVPlayerApp(
 
     BackHandler(enabled = settingsOpen || (route != AppRoute.HOME && route != AppRoute.PLAYER)) {
         if (settingsOpen) settingsOpen = false else {
-            if (route == AppRoute.PLAYER) playback.pauseForBackground()
-            route = AppRoute.HOME
+            route = when (route) {
+                AppRoute.USB_SUBTITLES -> AppRoute.USB_BROWSER
+                AppRoute.USB_BROWSER -> {
+                    val currentRoot = usbRoot
+                    val current = usbDirectory
+                    if (currentRoot != null && current != null && current.canonicalFile != currentRoot.directory.canonicalFile) {
+                        openUsbDirectory(currentRoot, current.parentFile ?: currentRoot.directory)
+                        AppRoute.USB_BROWSER
+                    } else AppRoute.HOME
+                }
+                else -> AppRoute.HOME
+            }
         }
     }
 
@@ -202,15 +280,50 @@ private fun TVPlayerApp(
         )
 
         AppRoute.USB_BROWSER -> UsbVideoBrowserScreen(
-            videos = usbVideos,
+            roots = usbRoots,
+            root = usbRoot,
+            directory = usbDirectory,
+            entries = usbEntries,
+            needsStorageAccess = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager(),
+            indexedVideos = usbIndexedVideos,
             loading = usbLoading,
             error = usbError,
-            onSelect = { video ->
-                playback.playDocument(video.uri)
-                route = AppRoute.PLAYER
+            onChooseRoot = { root -> openUsbDirectory(root, root.directory) },
+            onOpenFolder = { entry -> usbRoot?.let { root -> openUsbDirectory(root, entry.file) } },
+            onChooseVideo = { entry ->
+                usbLoading = true
+                appScope.launch {
+                    runCatching { usbVideoRepository.selection(entry) }
+                        .onSuccess { usbSelection = it; usbLoading = false; route = AppRoute.USB_SUBTITLES }
+                        .onFailure { usbLoading = false; usbError = it.message ?: "Could not read the selected USB video." }
+                }
+            },
+            onParent = {
+                val currentRoot = usbRoot
+                val current = usbDirectory
+                if (currentRoot == null || current == null || current.canonicalFile == currentRoot.directory.canonicalFile) loadUsbRoots()
+                else openUsbDirectory(currentRoot, current.parentFile ?: currentRoot.directory)
+            },
+            onRequestAccess = ::requestUsbStorageAccess,
+            onIndexedVideo = { video -> playback.playDocument(video.uri); route = AppRoute.PLAYER },
+            onShowIndexedVideos = {
+                if (context.checkSelfPermission(usbPermission) != PackageManager.PERMISSION_GRANTED) {
+                    usbPermissionLauncher.launch(usbPermission)
+                } else loadIndexedUsbVideos()
             },
             onRetry = ::browseUsb,
             onBack = { route = AppRoute.HOME },
+        )
+
+        AppRoute.USB_SUBTITLES -> UsbSubtitleChoiceScreen(
+            selection = usbSelection,
+            loading = usbLoading,
+            onPlay = { subtitle ->
+                val selection = usbSelection ?: return@UsbSubtitleChoiceScreen
+                playback.playLocalFile(selection.video.file, subtitle?.file)
+                route = AppRoute.PLAYER
+            },
+            onBack = { route = AppRoute.USB_BROWSER },
         )
 
         AppRoute.HANDOFF -> HandoffScreen(
@@ -307,21 +420,32 @@ private data class PendingPlayback(val url: String, val subtitleUrl: String?, va
 
 @Composable
 private fun UsbVideoBrowserScreen(
-    videos: List<UsbVideo>,
+    roots: List<UsbRoot>,
+    root: UsbRoot?,
+    directory: java.io.File?,
+    entries: List<UsbEntry>,
+    indexedVideos: List<UsbIndexedVideo>,
     loading: Boolean,
     error: String?,
-    onSelect: (UsbVideo) -> Unit,
+    needsStorageAccess: Boolean,
+    onChooseRoot: (UsbRoot) -> Unit,
+    onOpenFolder: (UsbEntry) -> Unit,
+    onChooseVideo: (UsbEntry) -> Unit,
+    onParent: () -> Unit,
+    onRequestAccess: () -> Unit,
+    onShowIndexedVideos: () -> Unit,
+    onIndexedVideo: (UsbIndexedVideo) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val firstVideoRequester = remember { FocusRequester() }
+    val firstEntryRequester = remember { FocusRequester() }
     TVBackground {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
         ) {
-            Text("USB VIDEOS", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
-            Text("Choose a video to play", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold)
+            Text("USB BROWSE", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
+            Text(directory?.name ?: "Choose a USB drive", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(20.dp))
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -336,24 +460,47 @@ private fun UsbVideoBrowserScreen(
                         loading -> Text("Scanning mounted USB drives…", color = Muted, fontSize = 20.sp)
                         error != null -> {
                             Text(error, color = Muted, fontSize = 20.sp)
-                            AppButton(onClick = onRetry, modifier = Modifier.focusRequester(firstVideoRequester)) {
-                                Text("Try again")
+                            if (root != null && directory != null) {
+                                AppButton(onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester)) {
+                                    Text(if (directory.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder")
+                                }
+                            }
+                            if (needsStorageAccess) AppButton(onClick = onRequestAccess, modifier = Modifier.focusRequester(firstEntryRequester)) {
+                                Text("Allow USB folder access")
+                            }
+                            if (needsStorageAccess || indexedVideos.isEmpty()) AppButton(onClick = onShowIndexedVideos, modifier = if (!needsStorageAccess) Modifier.focusRequester(firstEntryRequester) else Modifier) {
+                                Text("Show indexed videos")
+                            }
+                            AppButton(onClick = onRetry, modifier = Modifier) {
+                                Text("Scan USB drives")
+                            }
+                            indexedVideos.forEach { video ->
+                                AppButton(onClick = { onIndexedVideo(video) }) {
+                                    Column {
+                                        Text(video.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("${video.folder} · ${formatFileSize(video.sizeBytes)}", color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
                             }
                         }
-                        else -> videos.forEachIndexed { index, video ->
-                            AppButton(
-                                onClick = { onSelect(video) },
-                                modifier = if (index == 0) Modifier.focusRequester(firstVideoRequester) else Modifier,
-                            ) {
+                        root == null -> roots.forEachIndexed { index, usbRoot ->
+                            AppButton(onClick = { onChooseRoot(usbRoot) }, modifier = if (index == 0) Modifier.focusRequester(firstEntryRequester) else Modifier) {
                                 Column {
-                                    Text(video.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(
-                                        "${video.folder} · ${formatFileSize(video.sizeBytes)}",
-                                        color = Muted,
-                                        fontSize = 14.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
+                                    Text(usbRoot.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(usbRoot.directory.path, color = Muted, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                        else -> {
+                            AppButton(onClick = onParent, modifier = Modifier.focusRequester(firstEntryRequester)) {
+                                Text(if (directory?.canonicalFile == root.directory.canonicalFile) "USB drives" else "Up one folder")
+                            }
+                            entries.forEach { entry ->
+                                AppButton(onClick = { if (entry.isDirectory) onOpenFolder(entry) else onChooseVideo(entry) }) {
+                                    Column {
+                                        Text((if (entry.isDirectory) "📁  " else "▶  ") + entry.name, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        if (!entry.isDirectory) Text(formatFileSize(entry.sizeBytes), color = Muted, fontSize = 14.sp)
+                                    }
                                 }
                             }
                         }
@@ -363,9 +510,49 @@ private fun UsbVideoBrowserScreen(
             }
         }
     }
-    LaunchedEffect(loading, error, videos.size) {
-        if (!loading && (error != null || videos.isNotEmpty())) firstVideoRequester.requestFocus()
+    LaunchedEffect(loading, error, roots.size, entries.size, root) {
+        if (!loading) firstEntryRequester.requestFocus()
     }
+}
+
+@Composable
+private fun UsbSubtitleChoiceScreen(
+    selection: UsbVideoSelection?,
+    loading: Boolean,
+    onPlay: (UsbEntry?) -> Unit,
+    onBack: () -> Unit,
+) {
+    var selected by remember(selection) { mutableStateOf(selection?.automaticSubtitle) }
+    val firstChoice = remember { FocusRequester() }
+    TVBackground {
+        Column(Modifier.fillMaxSize().padding(28.dp), verticalArrangement = Arrangement.Center) {
+            Text("READY TO PLAY", color = Teal, fontSize = 16.sp, letterSpacing = 2.sp)
+            Text(selection?.video?.name ?: "Reading USB video…", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(16.dp))
+            Surface(modifier = Modifier.fillMaxSize(), shape = RoundedCornerShape(24.dp), colors = SurfaceDefaults.colors(containerColor = Color(0xFF102239))) {
+                Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("SUBTITLE IN THIS FOLDER", color = Teal, fontSize = 14.sp, letterSpacing = 1.sp)
+                    when {
+                        loading -> Text("Checking the video folder…", color = Muted, fontSize = 18.sp)
+                        selection?.subtitleStatus == SubtitleMatchStatus.AMBIGUOUS -> Text("More than one subtitle could fit. Choose one, or play without subtitles.", color = Muted, fontSize = 17.sp)
+                        selection?.automaticSubtitle != null -> Text("A subtitle was selected automatically.", color = Muted, fontSize = 17.sp)
+                        else -> Text("No subtitle was selected automatically.", color = Muted, fontSize = 17.sp)
+                    }
+                    AppButton(onClick = { selected = null }, modifier = Modifier.focusRequester(firstChoice)) {
+                        Text(if (selected == null) "✓  Play without subtitles" else "Play without subtitles")
+                    }
+                    selection?.subtitles.orEmpty().forEach { subtitle ->
+                        AppButton(onClick = { selected = subtitle }) {
+                            Text((if (selected?.file == subtitle.file) "✓  " else "") + subtitle.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    AppButton(onClick = { onPlay(selected) }, modifier = Modifier) { Text("Play video", fontSize = 18.sp) }
+                    AppButton(onClick = onBack) { Text("Back to USB folders") }
+                }
+            }
+        }
+    }
+    LaunchedEffect(selection, loading) { if (!loading) firstChoice.requestFocus() }
 }
 
 private fun formatFileSize(bytes: Long): String {

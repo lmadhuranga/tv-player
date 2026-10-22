@@ -124,6 +124,7 @@ class PlaybackController(context: Context, private val historyRepository: Histor
         subtitleUrl: String? = null,
         startPositionMs: Long = 0L,
         uploadedSubtitleFile: java.io.File? = null,
+        localSubtitleFile: java.io.File? = null,
         titleOverride: String? = null,
         uploadedVideoFile: java.io.File? = null,
     ) {
@@ -161,17 +162,20 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             title = cleanTitle,
             hasMedia = true,
             subtitlesEnabled = true,
-            subtitleLoading = subtitleUrl != null || uploadedSubtitleFile != null,
+            subtitleLoading = subtitleUrl != null || uploadedSubtitleFile != null || localSubtitleFile != null,
         )
         player.setMediaItem(MediaItem.fromUri(Uri.parse(url)), startPositionMs.coerceAtLeast(0L))
         player.prepare()
         player.playWhenReady = true
         playbackIntent = true
-        if (subtitleUrl != null || uploadedSubtitleFile != null) {
+        if (subtitleUrl != null || uploadedSubtitleFile != null || localSubtitleFile != null) {
             subtitleJob = scope.launch {
                 try {
-                    val cached = if (uploadedSubtitleFile != null) subtitleRepository.importFile(uploadedSubtitleFile)
-                    else subtitleRepository.download(subtitleUrl!!)
+                    val cached = when {
+                        uploadedSubtitleFile != null -> subtitleRepository.importFile(uploadedSubtitleFile)
+                        localSubtitleFile != null -> subtitleRepository.importFile(localSubtitleFile)
+                        else -> subtitleRepository.download(subtitleUrl!!)
+                    }
                     if (released || generation != sourceGeneration) {
                         subtitleRepository.discard(cached)
                         return@launch
@@ -215,6 +219,12 @@ class PlaybackController(context: Context, private val historyRepository: Histor
             ?.takeIf(String::isNotBlank)
             ?: "USB video"
         playUrl(uri.toString(), titleOverride = displayName)
+    }
+
+    fun playLocalFile(videoFile: java.io.File, subtitleFile: java.io.File?) {
+        if (released) return
+        val title = videoFile.name.filterNot(Char::isISOControl).take(120).ifBlank { "USB video" }
+        playUrl(Uri.fromFile(videoFile).toString(), titleOverride = title, localSubtitleFile = subtitleFile)
     }
 
     fun togglePlayPause() {
