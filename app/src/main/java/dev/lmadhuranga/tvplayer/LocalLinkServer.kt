@@ -525,7 +525,7 @@ class LocalLinkServer(
         if (previewGrants.size >= 32) previewGrants.clear()
         val ticket = Base64.encodeToString(ByteArray(32).also(SecureRandom()::nextBytes),
             Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
-        previewGrants[ticket] = PreviewGrant(root, path, name, peer, now + if (download) 15L * 60L * 1000L else 4L * 60L * 60L * 1000L, download)
+        previewGrants[ticket] = PreviewGrant(root, path, name, peer, now + (if (download) 15L * 60L * 1000L else 4L * 60L * 60L * 1000L), download)
         return ticket
     }
 
@@ -588,7 +588,7 @@ class LocalLinkServer(
                     file.seek(window.first)
                     val buffer = ByteArray(64 * 1024)
                     var remaining = window.length
-                    while (remaining > 0L && isCurrent(listener, runId)) {
+                    while (remaining > 0L && isCurrent(listener, runId) && previewGrants[ticket] === grant) {
                         val count = file.read(buffer, 0, minOf(remaining, buffer.size.toLong()).toInt())
                         if (count < 0) break
                         output.write(buffer, 0, count)
