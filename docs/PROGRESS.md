@@ -694,3 +694,13 @@ Verification record:
 - Focused source checks confirmed centered placement and paused-state gating, retained semantic description, side-by-side button order, and preserved callbacks and focus requester.
 - `git diff --check` passed. `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 68: `68-home-to-qr-navigation`
+
+Added a Home “Send to TV” action beside Settings that opens the existing QR/Handoff screen. Settings keeps its focus requester and return-focus behavior; Recently played actions and Handoff Back-to-Home routing are unchanged.
+
+Verification record:
+
+- Focused source checks confirmed the Home action calls `AppRoute.HANDOFF`, Settings retains its focus requester, Recently played replay wiring remains present, and Handoff Back still targets Home. `git diff --check` passed.
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 actionable tasks; 4 executed, 33 up-to-date).
+- No TV contact, install, launch, or preview was performed.

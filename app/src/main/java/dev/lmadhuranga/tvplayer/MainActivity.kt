@@ -138,6 +138,7 @@ private fun TVPlayerApp(
         AppRoute.HOME -> HomeScreen(
             entries = recentEntries,
             settingsRequester = settingsOpenerRequester,
+            onSendToTv = { route = AppRoute.HANDOFF },
             onOpenSettings = { settingsOpen = true },
             onReplay = { entry ->
                 val url = entry.mediaUrl ?: return@HomeScreen
@@ -249,6 +250,7 @@ private data class PendingPlayback(val url: String, val subtitleUrl: String?, va
 private fun HomeScreen(
     entries: List<HistoryEntry>,
     settingsRequester: FocusRequester,
+    onSendToTv: () -> Unit,
     onOpenSettings: () -> Unit,
     onReplay: (HistoryEntry) -> Unit,
 ) {
@@ -277,11 +279,16 @@ private fun HomeScreen(
                     fontSize = 21.sp,
                 )
                 Spacer(Modifier.height(34.dp))
-                AppButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier.focusRequester(settingsRequester),
-                ) {
-                    Text("Settings", fontSize = 18.sp)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AppButton(onClick = onSendToTv) {
+                        Text("Send to TV", fontSize = 18.sp)
+                    }
+                    AppButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier.focusRequester(settingsRequester),
+                    ) {
+                        Text("Settings", fontSize = 18.sp)
+                    }
                 }
             }
             Spacer(Modifier.width(56.dp))
