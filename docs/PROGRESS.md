@@ -402,3 +402,12 @@ Verification record:
 - Embedded handoff JavaScript passed `node --check`; focused source assertions passed for video history auto-submit, subtitle active-source guard, manual Send wiring, the shared `formBusy` guard, and unchanged 24-hour/20-entry history limits. `git diff --check` passed.
 - `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed with `BUILD SUCCESSFUL`.
 - No TV contact, install, launch, or preview was performed.
+
+## Milestone 38: `38-seedr-player-controls`
+
+Reshaped the fullscreen controller around the supplied Seedr Android TV reference: circular dark controls turn white when focused, with a circular back/settings header, a thin timeline and elapsed/total labels directly above the controls, subtitle/audio buttons at left, centered transport buttons, and an options button at right. Visible skip buttons seek by 10 seconds and expose matching accessible labels. D-pad Left/Right while controls are hidden still seeks by 30 seconds; timeline focus still seeks by 10 seconds. Playback speed remains available in Player Options, and the existing auto-hide, title, subtitle/audio, buffering, and error behavior remain wired.
+
+Verification record:
+
+- `./gradlew :app:assembleDebug --console=plain` completed `BUILD SUCCESSFUL` (37 tasks; 4 executed, 33 up-to-date). `git diff --check` and focused source assertions confirmed the circular control styling, timeline above the control row, visible ±10-second seek wiring, hidden-control ±30-second seeking, and retained options and subtitle/audio actions.
+- No TV contact, install, launch, or preview was performed. Layout, button focus colors, and remote navigation need visual device verification.

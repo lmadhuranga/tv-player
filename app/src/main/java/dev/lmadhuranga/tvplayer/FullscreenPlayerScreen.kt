@@ -3,11 +3,9 @@ package dev.lmadhuranga.tvplayer
 import android.view.Window
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -59,6 +58,8 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 
 import androidx.tv.material3.Surface
+import androidx.tv.material3.Button as TvButton
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
@@ -350,11 +351,14 @@ fun FullscreenPlayerScreen(
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.95f)))),
             )
             Column(
-                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 58.dp, vertical = 26.dp),
+                modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(horizontal = 32.dp, vertical = 26.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    AppButton(onClick = { interacted(onHome) }, modifier = Modifier.focusRequester(backFocus)) { Text("‹  Back", fontSize = 17.sp) }
+                    PlayerCircleButton(
+                        onClick = { interacted(onHome) },
+                        modifier = Modifier.focusRequester(backFocus).semantics { contentDescription = "Back" },
+                    ) { Text("‹", fontSize = 34.sp) }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             state.title ?: "TV PLAYER",
@@ -375,17 +379,17 @@ fun FullscreenPlayerScreen(
                             fontSize = 15.sp,
                         )
                     }
-                    AppButton(
+                    PlayerCircleButton(
                         onClick = { interacted { openOptions() } },
-                        modifier = Modifier.focusRequester(optionsFocus),
-                    ) { Text("⚙  Options", fontSize = 17.sp) }
+                        modifier = Modifier.focusRequester(optionsFocus).semantics { contentDescription = "Player options" },
+                    ) { Text("⚙", fontSize = 22.sp) }
                 }
             }
 
             Column(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .padding(start = 58.dp, end = 58.dp, top = 24.dp, bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(start = 32.dp, end = 32.dp, top = 24.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 state.error?.let { message ->
                     Text(message, color = Color(0xFFFFC2B7), fontSize = 16.sp)
@@ -395,66 +399,44 @@ fun FullscreenPlayerScreen(
                     }
                 }
                 state.subtitleError?.let { Text("Subtitle unavailable: $it", color = Color(0xFFFFB4A9), fontSize = 14.sp) }
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    if (maxWidth < 720.dp) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SubtitleAudioControls(
-                                subtitlesEnabled = state.subtitlesEnabled,
-                                subtitlesAvailable = state.subtitlesAvailable,
-                                showAudio = state.audioChoices.size > 1,
-                                audioFocus = audioFocus,
-                                onToggleSubtitles = { interacted(playback::toggleSubtitles) },
-                                onOpenAudio = { interacted { openOptions(fromAudioButton = true) } },
-                            )
-                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                TransportControls(
-                                    isPlaying = state.isPlaying,
-                                    speed = state.speed,
-                                    enabled = state.title != null,
-                                    playFocus = playFocus,
-                                    onSeekBackward = { interacted { playback.seekBy(-30_000L) } },
-                                    onTogglePlayback = { interacted(playback::togglePlayPause) },
-                                    onSeekForward = { interacted { playback.seekBy(30_000L) } },
-                                    onCycleSpeed = { interacted(playback::cycleSpeed) },
-                                )
-                            }
-                        }
-                    } else {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            SubtitleAudioControls(
-                                subtitlesEnabled = state.subtitlesEnabled,
-                                subtitlesAvailable = state.subtitlesAvailable,
-                                showAudio = state.audioChoices.size > 1,
-                                audioFocus = audioFocus,
-                                modifier = Modifier.align(Alignment.CenterStart),
-                                onToggleSubtitles = { interacted(playback::toggleSubtitles) },
-                                onOpenAudio = { interacted { openOptions(fromAudioButton = true) } },
-                            )
-                            TransportControls(
-                                isPlaying = state.isPlaying,
-                                speed = state.speed,
-                                enabled = state.title != null,
-                                playFocus = playFocus,
-                                modifier = Modifier.align(Alignment.Center),
-                                onSeekBackward = { interacted { playback.seekBy(-30_000L) } },
-                                onTogglePlayback = { interacted(playback::togglePlayPause) },
-                                onSeekForward = { interacted { playback.seekBy(30_000L) } },
-                                onCycleSpeed = { interacted(playback::cycleSpeed) },
-                            )
-                        }
-                    }
-                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(formatPlayerTime(state.positionMs), color = Color.White.copy(alpha = 0.62f), fontSize = 14.sp)
-                    Spacer(Modifier.weight(1f))
-                    Text(formatPlayerTime(state.durationMs), color = Color.White.copy(alpha = 0.42f), fontSize = 14.sp)
+                    Text(formatPlayerTime(state.positionMs), color = Color.White, fontSize = 14.sp)
+                    Spacer(Modifier.width(12.dp))
+                    PlayerProgress(
+                        positionMs = state.positionMs,
+                        bufferedPositionMs = state.bufferedPositionMs,
+                        durationMs = state.durationMs,
+                        onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(formatPlayerTime(state.durationMs), color = Color.White, fontSize = 14.sp)
                 }
-                PlayerProgress(
-                    positionMs = state.positionMs,
-                    bufferedPositionMs = state.bufferedPositionMs,
-                    durationMs = state.durationMs,
-                    onSeekBy = { delta -> interacted { playback.seekBy(delta) } },
-                )
+                Box(modifier = Modifier.fillMaxWidth().height(58.dp)) {
+                    SubtitleAudioControls(
+                        subtitlesEnabled = state.subtitlesEnabled,
+                        subtitlesAvailable = state.subtitlesAvailable,
+                        showAudio = state.audioChoices.size > 1,
+                        audioFocus = audioFocus,
+                        modifier = Modifier.align(Alignment.CenterStart),
+                        onToggleSubtitles = { interacted(playback::toggleSubtitles) },
+                        onOpenAudio = { interacted { openOptions(fromAudioButton = true) } },
+                    )
+                    TransportControls(
+                        isPlaying = state.isPlaying,
+                        enabled = state.title != null,
+                        playFocus = playFocus,
+                        modifier = Modifier.align(Alignment.Center),
+                        onSeekBackward = { interacted { playback.seekBy(-10_000L) } },
+                        onTogglePlayback = { interacted(playback::togglePlayPause) },
+                        onSeekForward = { interacted { playback.seekBy(10_000L) } },
+                    )
+                    PlayerCircleButton(
+                        onClick = { interacted { openOptions() } },
+                        modifier = Modifier.align(Alignment.CenterEnd).semantics { contentDescription = "Player options" },
+                        diameter = 50.dp,
+                    ) { Text("•••", fontSize = 19.sp, fontWeight = FontWeight.Bold) }
+                }
             }
         }
     }
@@ -475,12 +457,14 @@ private fun SubtitleAudioControls(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        AppButton(onClick = onToggleSubtitles, enabled = subtitlesAvailable) {
-            Text(if (subtitlesEnabled) "CC  On" else "CC  Off", fontSize = 16.sp)
-        }
+        PlayerCircleButton(
+            onClick = onToggleSubtitles,
+            enabled = subtitlesAvailable,
+            modifier = Modifier.semantics { contentDescription = if (subtitlesEnabled) "Turn subtitles off" else "Turn subtitles on" },
+        ) { Text("CC", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
         if (showAudio) {
-            AppButton(onClick = onOpenAudio, modifier = Modifier.focusRequester(audioFocus)) {
-                Text("Audio", fontSize = 16.sp)
+            PlayerCircleButton(onClick = onOpenAudio, modifier = Modifier.focusRequester(audioFocus).semantics { contentDescription = "Audio tracks" }) {
+                Text("◖))", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -489,52 +473,90 @@ private fun SubtitleAudioControls(
 @Composable
 private fun TransportControls(
     isPlaying: Boolean,
-    speed: Float,
     enabled: Boolean,
     playFocus: FocusRequester,
     modifier: Modifier = Modifier,
     onSeekBackward: () -> Unit,
     onTogglePlayback: () -> Unit,
     onSeekForward: () -> Unit,
-    onCycleSpeed: () -> Unit,
 ) {
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        AppButton(
+        PlayerCircleButton(
             onClick = onSeekBackward,
             enabled = enabled,
-            modifier = Modifier.semantics { contentDescription = "Seek backward 30 seconds" },
-        ) { Text("⏪︎", fontSize = 22.sp) }
-        AppButton(
+            modifier = Modifier.semantics { contentDescription = "Seek backward 10 seconds" },
+            diameter = 56.dp,
+        ) { Text("-10", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+        PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Previous item unavailable" }, diameter = 56.dp) {
+            Text("|◀", fontSize = 19.sp)
+        }
+        PlayerCircleButton(
             onClick = onTogglePlayback,
             enabled = enabled,
             modifier = Modifier.focusRequester(playFocus).semantics {
                 contentDescription = if (isPlaying) "Pause video" else "Play video"
             },
-        ) { Text(if (isPlaying) "⏸︎" else "▶︎", fontSize = 22.sp) }
-        AppButton(
+            diameter = 64.dp,
+        ) { Text(if (isPlaying) "Ⅱ" else "▶", fontSize = 25.sp, fontWeight = FontWeight.Bold) }
+        PlayerCircleButton(onClick = {}, enabled = false, modifier = Modifier.semantics { contentDescription = "Next item unavailable" }, diameter = 56.dp) {
+            Text("▶|", fontSize = 19.sp)
+        }
+        PlayerCircleButton(
             onClick = onSeekForward,
             enabled = enabled,
-            modifier = Modifier.semantics { contentDescription = "Seek forward 30 seconds" },
-        ) { Text("⏩︎", fontSize = 22.sp) }
-        AppButton(onClick = onCycleSpeed, enabled = enabled) { Text("${speed}×", fontSize = 16.sp) }
+            modifier = Modifier.semantics { contentDescription = "Seek forward 10 seconds" },
+            diameter = 56.dp,
+        ) { Text("+10", fontSize = 15.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
 @Composable
-private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationMs: Long, onSeekBy: (Long) -> Unit) {
+private fun PlayerCircleButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    diameter: androidx.compose.ui.unit.Dp = 50.dp,
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
+) {
+    TvButton(
+        onClick = onClick,
+        modifier = modifier.size(diameter),
+        enabled = enabled,
+        shape = ButtonDefaults.shape(
+            shape = CircleShape,
+            focusedShape = CircleShape,
+            pressedShape = CircleShape,
+            disabledShape = CircleShape,
+            focusedDisabledShape = CircleShape,
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        colors = ButtonDefaults.colors(
+            containerColor = Color(0xFF252525),
+            contentColor = Color.White,
+            focusedContainerColor = Color.White,
+            focusedContentColor = Color(0xFF111111),
+            pressedContainerColor = Color.White,
+            pressedContentColor = Color(0xFF111111),
+            disabledContainerColor = Color(0xFF151515),
+            disabledContentColor = Color(0xFF5E5E5E),
+        ),
+        content = content,
+    )
+}
+
+@Composable
+private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationMs: Long, onSeekBy: (Long) -> Unit, modifier: Modifier = Modifier) {
     var focused by remember { mutableStateOf(false) }
     val progress = if (durationMs > 0L) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     val buffered = if (durationMs > 0L) (bufferedPositionMs.toFloat() / durationMs).coerceIn(progress, 1f) else 0f
     Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(if (focused) 14.dp else 7.dp)
-            .background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
-            .then(if (focused) Modifier.border(2.dp, Color.White, RoundedCornerShape(8.dp)) else Modifier)
+            .then(modifier)
+            .height(12.dp)
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionLeft) {
@@ -549,8 +571,12 @@ private fun PlayerProgress(positionMs: Long, bufferedPositionMs: Long, durationM
             }
             .focusable(),
     ) {
-        Box(Modifier.fillMaxWidth(buffered).height(if (focused) 14.dp else 7.dp).background(Color.White.copy(alpha = 0.34f), RoundedCornerShape(8.dp)))
-        Box(Modifier.fillMaxWidth(progress).height(if (focused) 14.dp else 7.dp).background(Color.White.copy(alpha = 0.68f), RoundedCornerShape(8.dp)))
+        Box(Modifier.fillMaxWidth().height(4.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(buffered).height(4.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.27f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(4.dp).align(Alignment.CenterStart).background(Color.White.copy(alpha = 0.84f), RoundedCornerShape(4.dp)))
+        Box(Modifier.fillMaxWidth(progress).height(12.dp), contentAlignment = Alignment.CenterEnd) {
+            Box(Modifier.size(if (focused) 12.dp else 8.dp).background(if (focused) Color(0xFF52A6FF) else Color.White, CircleShape))
+        }
     }
 }
 
