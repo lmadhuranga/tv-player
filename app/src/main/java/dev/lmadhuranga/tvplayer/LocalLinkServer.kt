@@ -74,7 +74,7 @@ class LocalLinkServer(
     private val generation = AtomicLong(0L)
     @Volatile private var server: ServerSocket? = null
     @Volatile private var activeSocket: Socket? = null
-    @Volatile private var approvalRequestInProgress = false
+    @Volatile private var approvalSocket: Socket? = null
     @Volatile private var sessionToken: String = ""
     private var pendingApproval: PendingApproval? = null
     private var lastApprovalRequestAtMs = 0L
@@ -138,7 +138,7 @@ class LocalLinkServer(
         server = null
         stopped.set(true)
         generation.incrementAndGet()
-        approvalRequestInProgress = false
+        approvalSocket = null
         sessionToken = ""
         releasePendingApproval()
         mutableState.value = HandoffState(message = message)
@@ -149,9 +149,9 @@ class LocalLinkServer(
         if (stopped.getAndSet(true)) return
         generation.incrementAndGet()
         sessionToken = ""
-        val wasAwaitingApproval = approvalRequestInProgress
+        val awaitingSocket = activeSocket?.takeIf { approvalSocket === it }
         releasePendingApproval()
-        if (!wasAwaitingApproval) try { activeSocket?.close() } catch (_: Exception) { }
+        if (awaitingSocket == null) try { activeSocket?.close() } catch (_: Exception) { }
         activeSocket = null
         val current = server
         server = null
@@ -199,7 +199,7 @@ class LocalLinkServer(
         val failedGeneration = generation.incrementAndGet()
         server = null
         activeSocket = null
-        approvalRequestInProgress = false
+        approvalSocket = null
         sessionToken = ""
         releasePendingApproval()
         try { listener.close() } catch (_: Exception) { }
@@ -482,7 +482,7 @@ class LocalLinkServer(
             lastApprovalRequestAtMs = now
             PendingApproval(UUID.randomUUID().toString(), requesterDevice, requesterAddress).also {
                 pendingApproval = it
-                approvalRequestInProgress = true
+                approvalSocket = socket
                 publishPairingState(message = null)
             }
         }
@@ -525,7 +525,9 @@ class LocalLinkServer(
             respond(output, response.first, response.second, response.third,
                 if (response.first == 200) "application/json; charset=utf-8" else "text/plain; charset=utf-8")
         } finally {
-            synchronized(this) { approvalRequestInProgress = false }
+            synchronized(this) {
+                if (approvalSocket === socket) approvalSocket = null
+            }
         }
     }
 
