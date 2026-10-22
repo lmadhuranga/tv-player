@@ -501,7 +501,7 @@ fun FullscreenPlayerScreen(
 
         if (state.isBuffering) {
             StatusPill(
-                text = "Loading${".".repeat(loadingDots)}  ·  ${formatPlayerTime(state.bufferedPositionMs)} buffered",
+                text = ".".repeat(loadingDots),
                 modifier = Modifier.align(Alignment.Center),
             )
         }

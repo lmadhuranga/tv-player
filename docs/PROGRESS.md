@@ -834,3 +834,14 @@ Verification record:
 - [x] `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --console=plain` passed (`BUILD SUCCESSFUL`; 55 actionable tasks, 17 executed, 38 up-to-date).
 - [ ] URL, browser-upload, USB buffering states, visible/hidden speed behavior, and bottom Options focus remain pending runtime verification.
 - No TV contact, installation, or runtime validation was performed for this change.
+
+## Milestone 83: `83-buffering-dots-only`
+
+The centered buffering indicator now displays only its existing animated dots. Buffering detection and the network-speed UI are unchanged.
+
+Verification record:
+
+- [x] `git diff --check` passed.
+- [x] `./gradlew :app:assembleDebug --console=plain` passed.
+- [ ] Buffering indicator appearance remains pending TV runtime verification.
+- No TV contact, installation, or runtime verification was performed for this change.
