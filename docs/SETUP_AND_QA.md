@@ -97,3 +97,6 @@ Source supports direct HTTP(S), progressive playback, and Media3 HLS/DASH module
 
 - [ ] On the phone handoff page, verify the subtitle section starts collapsed with only “Add subtitle” available; activating it reveals URL/File controls, history, and size guidance. Check `aria-expanded` and `aria-controls`, and confirm the toggle is disabled while sending.
 - [ ] Close the subtitle section after entering a URL or choosing a file; confirm both selections clear, mode resets to URL, and the next video-only send contains no subtitle. Select a subtitle-history entry and confirm it opens the section and fills the URL without submitting.
+
+- [ ] On the phone handoff page, verify the compact dark card at narrow and wide widths, no horizontal overflow, readable focus states, and touch-sized full-width controls. Confirm the subtitle section starts collapsed, URL/File modes and history still work, approval status is visible, and progress/Cancel appear only during file transfers.
+- [x] Milestone 29 source/build checks are recorded in `docs/PROGRESS.md`; no browser visual preview or TV contact was performed for the layout change.

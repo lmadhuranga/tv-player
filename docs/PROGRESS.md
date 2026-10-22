@@ -3,8 +3,8 @@
 ## Current state
 
 - Date: 2026-10-22
-- Implemented through milestone: `28-collapsible-subtitle` (source implementation and local checks recorded below; no TV interaction for this milestone)
-- Current branch: `28-collapsible-subtitle`
+- Implemented through milestone: `29-minimal-phone-page` (source implementation and local checks recorded below; no TV interaction for this milestone)
+- Current branch: `29-minimal-phone-page`
 - Planning baseline: `be2f7cc`; milestones 2–27 are committed sequentially on local branches (full mapping below).
 - The milestone 19 APK was previously installed/launched on the authorized Sony BRAVIA VU3 (Android API 34). Milestone 25 later included limited handoff/player inspection, a successful browser URL send, and Settings persistence checks; details and remaining runtime gaps are recorded below.
 
@@ -52,6 +52,7 @@
 | 26 | `26-darker-qr-page` | `3ad257b` |
 | 27 | `27-remote-pair-approval` | `08fb00a` |
 | 28 | `28-collapsible-subtitle` | `de73547` |
+| 29 | `29-minimal-phone-page` | branch HEAD (`git rev-parse 29-minimal-phone-page`) |
 
 ## Milestone 2: `2-android-tv-skeleton`
 
@@ -307,3 +308,14 @@ Verification record:
 - With JDK `17.0.17`, Gradle `8.13`, and SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 25 lint warnings, zero errors).
 - Extracted the embedded handoff script to `/tmp/tv-player-handoff.js`; `node --check /tmp/tv-player-handoff.js` passed. Source assertions covered initial collapsed/disabled state, accessibility attributes, clear/reset on close, busy lock, history reveal/fill order, optional subtitle send, and hidden-state guards. `git diff --check` passed.
 - No TV contact, install, or launch was performed. Visual phone-browser behavior remains unverified in a browser.
+
+
+## Milestone 29: `29-minimal-phone-page`
+
+Simplified the paired-phone handoff form into a compact dark card with a concise heading, short field labels, touch-sized full-width controls, and responsive safe-area spacing. The layout stays centered on wider screens and switches to compact padding on narrow screens. Removed the long instructional paragraph and redundant upload-limit helper; the current TV upload limit appears after pairing. The optional subtitle remains collapsed by default with its URL/File controls and history inside. The URL/File selectors, history selection/clear action, remote approval wait, progress/status messaging, and form busy lock remain intact. Upload progress and Cancel are hidden unless a file transfer is active.
+
+Verification record:
+
+- With JDK `17.0.17`, Gradle `8.13`, and SDK `36`, `./gradlew :app:assembleDebug :app:lintDebug --console=plain` completed `BUILD SUCCESSFUL` (48 tasks; 25 lint warnings, zero errors).
+- Extracted the embedded handoff page and script to `/tmp/tv-player-handoff.html` and `/tmp/tv-player-handoff.js`. `node --check /tmp/tv-player-handoff.js`, assertions for responsive styles, accessible mode groups, collapsed subtitle, and upload-only progress/cancel, and `git diff --check` passed.
+- No TV contact, install, launch, or visual browser preview was performed. The static HTML preview is available for narrow and wide browser inspection; do not submit its form because it is a local file without the TV backend.
